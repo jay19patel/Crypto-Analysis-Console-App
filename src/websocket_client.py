@@ -90,7 +90,7 @@ class CryptoWebSocketClient:
         print(f"╚══════════════════════════════════════════════════════════════╝{Style.RESET_ALL}")
         
         print(f"\n{Fore.CYAN}{'='*60}")
-        print(f"Last Update: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Last Update: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')}")
         print(f"{'='*60}{Style.RESET_ALL}")
         
         # Sort symbols for consistent display order

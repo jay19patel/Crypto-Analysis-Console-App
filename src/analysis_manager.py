@@ -32,11 +32,12 @@ class AnalysisManager:
             data.EMA([5, 15, 50])
             data.RSI(14)
             data.MACD()
+            data.ATR(14)  # Added ATR to default indicators
             data.Supertrend()
             data.ADX()
             data.VWAP()
             data.ZSCORE(20)
-            self.print_message("✅ Default indicators loaded successfully!", "green")
+            self.print_message("✅ All default indicators loaded successfully!", "green")
         except Exception as e:
             self.print_message(f"❌ Error setting up indicators: {e}", "red")
             raise
@@ -218,7 +219,7 @@ class AnalysisManager:
             change_text = "[white]N/A[/white]"
         
         price_table.add_row("💵 Current Price", f"{current_price:.4f}", change_text)
-        price_table.add_row("📅 Last Update", f"{data.df.index[-1].strftime('%Y-%m-%d %H:%M:%S')}", "🔄 Live")
+        price_table.add_row("📅 Last Update", f"{data.df.index[-1].strftime('%Y-%m-%d %I:%M:%S %p')}", "🔄 Live")
         price_table.add_row("📊 Volume", f"{latest['volume']:,.0f}", "📦 Active")
         price_table.add_row("🎯 High", f"{latest['high']:.4f}", "⬆️")
         price_table.add_row("🎯 Low", f"{latest['low']:.4f}", "⬇️")
@@ -233,15 +234,55 @@ class AnalysisManager:
         indicators_table.add_column("🎯 Signal", style="bold", width=25)
         indicators_table.add_column("💡 Interpretation", style="cyan", width=20)
         
-        # Add various analysis methods
+        # Add various analysis methods - ALL AVAILABLE INDICATORS
+        self._add_ema_analysis(indicators_table, data.df, latest, current_price)
         self._add_rsi_analysis(indicators_table, data.df, latest)
         self._add_macd_analysis(indicators_table, data.df, latest)
+        self._add_atr_analysis(indicators_table, data.df, latest)
         self._add_supertrend_analysis(indicators_table, data.df, latest)
         self._add_vwap_analysis(indicators_table, data.df, latest, current_price)
         self._add_adx_analysis(indicators_table, data.df, latest)
         self._add_zscore_analysis(indicators_table, data.df, latest)
         
         return indicators_table
+    
+    def _add_ema_analysis(self, table, df, latest, current_price):
+        """Add EMA analysis to indicators table"""
+        ema_cols = [col for col in df.columns if col.startswith('EMA_')]
+        for col in ema_cols:
+            if not pd.isna(latest[col]):
+                ema_value = latest[col]
+                period = col.split('_')[1]
+                
+                if current_price > ema_value:
+                    signal = "[green]📈 Above EMA[/green]"
+                    interpretation = "[green]Bullish[/green]"
+                else:
+                    signal = "[red]📉 Below EMA[/red]"
+                    interpretation = "[red]Bearish[/red]"
+                
+                table.add_row(f"📊 EMA_{period}", f"{ema_value:.4f}", signal, interpretation)
+    
+    def _add_atr_analysis(self, table, df, latest):
+        """Add ATR analysis to indicators table"""
+        atr_cols = [col for col in df.columns if col.startswith('ATR_')]
+        for col in atr_cols:
+            if not pd.isna(latest[col]):
+                atr_value = latest[col]
+                period = col.split('_')[1]
+                
+                # ATR interpretation based on volatility
+                if atr_value > latest['close'] * 0.02:  # More than 2% of price
+                    signal = "[red]🔥 High Volatility[/red]"
+                    interpretation = "[red]Volatile[/red]"
+                elif atr_value > latest['close'] * 0.01:  # More than 1% of price
+                    signal = "[yellow]⚡ Medium Volatility[/yellow]"
+                    interpretation = "[yellow]Moderate[/yellow]"
+                else:
+                    signal = "[green]😌 Low Volatility[/green]"
+                    interpretation = "[green]Stable[/green]"
+                
+                table.add_row(f"📏 ATR_{period}", f"{atr_value:.4f}", signal, interpretation)
     
     def _add_rsi_analysis(self, table, df, latest):
         """Add RSI analysis to indicators table"""
@@ -361,7 +402,7 @@ class AnalysisManager:
     
     def _show_footer(self):
         """Display footer with timestamp"""
-        footer_text = f"⏰ Analysis generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} IST"
+        footer_text = f"⏰ Analysis generated at: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')} IST"
         footer_panel = Panel(
             footer_text,
             border_style="blue",

@@ -337,7 +337,7 @@ class HistoricalData:
             change_text = "[white]N/A[/white]"
         
         price_table.add_row("💵 Current Price", f"{current_price:.4f}", change_text)
-        price_table.add_row("📅 Last Update", f"{self.df.index[-1].strftime('%Y-%m-%d %H:%M:%S')}", "🔄 Live")
+        price_table.add_row("📅 Last Update", f"{self.df.index[-1].strftime('%Y-%m-%d %I:%M:%S %p')}", "🔄 Live")
         price_table.add_row("📊 Volume", f"{latest['volume']:,.0f}", "📦 Active")
         price_table.add_row("🎯 High", f"{latest['high']:.4f}", "⬆️")
         price_table.add_row("🎯 Low", f"{latest['low']:.4f}", "⬇️")
@@ -348,6 +348,22 @@ class HistoricalData:
         indicators_table.add_column("📊 Value", style="yellow", width=15)
         indicators_table.add_column("🎯 Signal", style="bold", width=25)
         indicators_table.add_column("💡 Interpretation", style="cyan", width=20)
+        
+        # EMA Analysis
+        ema_cols = [col for col in self.df.columns if col.startswith('EMA_')]
+        for col in ema_cols:
+            if not pd.isna(latest[col]):
+                ema_value = latest[col]
+                period = col.split('_')[1]
+                
+                if current_price > ema_value:
+                    signal = "[green]📈 Above EMA[/green]"
+                    interpretation = "[green]Bullish[/green]"
+                else:
+                    signal = "[red]📉 Below EMA[/red]"
+                    interpretation = "[red]Bearish[/red]"
+                
+                indicators_table.add_row(f"📊 EMA_{period}", f"{ema_value:.4f}", signal, interpretation)
         
         # RSI Analysis
         rsi_cols = [col for col in self.df.columns if col.startswith('RSI_')]
@@ -383,6 +399,26 @@ class HistoricalData:
                         signal = "[red]📉 Bearish[/red]"
                         interpretation = "[red]Downtrend[/red]"
                     indicators_table.add_row("🎯 MACD", f"{macd_val:.4f}", signal, interpretation)
+        
+        # ATR Analysis
+        atr_cols = [col for col in self.df.columns if col.startswith('ATR_')]
+        for col in atr_cols:
+            if not pd.isna(latest[col]):
+                atr_value = latest[col]
+                period = col.split('_')[1]
+                
+                # ATR interpretation based on volatility
+                if atr_value > current_price * 0.02:  # More than 2% of price
+                    signal = "[red]🔥 High Volatility[/red]"
+                    interpretation = "[red]Volatile[/red]"
+                elif atr_value > current_price * 0.01:  # More than 1% of price
+                    signal = "[yellow]⚡ Medium Volatility[/yellow]"
+                    interpretation = "[yellow]Moderate[/yellow]"
+                else:
+                    signal = "[green]😌 Low Volatility[/green]"
+                    interpretation = "[green]Stable[/green]"
+                
+                indicators_table.add_row(f"📏 ATR_{period}", f"{atr_value:.4f}", signal, interpretation)
         
         # Supertrend Analysis
         st_signal_cols = [col for col in self.df.columns if col == 'Supertrend_Signal']
@@ -481,7 +517,7 @@ class HistoricalData:
             ))
         
         # Footer with timestamp
-        footer_text = f"⏰ Analysis generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} IST"
+        footer_text = f"⏰ Analysis generated at: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')} IST"
         footer_panel = Panel(
             footer_text,
             border_style="blue",
