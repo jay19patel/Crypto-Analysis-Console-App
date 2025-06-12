@@ -5,32 +5,30 @@ from datetime import datetime, timedelta
 import time
 import numpy as np
 from typing import List, Union, Optional
-import argparse
-import sys
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
-from rich.live import Live
-from rich.layout import Layout
-from rich import box
 
 
 class HistoricalData:
     """
     Historical Data Technical Analysis Class using pandas-ta
+    Focuses on data fetching and indicator calculations only.
     
     Usage:
+        # For data and indicators only
         data = HistoricalData("ETHUSD")
         data.EMA([5, 15])  # Adds EMA_5, EMA_15 columns
         data.RSI(window=14)  # Adds RSI_14 column
         data.MACD()  # Adds MACD columns
         
-        # Get current market status
-        data.get_current_analysis()
+        # For display and analysis management, use AnalysisManager:
+        from analysis_manager import AnalysisManager
+        manager = AnalysisManager()
+        manager.initialize_data("ETHUSD")
+        manager.show_analysis(manager.data)
         
-        # Refresh all data and indicators
-        data.refresh()
+        # Or direct access to data
+        df = data.get_data()  # Get DataFrame with all indicators
+        latest = data.get_latest_data()  # Get latest candle data
+        data.refresh()  # Refresh all data and indicators
     """
     
     def __init__(self, symbol: str = 'BTCUSD', resolution: str = '5m', days: int = 10):
@@ -40,14 +38,13 @@ class HistoricalData:
         Args:
             symbol (str): Trading pair symbol (default: 'BTCUSD')
             resolution (str): Timeframe - '1m', '5m', '15m', '1h', '1d' (default: '5m')
-            days (int): Number of days of historical data (default: 30)
+            days (int): Number of days of historical data (default: 10)
         """
         self.symbol = symbol
         self.resolution = resolution
         self.days = days
         self.df = None
         self.applied_indicators = []  # Track applied indicators for refresh
-        self.console = Console()
         
         # Fetch data on initialization
         self._fetch_data()
@@ -294,237 +291,6 @@ class HistoricalData:
         # Track for refresh functionality
         if ('ZSCORE', window) not in self.applied_indicators:
             self.applied_indicators.append(('ZSCORE', window))
-    
-    def get_current_analysis(self):
-        """
-        Display current market analysis with attractive console-based tables
-        """
-        if self.df is None:
-            self.console.print("[red]❌ No data available.[/red]")
-            return
-        
-        latest = self.df.iloc[-1]
-        current_price = latest['close']
-        
-        # Create main layout
-        layout = Layout()
-        
-        # Header Panel
-        header_text = Text(f"📊 TECHNICAL ANALYSIS DASHBOARD", style="bold white")
-        header_panel = Panel(
-            header_text,
-            title=f"🚀 {self.symbol}",
-            title_align="left",
-            border_style="blue",
-            box=box.DOUBLE_EDGE
-        )
-        
-        # Price Info Table
-        price_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
-        price_table.add_column("📈 Market Data", style="cyan", width=20)
-        price_table.add_column("💰 Value", style="yellow", width=25)
-        price_table.add_column("📊 Status", style="green", width=20)
-        
-        # Calculate 24h change if possible
-        if len(self.df) > 1:
-            prev_price = self.df.iloc[-2]['close']
-            change = current_price - prev_price
-            change_pct = (change / prev_price) * 100
-            change_color = "green" if change >= 0 else "red"
-            change_symbol = "📈" if change >= 0 else "📉"
-            change_text = f"[{change_color}]{change_symbol} {change:+.4f} ({change_pct:+.2f}%)[/{change_color}]"
-        else:
-            change_text = "[white]N/A[/white]"
-        
-        price_table.add_row("💵 Current Price", f"{current_price:.4f}", change_text)
-        price_table.add_row("📅 Last Update", f"{self.df.index[-1].strftime('%Y-%m-%d %I:%M:%S %p')}", "🔄 Live")
-        price_table.add_row("📊 Volume", f"{latest['volume']:,.0f}", "📦 Active")
-        price_table.add_row("🎯 High", f"{latest['high']:.4f}", "⬆️")
-        price_table.add_row("🎯 Low", f"{latest['low']:.4f}", "⬇️")
-        
-        # Technical Indicators Table
-        indicators_table = Table(show_header=True, header_style="bold cyan", box=box.ROUNDED)
-        indicators_table.add_column("🔍 Indicator", style="white", width=18)
-        indicators_table.add_column("📊 Value", style="yellow", width=15)
-        indicators_table.add_column("🎯 Signal", style="bold", width=25)
-        indicators_table.add_column("💡 Interpretation", style="cyan", width=20)
-        
-        # EMA Analysis
-        ema_cols = [col for col in self.df.columns if col.startswith('EMA_')]
-        for col in ema_cols:
-            if not pd.isna(latest[col]):
-                ema_value = latest[col]
-                period = col.split('_')[1]
-                
-                if current_price > ema_value:
-                    signal = "[green]📈 Above EMA[/green]"
-                    interpretation = "[green]Bullish[/green]"
-                else:
-                    signal = "[red]📉 Below EMA[/red]"
-                    interpretation = "[red]Bearish[/red]"
-                
-                indicators_table.add_row(f"📊 EMA_{period}", f"{ema_value:.4f}", signal, interpretation)
-        
-        # RSI Analysis
-        rsi_cols = [col for col in self.df.columns if col.startswith('RSI_')]
-        for col in rsi_cols:
-            if not pd.isna(latest[col]):
-                rsi_value = latest[col]
-                if rsi_value > 70:
-                    signal = "[red]🔴 Overbought[/red]"
-                    interpretation = "[red]Sell Signal[/red]"
-                elif rsi_value < 30:
-                    signal = "[green]🟢 Oversold[/green]"
-                    interpretation = "[green]Buy Signal[/green]"
-                else:
-                    signal = "[yellow]⚪ Normal[/yellow]"
-                    interpretation = "[yellow]Neutral[/yellow]"
-                indicators_table.add_row(f"📊 {col}", f"{rsi_value:.2f}", signal, interpretation)
-        
-        # MACD Analysis
-        macd_cols = [col for col in self.df.columns if col.startswith('MACD_') and not 'Signal' in col and not 'Histogram' in col]
-        for col in macd_cols:
-            if not pd.isna(latest[col]):
-                signal_col = col.replace('MACD_', 'MACD_Signal_').split('_')
-                signal_col = 'MACD_Signal_' + signal_col[-1]
-                
-                if signal_col in self.df.columns:
-                    macd_val = latest[col]
-                    signal_val = latest[signal_col]
-                    
-                    if macd_val > signal_val:
-                        signal = "[green]📈 Bullish[/green]"
-                        interpretation = "[green]Uptrend[/green]"
-                    else:
-                        signal = "[red]📉 Bearish[/red]"
-                        interpretation = "[red]Downtrend[/red]"
-                    indicators_table.add_row("🎯 MACD", f"{macd_val:.4f}", signal, interpretation)
-        
-        # ATR Analysis
-        atr_cols = [col for col in self.df.columns if col.startswith('ATR_')]
-        for col in atr_cols:
-            if not pd.isna(latest[col]):
-                atr_value = latest[col]
-                period = col.split('_')[1]
-                
-                # ATR interpretation based on volatility
-                if atr_value > current_price * 0.02:  # More than 2% of price
-                    signal = "[red]🔥 High Volatility[/red]"
-                    interpretation = "[red]Volatile[/red]"
-                elif atr_value > current_price * 0.01:  # More than 1% of price
-                    signal = "[yellow]⚡ Medium Volatility[/yellow]"
-                    interpretation = "[yellow]Moderate[/yellow]"
-                else:
-                    signal = "[green]😌 Low Volatility[/green]"
-                    interpretation = "[green]Stable[/green]"
-                
-                indicators_table.add_row(f"📏 ATR_{period}", f"{atr_value:.4f}", signal, interpretation)
-        
-        # Supertrend Analysis
-        st_signal_cols = [col for col in self.df.columns if col == 'Supertrend_Signal']
-        for col in st_signal_cols:
-            if not pd.isna(latest[col]):
-                if latest[col] == 1:
-                    signal = "[green]🟢 UPTREND[/green]"
-                    interpretation = "[green]Buy Zone[/green]"
-                else:
-                    signal = "[red]🔴 DOWNTREND[/red]"
-                    interpretation = "[red]Sell Zone[/red]"
-                indicators_table.add_row("⚡ Supertrend", f"{latest[col]}", signal, interpretation)
-        
-        # VWAP Analysis
-        if 'VWAP' in self.df.columns and not pd.isna(latest['VWAP']):
-            vwap_val = latest['VWAP']
-            if current_price > vwap_val:
-                signal = "[green]📈 Above VWAP[/green]"
-                interpretation = "[green]Bullish[/green]"
-            else:
-                signal = "[red]📉 Below VWAP[/red]"
-                interpretation = "[red]Bearish[/red]"
-            indicators_table.add_row("💎 VWAP", f"{vwap_val:.4f}", signal, interpretation)
-        
-        # ADX Analysis
-        adx_cols = [col for col in self.df.columns if col.startswith('ADX_')]
-        for col in adx_cols:
-            if not pd.isna(latest[col]):
-                adx_val = latest[col]
-                window = col.split('_')[1]
-                
-                di_plus_col = f'DI_Plus_{window}'
-                di_minus_col = f'DI_Minus_{window}'
-                
-                if di_plus_col in self.df.columns and di_minus_col in self.df.columns:
-                    di_plus = latest[di_plus_col]
-                    di_minus = latest[di_minus_col]
-                    
-                    if adx_val > 25:
-                        strength = "[green]Strong[/green]"
-                    else:
-                        strength = "[yellow]Weak[/yellow]"
-                    
-                    if di_plus > di_minus:
-                        direction = "[green]📈 Uptrend[/green]"
-                        interpretation = "[green]Bullish[/green]"
-                    else:
-                        direction = "[red]📉 Downtrend[/red]"
-                        interpretation = "[red]Bearish[/red]"
-                    
-                    indicators_table.add_row("🎪 ADX", f"{adx_val:.2f}", f"{strength} {direction}", interpretation)
-        
-        # Z-Score Analysis
-        zscore_cols = [col for col in self.df.columns if col.startswith('ZSCORE_')]
-        for col in zscore_cols:
-            if not pd.isna(latest[col]):
-                zscore_val = latest[col]
-                
-                if zscore_val > 2:
-                    signal = "[red]🔴 Extremely Overbought[/red]"
-                    interpretation = "[red]Strong Sell[/red]"
-                elif zscore_val > 1:
-                    signal = "[yellow]🟡 Overbought[/yellow]"
-                    interpretation = "[yellow]Consider Sell[/yellow]"
-                elif zscore_val < -2:
-                    signal = "[green]🟢 Extremely Oversold[/green]"
-                    interpretation = "[green]Strong Buy[/green]"
-                elif zscore_val < -1:
-                    signal = "[yellow]🟡 Oversold[/yellow]"
-                    interpretation = "[yellow]Consider Buy[/yellow]"
-                else:
-                    signal = "[white]⚪ Normal Range[/white]"
-                    interpretation = "[white]Neutral[/white]"
-                
-                indicators_table.add_row(f"📐 {col}", f"{zscore_val:.2f}", signal, interpretation)
-        
-        # Display everything
-        self.console.print(header_panel)
-        self.console.print("")
-        self.console.print(price_table)
-        self.console.print("")
-        
-        if len(indicators_table.rows) > 0:
-            indicators_panel = Panel(
-                indicators_table,
-                title="🔍 Technical Indicators Analysis",
-                border_style="green",
-                box=box.ROUNDED
-            )
-            self.console.print(indicators_panel)
-        else:
-            self.console.print(Panel(
-                "[yellow]No technical indicators calculated yet. Use methods like EMA(), RSI(), MACD() to add indicators.[/yellow]",
-                title="ℹ️ Information",
-                border_style="yellow"
-            ))
-        
-        # Footer with timestamp
-        footer_text = f"⏰ Analysis generated at: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')} IST"
-        footer_panel = Panel(
-            footer_text,
-            border_style="blue",
-            box=box.ASCII
-        )
-        self.console.print("")
-        self.console.print(footer_panel)
     
     def refresh(self):
         """

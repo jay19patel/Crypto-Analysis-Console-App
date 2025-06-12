@@ -133,18 +133,11 @@ class SystemChecker:
                 results.append((check_name, False))
             print()  # Add spacing between checks
         
-        # Summary
-        print(f"{Fore.YELLOW}{'='*60}")
-        print(f"Check Summary")
-        print(f"{'='*60}{Style.RESET_ALL}")
+       
         
         passed = sum(1 for _, result in results if result)
         total = len(results)
-        
-        for check_name, result in results:
-            status = f"{Fore.GREEN}PASS{Style.RESET_ALL}" if result else f"{Fore.RED}FAIL{Style.RESET_ALL}"
-            print(f"  {check_name}: {status}")
-        
+                
         print(f"\n{Fore.CYAN}Overall: {passed}/{total} checks passed{Style.RESET_ALL}")
         
         if passed == total:

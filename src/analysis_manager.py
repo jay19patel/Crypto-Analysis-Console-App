@@ -20,10 +20,30 @@ from technical_analysis import HistoricalData
 class AnalysisManager:
     """
     Complete technical analysis management including execution and display
+    Handles UI/display while HistoricalData focuses on data & calculations
+    
+    Usage:
+        # Initialize and run single analysis
+        manager = AnalysisManager()
+        manager.run_single_analysis("BTCUSD")
+        
+        # Run continuous analysis loop
+        manager.run_analysis_loop("ETHUSD", refresh_interval=30)
+        
+        # Manual control
+        manager.initialize_data("BTCUSD", resolution="1h", days=30)
+        manager.add_indicator("EMA", [10, 20, 50])
+        manager.show_analysis(manager.data)
+        manager.refresh_analysis()
+        
+        # Direct data access
+        data = manager.get_current_data()
+        df = data.get_data() if data else None
     """
     
     def __init__(self):
         self.console = Console()
+        self.data = None  # Current HistoricalData instance
     
     def setup_default_indicators(self, data):
         """Setup default technical indicators for analysis"""
@@ -42,6 +62,31 @@ class AnalysisManager:
             self.print_message(f"❌ Error setting up indicators: {e}", "red")
             raise
     
+    def initialize_data(self, symbol, resolution='5m', days=10):
+        """
+        Initialize data with technical indicators
+        
+        Args:
+            symbol (str): Trading symbol
+            resolution (str): Timeframe  
+            days (int): Historical data days
+            
+        Returns:
+            bool: Success status
+        """
+        try:
+            self.print_message(f"🚀 Initializing analysis for {symbol}...", "cyan")
+            self.data = HistoricalData(symbol=symbol, resolution=resolution, days=days)
+            
+            self.setup_default_indicators(self.data)
+            
+            self.print_message("✅ Analysis ready!", "green")
+            return True
+            
+        except Exception as e:
+            self.print_message(f"❌ Error: {e}", "red")
+            return False
+    
     def run_single_analysis(self, symbol, resolution='5m', days=10):
         """
         Run analysis once
@@ -51,22 +96,12 @@ class AnalysisManager:
             resolution (str): Timeframe
             days (int): Historical data days
         """
-        try:
-            self.print_message(f"🚀 Initializing analysis for {symbol}...", "cyan")
-            data = HistoricalData(symbol=symbol, resolution=resolution, days=days)
-            
-            self.setup_default_indicators(data)
-            
-            self.print_message("✅ Analysis ready!", "green")
-            self.print_message("=" * 80, "white")
-            
-            self.show_analysis(data)
-            
-            return True
-            
-        except Exception as e:
-            self.print_message(f"❌ Error: {e}", "red")
+        if not self.initialize_data(symbol, resolution, days):
             return False
+            
+        self.print_message("=" * 80, "white")
+        self.show_analysis(self.data)
+        return True
     
     def run_analysis_loop(self, symbol, refresh_interval, resolution='5m', days=10):
         """
@@ -78,14 +113,11 @@ class AnalysisManager:
             resolution (str): Timeframe
             days (int): Historical data days
         """
+        # Initialize data first
+        if not self.initialize_data(symbol, resolution, days):
+            return False
+        
         try:
-            # Initialize data
-            self.print_message(f"🚀 Initializing analysis for {symbol}...", "cyan")
-            data = HistoricalData(symbol=symbol, resolution=resolution, days=days)
-            
-            # Setup default indicators
-            self.setup_default_indicators(data)
-            
             self.print_message(f"🔄 Starting analysis loop - refreshing every {refresh_interval} seconds", "green")
             self.print_message("Press Ctrl+C to stop", "yellow")
             self.print_message("=" * 80, "white")
@@ -96,7 +128,7 @@ class AnalysisManager:
                     self.clear_screen()
                     
                     # Show analysis
-                    self.show_analysis(data)
+                    self.show_analysis(self.data)
                     
                     # Wait for next refresh
                     self.print_message(f"\n⏳ Next refresh in {refresh_interval} seconds... (Press Ctrl+C to stop)", "dim white")
@@ -104,7 +136,7 @@ class AnalysisManager:
                     
                     # Refresh data and indicators
                     self.print_message("🔄 Refreshing data...", "cyan")
-                    data.refresh()
+                    self.data.refresh()
                     
                 except KeyboardInterrupt:
                     self.print_message("\n🛑 Analysis stopped by user", "yellow")
@@ -117,7 +149,7 @@ class AnalysisManager:
             return True
                     
         except Exception as e:
-            self.print_message(f"❌ Failed to initialize: {e}", "red")
+            self.print_message(f"❌ Failed to start analysis loop: {e}", "red")
             return False
     
     def check_requirements(self):
@@ -160,32 +192,19 @@ class AnalysisManager:
         latest = data.df.iloc[-1]
         current_price = latest['close']
         
-        # Header Panel
-        header_text = Text(f"📊 TECHNICAL ANALYSIS DASHBOARD", style="bold white")
-        header_panel = Panel(
-            header_text,
-            title=f"🚀 {data.symbol}",
-            title_align="left",
-            border_style="blue",
-            box=box.DOUBLE_EDGE
-        )
         
-        # Price Info Table
-        price_table = self._create_price_table(data, latest, current_price)
+        
         
         # Technical Indicators Table
         indicators_table = self._create_indicators_table(data, latest, current_price)
-        
-        # Display everything
-        self.console.print(header_panel)
-        self.console.print("")
-        self.console.print(price_table)
-        self.console.print("")
-        
         if len(indicators_table.rows) > 0:
+            # Create detailed title with all info
+            timestamp = data.df.index[-1].strftime('%Y-%m-%d %I:%M:%S %p')
+            panel_title = f"🔍 {data.symbol} | Resolution: {data.resolution} | History: {data.days} days | {timestamp}"
+            
             indicators_panel = Panel(
                 indicators_table,
-                title="🔍 Technical Indicators Analysis",
+                title=panel_title,
                 border_style="green",
                 box=box.ROUNDED
             )
@@ -197,34 +216,7 @@ class AnalysisManager:
                 border_style="yellow"
             ))
         
-        # Footer with timestamp
-        self._show_footer()
-    
-    def _create_price_table(self, data, latest, current_price):
-        """Create price information table"""
-        price_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
-        price_table.add_column("📈 Market Data", style="cyan", width=20)
-        price_table.add_column("💰 Value", style="yellow", width=25)
-        price_table.add_column("📊 Status", style="green", width=20)
-        
-        # Calculate change if possible
-        if len(data.df) > 1:
-            prev_price = data.df.iloc[-2]['close']
-            change = current_price - prev_price
-            change_pct = (change / prev_price) * 100
-            change_color = "green" if change >= 0 else "red"
-            change_symbol = "📈" if change >= 0 else "📉"
-            change_text = f"[{change_color}]{change_symbol} {change:+.4f} ({change_pct:+.2f}%)[/{change_color}]"
-        else:
-            change_text = "[white]N/A[/white]"
-        
-        price_table.add_row("💵 Current Price", f"{current_price:.4f}", change_text)
-        price_table.add_row("📅 Last Update", f"{data.df.index[-1].strftime('%Y-%m-%d %I:%M:%S %p')}", "🔄 Live")
-        price_table.add_row("📊 Volume", f"{latest['volume']:,.0f}", "📦 Active")
-        price_table.add_row("🎯 High", f"{latest['high']:.4f}", "⬆️")
-        price_table.add_row("🎯 Low", f"{latest['low']:.4f}", "⬇️")
-        
-        return price_table
+        # No footer needed as timestamp is in header now
     
     def _create_indicators_table(self, data, latest, current_price):
         """Create technical indicators table"""
@@ -400,20 +392,68 @@ class AnalysisManager:
                 
                 table.add_row(f"📐 {col}", f"{zscore_val:.2f}", signal, interpretation)
     
-    def _show_footer(self):
-        """Display footer with timestamp"""
-        footer_text = f"⏰ Analysis generated at: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')} IST"
-        footer_panel = Panel(
-            footer_text,
-            border_style="blue",
-            box=box.ASCII
-        )
-        self.console.print("")
-        self.console.print(footer_panel)
+
     
     def print_message(self, message, style="white"):
         """Print a styled message"""
         self.console.print(f"[{style}]{message}[/{style}]")
+    
+    def refresh_analysis(self):
+        """
+        Refresh current data and show updated analysis
+        
+        Returns:
+            bool: Success status
+        """
+        if self.data is None:
+            self.print_message("❌ No data initialized. Call initialize_data() first.", "red")
+            return False
+        
+        try:
+            self.print_message("🔄 Refreshing data...", "cyan")
+            self.data.refresh()
+            self.show_analysis(self.data)
+            return True
+        except Exception as e:
+            self.print_message(f"❌ Error refreshing data: {e}", "red")
+            return False
+    
+    def get_current_data(self):
+        """
+        Get current HistoricalData instance
+        
+        Returns:
+            HistoricalData: Current data instance or None
+        """
+        return self.data
+    
+    def add_indicator(self, indicator_name, *args, **kwargs):
+        """
+        Add a new indicator to current data
+        
+        Args:
+            indicator_name (str): Name of indicator (EMA, RSI, MACD, etc.)
+            *args: Arguments for the indicator
+            **kwargs: Keyword arguments for the indicator
+            
+        Returns:
+            bool: Success status
+        """
+        if self.data is None:
+            self.print_message("❌ No data initialized. Call initialize_data() first.", "red")
+            return False
+        
+        try:
+            method = getattr(self.data, indicator_name)
+            method(*args, **kwargs)
+            self.print_message(f"✅ Added {indicator_name} indicator", "green")
+            return True
+        except AttributeError:
+            self.print_message(f"❌ Indicator {indicator_name} not found", "red")
+            return False
+        except Exception as e:
+            self.print_message(f"❌ Error adding {indicator_name}: {e}", "red")
+            return False
     
     def clear_screen(self):
         """Clear the console screen"""

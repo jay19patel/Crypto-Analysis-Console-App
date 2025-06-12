@@ -108,9 +108,6 @@ def run_technical_analysis(refresh_interval=None, symbol='BTCUSD', resolution='5
     
     try:
         if refresh_interval and refresh_interval > 0:
-            print(f"\n{Fore.GREEN}🔄 Starting analysis with {refresh_interval}-second refresh for {symbol}{Style.RESET_ALL}")
-            print(f"{Fore.YELLOW}📊 Press Ctrl+C to stop the analysis{Style.RESET_ALL}")
-            print(f"{Style.DIM}Resolution: {resolution} | History: {days} days{Style.RESET_ALL}")
             time.sleep(1)  # Brief pause before starting
             
             # Run with refresh loop

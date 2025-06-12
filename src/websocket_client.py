@@ -15,7 +15,7 @@ class CryptoWebSocketClient:
         self.ws = None
         self.latest_prices = {}
         self.connected = False
-        self.price_update_interval = 1  # seconds
+        self.price_update_interval = 5  # seconds
         self.price_timer = None
         
     def on_error(self, ws, error):
@@ -41,7 +41,7 @@ class CryptoWebSocketClient:
                         "name": "v2/ticker",
                         "symbols": [
                             "BTCUSD",
-                            "MARK:BTCUSD"
+                            "ETHUSD",
                         ]
                     }
                 ]
@@ -99,15 +99,12 @@ class CryptoWebSocketClient:
         for symbol in sorted_symbols:
             data = self.latest_prices[symbol]
             price = data["price"]   
-            timestamp = data["timestamp"]
-            time_diff = (datetime.now() - timestamp).seconds
             
             # Create a more visually appealing display
             symbol_clean = symbol.replace('USD', '')
-            print(f"{Fore.WHITE}🔸 {symbol_clean}/USD: {Fore.GREEN}${price:,.2f} {Style.DIM}(updated {time_diff}s ago){Style.RESET_ALL}")
+            print(f"{Fore.WHITE}🔸 {symbol_clean}/USD: {Fore.GREEN}${price:,.2f} {Style.DIM}{Style.RESET_ALL}")
         
         print(f"{Fore.CYAN}{'='*60}{Style.RESET_ALL}")
-        print(f"{Style.DIM}Updates every 10 seconds • Press Ctrl+C to stop{Style.RESET_ALL}\n")
 
     def schedule_price_updates(self):
         """Schedule periodic price updates every 10 seconds"""
