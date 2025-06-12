@@ -292,6 +292,34 @@ class HistoricalData:
         if ('ZSCORE', window) not in self.applied_indicators:
             self.applied_indicators.append(('ZSCORE', window))
     
+    def Stochastic(self, window: int = 14, smooth_k: int = 3, smooth_d: int = 3):
+        """
+        Calculate Stochastic Oscillator
+        
+        Args:
+            window (int): Lookback period (default: 14)
+            smooth_k (int): %K smoothing period (default: 3)
+            smooth_d (int): %D smoothing period (default: 3)
+            
+        Returns:
+            DataFrame: Self.df with Stochastic columns added
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded.")
+        
+        if window <= 0 or smooth_k <= 0 or smooth_d <= 0:
+            raise ValueError("All periods must be positive")
+        
+        stoch = ta.stoch(high=self.df['high'], low=self.df['low'], 
+                         close=self.df['close'], k=window, d=smooth_k, smooth_d=smooth_d)
+        
+        self.df[f'Stoch_{window}'] = stoch[f'STOCHk_{window}_{smooth_k}_{smooth_d}']
+        self.df[f'Stoch_Signal_{window}'] = stoch[f'STOCHd_{window}_{smooth_k}_{smooth_d}']
+        
+        # Track for refresh functionality
+        if ('Stochastic', (window, smooth_k, smooth_d)) not in self.applied_indicators:
+            self.applied_indicators.append(('Stochastic', (window, smooth_k, smooth_d)))
+    
     def refresh(self):
         """
         Refresh data and recalculate all previously applied indicators
@@ -323,6 +351,8 @@ class HistoricalData:
                     self.VWAP()
                 elif indicator == 'ZSCORE':
                     self.ZSCORE(params)
+                elif indicator == 'Stochastic':
+                    self.Stochastic(params[0], params[1], params[2])
             except Exception as e:
                 self.console.print(f"[red]❌ Failed to recalculate {indicator}: {e}[/red]")
     

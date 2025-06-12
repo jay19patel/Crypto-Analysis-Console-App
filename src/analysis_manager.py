@@ -15,6 +15,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich import box
 from technical_analysis import HistoricalData
+from trading_strategies import TradingStrategies
 
 
 class AnalysisManager:
@@ -52,11 +53,12 @@ class AnalysisManager:
             data.EMA([5, 15, 50])
             data.RSI(14)
             data.MACD()
-            data.ATR(14)  # Added ATR to default indicators
+            data.ATR(14)
             data.Supertrend()
             data.ADX()
             data.VWAP()
             data.ZSCORE(20)
+            data.Stochastic(14)  # Added Stochastic indicator
             self.print_message("✅ All default indicators loaded successfully!", "green")
         except Exception as e:
             self.print_message(f"❌ Error setting up indicators: {e}", "red")
@@ -192,16 +194,18 @@ class AnalysisManager:
         latest = data.df.iloc[-1]
         current_price = latest['close']
         
-        
-        
-        
         # Technical Indicators Table
         indicators_table = self._create_indicators_table(data, latest, current_price)
+        
+        # Trading Strategies Table
+        strategies_table = self._create_strategies_table(data)
+        
         if len(indicators_table.rows) > 0:
             # Create detailed title with all info
             timestamp = data.df.index[-1].strftime('%Y-%m-%d %I:%M:%S %p')
             panel_title = f"🔍 {data.symbol} | Resolution: {data.resolution} | History: {data.days} days | {timestamp}"
             
+            # Create a combined panel with both tables
             indicators_panel = Panel(
                 indicators_table,
                 title=panel_title,
@@ -209,14 +213,22 @@ class AnalysisManager:
                 box=box.ROUNDED
             )
             self.console.print(indicators_panel)
+            
+            # Show strategies panel separately
+            if len(strategies_table.rows) > 0:
+                strategies_panel = Panel(
+                    strategies_table,
+                    title="📊 Trading Strategies Analysis",
+                    border_style="cyan",
+                    box=box.ROUNDED
+                )
+                self.console.print(strategies_panel)
         else:
             self.console.print(Panel(
                 "[yellow]No technical indicators calculated yet. Use methods like EMA(), RSI(), MACD() to add indicators.[/yellow]",
                 title="ℹ️ Information",
                 border_style="yellow"
             ))
-        
-        # No footer needed as timestamp is in header now
     
     def _create_indicators_table(self, data, latest, current_price):
         """Create technical indicators table"""
@@ -392,7 +404,42 @@ class AnalysisManager:
                 
                 table.add_row(f"📐 {col}", f"{zscore_val:.2f}", signal, interpretation)
     
-
+    def _create_strategies_table(self, data) -> Table:
+        """Create trading strategies analysis table"""
+        strategies_table = Table(show_header=True, header_style="bold cyan", box=box.ROUNDED)
+        strategies_table.add_column("📈 Strategy", style="white", width=20)
+        strategies_table.add_column("🎯 Signal", style="bold", width=15)
+        strategies_table.add_column("💪 Strength", style="yellow", width=15)
+        strategies_table.add_column("✅ Conditions Met", style="green", width=30)
+        strategies_table.add_column("❌ Failed Conditions", style="red", width=30)
+        
+        # Initialize trading strategies
+        strategies = TradingStrategies(data)
+        
+        # Get signals from all strategies
+        signals = strategies.analyze_all()
+        
+        # Add each strategy to the table
+        for signal in signals:
+            # Format signal color based on type
+            signal_color = {
+                "BUY": "[green]",
+                "SELL": "[red]",
+                "NEUTRAL": "[yellow]"
+            }.get(signal.signal, "[white]")
+            
+            # Format strength with color gradient
+            strength_color = "[green]" if signal.strength >= 70 else "[yellow]" if signal.strength >= 30 else "[red]"
+            
+            strategies_table.add_row(
+                signal.strategy_name,
+                f"{signal_color}{signal.signal}[/]",
+                f"{strength_color}{signal.strength:.1f}%[/]",
+                "\n".join(signal.conditions_met) if signal.conditions_met else "-",
+                "\n".join(signal.conditions_failed) if signal.conditions_failed else "-"
+            )
+        
+        return strategies_table
     
     def print_message(self, message, style="white"):
         """Print a styled message"""
