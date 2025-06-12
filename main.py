@@ -25,7 +25,7 @@ def print_banner():
     banner = f"""
 {Fore.CYAN}╔══════════════════════════════════════════════════════════════╗
 ║                    Crypto Price Tracker                      ║
-║                   WebSocket-based Monitor                    ║
+║           WebSocket Monitor + Technical Analysis             ║
 ╚══════════════════════════════════════════════════════════════╝{Style.RESET_ALL}
 """
     print(banner)
@@ -86,15 +86,60 @@ def run_full_application():
         print(f"\n{Fore.RED}❌ Application error: {e}{Style.RESET_ALL}")
         return False
 
+def run_technical_analysis(refresh_interval=None, symbol='BTCUSD', resolution='5m', days=10):
+    """Run technical analysis module"""
+    from analysis_manager import AnalysisManager
+    
+    # Show banner first
+    print_banner()
+    
+    # Show progress bar for analysis preparation
+    show_progress_bar(f"{Fore.CYAN}Preparing technical analysis for {symbol}{Style.RESET_ALL}", 2)
+    
+    manager = AnalysisManager()
+    
+    print(f"\n{Fore.GREEN}🔧 Setting up technical analysis module...{Style.RESET_ALL}")
+    
+    # Check requirements
+    if not manager.check_requirements():
+        print(f"\n{Fore.RED}❌ Please install technical analysis dependencies first.{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}Run: pip install -r requirements.txt{Style.RESET_ALL}")
+        return False
+    
+    try:
+        if refresh_interval and refresh_interval > 0:
+            print(f"\n{Fore.GREEN}🔄 Starting analysis with {refresh_interval}-second refresh for {symbol}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}📊 Press Ctrl+C to stop the analysis{Style.RESET_ALL}")
+            print(f"{Style.DIM}Resolution: {resolution} | History: {days} days{Style.RESET_ALL}")
+            time.sleep(1)  # Brief pause before starting
+            
+            # Run with refresh loop
+            return manager.run_analysis_loop(symbol, refresh_interval, resolution, days)
+        else:
+            print(f"\n{Fore.GREEN}📊 Running one-time analysis for {symbol}{Style.RESET_ALL}")
+            print(f"{Style.DIM}Resolution: {resolution} | History: {days} days{Style.RESET_ALL}")
+            time.sleep(1)  # Brief pause before starting
+            
+            # Run once
+            return manager.run_single_analysis(symbol, resolution, days)
+    except KeyboardInterrupt:
+        print(f"\n{Fore.YELLOW}👋 Technical analysis stopped by user{Style.RESET_ALL}")
+        return True
+    except Exception as e:
+        print(f"\n{Fore.RED}❌ Technical analysis error: {e}{Style.RESET_ALL}")
+        return False
+
 def main():
     """Main application entry point"""
     parser = argparse.ArgumentParser(
-        description="Crypto Price Tracker - Monitor BTC and ETH prices via WebSocket",
+        description="Crypto Price Tracker - Monitor BTC and ETH prices via WebSocket + Technical Analysis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --check     Run system diagnostics
-  python main.py --full      Start full application with price monitoring
+  python main.py --check        Run system diagnostics
+  python main.py --full         Start full WebSocket price monitoring
+  python main.py --analysis     Run technical analysis once
+  python main.py --analysis 5   Run technical analysis with 5-second refresh
         """
     )
     
@@ -111,9 +156,39 @@ Examples:
     )
     
     parser.add_argument(
+        '--analysis',
+        type=int,
+        nargs='?',
+        const=0,
+        help='Run technical analysis. Optionally specify refresh interval in seconds'
+    )
+    
+    parser.add_argument(
+        '--symbol',
+        type=str,
+        default='BTCUSD',
+        help='Trading pair symbol for technical analysis (default: BTCUSD)'
+    )
+    
+    parser.add_argument(
+        '--resolution',
+        type=str,
+        default='5m',
+        choices=['1m', '5m', '15m', '1h', '1d'],
+        help='Timeframe resolution for technical analysis (default: 5m)'
+    )
+    
+    parser.add_argument(
+        '--days',
+        type=int,
+        default=10,
+        help='Number of days of historical data for technical analysis (default: 10)'
+    )
+    
+    parser.add_argument(
         '--version',
         action='version',
-        version='Crypto Price Tracker v1.0.0'
+        version='Crypto Price Tracker v2.0.0 (with Technical Analysis)'
     )
     
     args = parser.parse_args()
@@ -122,8 +197,9 @@ Examples:
     if not any(vars(args).values()):
         print_banner()
         print(f"{Fore.YELLOW}Please specify an option:{Style.RESET_ALL}")
-        print(f"  {Fore.WHITE}--check{Style.RESET_ALL}  : Run system diagnostics")
-        print(f"  {Fore.WHITE}--full{Style.RESET_ALL}   : Start price monitoring")
+        print(f"  {Fore.WHITE}--check{Style.RESET_ALL}     : Run system diagnostics")
+        print(f"  {Fore.WHITE}--full{Style.RESET_ALL}      : Start WebSocket price monitoring")
+        print(f"  {Fore.WHITE}--analysis{Style.RESET_ALL}  : Run technical analysis")
         print(f"\n{Fore.CYAN}Use --help for more information{Style.RESET_ALL}")
         return
     
@@ -131,9 +207,23 @@ Examples:
     if args.check:
         success = check_system()
         if success:
-            print(f"\n{Fore.GREEN}✅ Ready to run! Use '--full' to start the application.{Style.RESET_ALL}")
+            print(f"\n{Fore.GREEN}✅ Ready to run! Use '--full' for WebSocket or '--analysis' for technical analysis.{Style.RESET_ALL}")
         else:
             print(f"\n{Fore.RED}❌ Please fix the issues above before running the application.{Style.RESET_ALL}")
+            sys.exit(1)
+    
+    elif args.analysis is not None:
+        try:
+            run_technical_analysis(
+                refresh_interval=args.analysis if args.analysis > 0 else None,
+                symbol=args.symbol,
+                resolution=args.resolution,
+                days=args.days
+            )
+        except KeyboardInterrupt:
+            print(f"\n{Fore.YELLOW}👋 Goodbye!{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"\n{Fore.RED}❌ Unexpected error: {e}{Style.RESET_ALL}")
             sys.exit(1)
     
     elif args.full:
