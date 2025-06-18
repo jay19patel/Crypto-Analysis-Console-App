@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     ATR_PERIOD: int = 14
     STOCH_PERIOD: int = 14
     
+    # Additional Indicator Settings
+    SUPERTREND_PERIOD: int = 10
+    SUPERTREND_MULTIPLIER: float = 3.0
+    ADX_PERIOD: int = 14
+    ZSCORE_PERIOD: int = 20
+    
     # UI Configuration
     BANNER_TITLE: str = "Crypto Price Tracker"
     BANNER_SUBTITLE: str = "WebSocket Monitor + Technical Analysis"

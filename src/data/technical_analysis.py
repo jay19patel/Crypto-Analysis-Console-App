@@ -162,6 +162,45 @@ class TechnicalAnalysis:
             )
             self.applied_indicators.append(('VWAP', None))
             
+            # Calculate Supertrend
+            st_period = self.settings.SUPERTREND_PERIOD
+            st_multiplier = self.settings.SUPERTREND_MULTIPLIER
+            
+            supertrend_data = ta.supertrend(
+                self.df['high'],
+                self.df['low'],
+                self.df['close'],
+                length=st_period,
+                multiplier=st_multiplier
+            )
+            
+            self.df[f'SUPERT_{st_period}_{st_multiplier}'] = supertrend_data[f'SUPERT_{st_period}_{st_multiplier}']
+            self.df[f'SUPERTd_{st_period}_{st_multiplier}'] = supertrend_data[f'SUPERTd_{st_period}_{st_multiplier}']
+            self.df[f'SUPERTl_{st_period}_{st_multiplier}'] = supertrend_data[f'SUPERTl_{st_period}_{st_multiplier}']
+            self.df[f'SUPERTs_{st_period}_{st_multiplier}'] = supertrend_data[f'SUPERTs_{st_period}_{st_multiplier}']
+            self.applied_indicators.append(('Supertrend', (st_period, st_multiplier)))
+            
+            # Calculate ADX
+            adx_period = self.settings.ADX_PERIOD
+            adx_data = ta.adx(
+                self.df['high'],
+                self.df['low'],
+                self.df['close'],
+                length=adx_period
+            )
+            
+            self.df[f'ADX_{adx_period}'] = adx_data[f'ADX_{adx_period}']
+            self.df[f'DMP_{adx_period}'] = adx_data[f'DMP_{adx_period}']
+            self.df[f'DMN_{adx_period}'] = adx_data[f'DMN_{adx_period}']
+            self.applied_indicators.append(('ADX', adx_period))
+            
+            # Calculate Z-Score
+            zscore_period = self.settings.ZSCORE_PERIOD
+            rolling_mean = self.df['close'].rolling(window=zscore_period).mean()
+            rolling_std = self.df['close'].rolling(window=zscore_period).std()
+            self.df[f'ZSCORE_{zscore_period}'] = (self.df['close'] - rolling_mean) / rolling_std
+            self.applied_indicators.append(('ZSCORE', zscore_period))
+            
             self.ui.print_success(f"Successfully calculated {len(self.applied_indicators)} indicators")
             
         except Exception as e:
@@ -301,6 +340,95 @@ class TechnicalAnalysis:
                     self.indicators.append(IndicatorResult(
                         name="VWAP",
                         value=f"{vwap_value:.2f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
+            
+            # Analyze Supertrend
+            st_period = self.settings.SUPERTREND_PERIOD
+            st_multiplier = self.settings.SUPERTREND_MULTIPLIER
+            supert_col = f'SUPERT_{st_period}_{st_multiplier}'
+            supertd_col = f'SUPERTd_{st_period}_{st_multiplier}'
+            
+            if supert_col in latest and supertd_col in latest:
+                supert_value = latest[supert_col]
+                supert_direction = latest[supertd_col]
+                
+                if pd.notna(supert_value) and pd.notna(supert_direction):
+                    if supert_direction == 1:  # Bullish trend
+                        signal = "🟢 Bullish Trend"
+                        interpretation = "Strong Buy"
+                    else:  # Bearish trend
+                        signal = "🔴 Bearish Trend"
+                        interpretation = "Strong Sell"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name="Supertrend",
+                        value=f"{supert_value:.2f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
+            
+            # Analyze ADX
+            adx_period = self.settings.ADX_PERIOD
+            adx_col = f'ADX_{adx_period}'
+            dmp_col = f'DMP_{adx_period}'
+            dmn_col = f'DMN_{adx_period}'
+            
+            if adx_col in latest and dmp_col in latest and dmn_col in latest:
+                adx_value = latest[adx_col]
+                dmp_value = latest[dmp_col]
+                dmn_value = latest[dmn_col]
+                
+                if pd.notna(adx_value) and pd.notna(dmp_value) and pd.notna(dmn_value):
+                    if adx_value > 25:
+                        if dmp_value > dmn_value:
+                            signal = "💪 Strong Uptrend"
+                            interpretation = "Strong Bullish"
+                        else:
+                            signal = "💪 Strong Downtrend"
+                            interpretation = "Strong Bearish"
+                    elif adx_value > 20:
+                        signal = "📊 Moderate Trend"
+                        interpretation = "Trending Market"
+                    else:
+                        signal = "➡️ Weak Trend"
+                        interpretation = "Sideways Market"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name=f"ADX_{adx_period}",
+                        value=f"{adx_value:.1f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
+            
+            # Analyze Z-Score
+            zscore_period = self.settings.ZSCORE_PERIOD
+            zscore_col = f'ZSCORE_{zscore_period}'
+            
+            if zscore_col in latest:
+                zscore_value = latest[zscore_col]
+                
+                if pd.notna(zscore_value):
+                    if zscore_value > 2:
+                        signal = "🔴 Extremely Overbought"
+                        interpretation = "Strong Sell Signal"
+                    elif zscore_value > 1:
+                        signal = "🟡 Overbought"
+                        interpretation = "Caution - Sell"
+                    elif zscore_value < -2:
+                        signal = "🟢 Extremely Oversold"
+                        interpretation = "Strong Buy Signal"
+                    elif zscore_value < -1:
+                        signal = "🟡 Oversold"
+                        interpretation = "Caution - Buy"
+                    else:
+                        signal = "⚪ Normal Range"
+                        interpretation = "Neutral"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name=f"Z-Score_{zscore_period}",
+                        value=f"{zscore_value:.2f}",
                         signal=signal,
                         interpretation=interpretation
                     ))
