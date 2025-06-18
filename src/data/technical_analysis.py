@@ -3,11 +3,13 @@ import pandas as pd
 import pandas_ta as ta
 import numpy as np
 from datetime import datetime, timedelta
+import time
 from typing import Dict, List, Optional, Union, Any
 from dataclasses import dataclass
 
 from ..config import get_settings
 from ..ui.console import ConsoleUI
+from ..strategies.strategy_manager import StrategyManager
 
 @dataclass
 class IndicatorResult:
@@ -17,18 +19,8 @@ class IndicatorResult:
     signal: str
     interpretation: str
 
-@dataclass
-class StrategyResult:
-    """Data class for trading strategy results"""
-    name: str
-    signal: str
-    strength: float
-    interpretation: str
-    conditions_met: List[str]
-    conditions_failed: List[str]
-
 class TechnicalAnalysis:
-    """Technical analysis engine with improved error handling and type safety"""
+    """Enhanced technical analysis engine using the working HistoricalData approach"""
     
     def __init__(self, ui: ConsoleUI, symbol: str = 'BTCUSD', resolution: str = '5m', days: int = 10):
         """
@@ -47,46 +39,56 @@ class TechnicalAnalysis:
         self.days = days
         self.df: Optional[pd.DataFrame] = None
         self.indicators: List[IndicatorResult] = []
-        self.strategies: List[StrategyResult] = []
-        
-        # Initialize HTTP client with timeout
-        self.client = httpx.Client(timeout=self.settings.WEBSOCKET_TIMEOUT)
+        self.strategy_manager = StrategyManager()
+        self.strategy_results = []
+        self.applied_indicators = []  # Track applied indicators for refresh
     
     def fetch_historical_data(self) -> bool:
         """
-        Fetch historical price data
+        Fetch historical price data using the working Delta Exchange API approach
         
         Returns:
             bool: True if data was fetched successfully
         """
         try:
-            # Calculate time range
-            end_time = datetime.now()
-            start_time = end_time - timedelta(days=self.days)
+            end_time = int(time.time())
+            start_time = end_time - (self.days * 86400)
             
-            # Fetch data from API
-            response = self.client.get(
-                f"{self.settings.HISTORICAL_URL}",
-                params={
-                    "symbol": self.symbol,
-                    "resolution": self.resolution,
-                    "from": int(start_time.timestamp()),
-                    "to": int(end_time.timestamp())
-                }
-            )
-            response.raise_for_status()
+            url = 'https://api.india.delta.exchange/v2/history/candles'
+            params = {
+                'symbol': self.symbol,
+                'resolution': self.resolution,
+                'start': start_time,
+                'end': end_time
+            }
             
-            # Process data
-            data = response.json()
-            self.df = pd.DataFrame({
-                'timestamp': pd.to_datetime(data['t'], unit='s'),
-                'open': data['o'],
-                'high': data['h'],
-                'low': data['l'],
-                'close': data['c'],
-                'volume': data['v']
-            }).set_index('timestamp')
+            with httpx.Client() as client:
+                response = client.get(url, params=params)
+                response.raise_for_status()
+                result = response.json()
+                candles = result.get('result', [])
             
+            if not candles:
+                self.ui.print_error(f"No data found for {self.symbol}")
+                return False
+            
+            # Create DataFrame
+            self.df = pd.DataFrame(candles, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
+            
+            # Convert to IST timezone
+            self.df['datetime'] = pd.to_datetime(self.df['time'], unit='s') + timedelta(hours=5, minutes=30)
+            
+            # Set proper data types
+            for col in ['open', 'high', 'low', 'close', 'volume']:
+                self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+            
+            # Reverse DataFrame so oldest candle is first (index 0)
+            self.df = self.df.iloc[::-1].reset_index(drop=True)
+
+            # Set datetime as index
+            self.df.set_index('datetime', inplace=True)
+            
+            self.ui.print_success(f"Successfully fetched {len(self.df)} candles for {self.symbol}")
             return True
             
         except httpx.RequestError as e:
@@ -97,47 +99,59 @@ class TechnicalAnalysis:
             return False
     
     def calculate_indicators(self) -> None:
-        """Calculate all technical indicators"""
+        """Calculate all technical indicators using the proven approach"""
         if self.df is None or self.df.empty:
             self.ui.print_error("No data available for indicator calculation")
             return
         
         try:
+            # Clear applied indicators for fresh calculation
+            self.applied_indicators = []
+            
             # Calculate EMAs
             for period in self.settings.EMA_PERIODS:
                 self.df[f'EMA_{period}'] = ta.ema(self.df['close'], length=period)
+                self.applied_indicators.append(('EMA', period))
             
             # Calculate RSI
-            self.df[f'RSI_{self.settings.RSI_PERIOD}'] = ta.rsi(
-                self.df['close'],
-                length=self.settings.RSI_PERIOD
-            )
+            rsi_period = self.settings.RSI_PERIOD
+            self.df[f'RSI_{rsi_period}'] = ta.rsi(self.df['close'], length=rsi_period)
+            self.applied_indicators.append(('RSI', rsi_period))
             
             # Calculate MACD
-            macd = ta.macd(
-                self.df['close'],
-                fast=self.settings.MACD_SETTINGS['fast'],
-                slow=self.settings.MACD_SETTINGS['slow'],
-                signal=self.settings.MACD_SETTINGS['signal']
-            )
-            self.df = pd.concat([self.df, macd], axis=1)
+            fast = self.settings.MACD_SETTINGS['fast']
+            slow = self.settings.MACD_SETTINGS['slow']
+            signal = self.settings.MACD_SETTINGS['signal']
+            
+            macd_data = ta.macd(self.df['close'], fast=fast, slow=slow, signal=signal)
+            self.df[f'MACD_{fast}_{slow}_{signal}'] = macd_data[f'MACD_{fast}_{slow}_{signal}']
+            self.df[f'MACDs_{fast}_{slow}_{signal}'] = macd_data[f'MACDs_{fast}_{slow}_{signal}']
+            self.df[f'MACDh_{fast}_{slow}_{signal}'] = macd_data[f'MACDh_{fast}_{slow}_{signal}']
+            self.applied_indicators.append(('MACD', (fast, slow, signal)))
             
             # Calculate ATR
-            self.df[f'ATR_{self.settings.ATR_PERIOD}'] = ta.atr(
-                self.df['high'],
-                self.df['low'],
-                self.df['close'],
-                length=self.settings.ATR_PERIOD
+            atr_period = self.settings.ATR_PERIOD
+            self.df[f'ATR_{atr_period}'] = ta.atr(
+                self.df['high'], 
+                self.df['low'], 
+                self.df['close'], 
+                length=atr_period
             )
+            self.applied_indicators.append(('ATR', atr_period))
             
             # Calculate Stochastic
-            stoch = ta.stoch(
+            stoch_period = self.settings.STOCH_PERIOD
+            stoch_data = ta.stoch(
                 self.df['high'],
                 self.df['low'],
                 self.df['close'],
-                length=self.settings.STOCH_PERIOD
+                k=stoch_period,
+                d=3,
+                smooth_k=3
             )
-            self.df = pd.concat([self.df, stoch], axis=1)
+            self.df[f'STOCHk_{stoch_period}_3_3'] = stoch_data[f'STOCHk_{stoch_period}_3_3']
+            self.df[f'STOCHd_{stoch_period}_3_3'] = stoch_data[f'STOCHd_{stoch_period}_3_3']
+            self.applied_indicators.append(('Stochastic', stoch_period))
             
             # Calculate VWAP
             self.df['VWAP'] = ta.vwap(
@@ -146,9 +160,14 @@ class TechnicalAnalysis:
                 self.df['close'],
                 self.df['volume']
             )
+            self.applied_indicators.append(('VWAP', None))
+            
+            self.ui.print_success(f"Successfully calculated {len(self.applied_indicators)} indicators")
             
         except Exception as e:
             self.ui.print_error(f"Error calculating indicators: {e}")
+            import traceback
+            traceback.print_exc()
     
     def analyze_indicators(self) -> None:
         """Analyze indicators and generate signals"""
@@ -164,94 +183,147 @@ class TechnicalAnalysis:
             
             # Analyze EMAs
             for period in self.settings.EMA_PERIODS:
-                ema_value = latest[f'EMA_{period}']
-                if current_price > ema_value:
-                    signal = "📈 Above EMA"
-                    interpretation = "Bullish"
-                else:
-                    signal = "📉 Below EMA"
-                    interpretation = "Bearish"
-                
-                self.indicators.append(IndicatorResult(
-                    name=f"EMA_{period}",
-                    value=f"{ema_value:.2f}",
-                    signal=signal,
-                    interpretation=interpretation
-                ))
+                if f'EMA_{period}' in latest:
+                    ema_value = latest[f'EMA_{period}']
+                    if pd.notna(ema_value):
+                        if current_price > ema_value:
+                            signal = "📈 Above EMA"
+                            interpretation = "Bullish"
+                        else:
+                            signal = "📉 Below EMA"
+                            interpretation = "Bearish"
+                        
+                        self.indicators.append(IndicatorResult(
+                            name=f"EMA_{period}",
+                            value=f"{ema_value:.2f}",
+                            signal=signal,
+                            interpretation=interpretation
+                        ))
             
             # Analyze RSI
-            rsi_value = latest[f'RSI_{self.settings.RSI_PERIOD}']
-            if rsi_value > 70:
-                signal = "🔴 Overbought"
-                interpretation = "Sell Signal"
-            elif rsi_value < 30:
-                signal = "🟢 Oversold"
-                interpretation = "Buy Signal"
-            else:
-                signal = "⚪ Normal"
-                interpretation = "Neutral"
+            rsi_col = f'RSI_{self.settings.RSI_PERIOD}'
+            if rsi_col in latest:
+                rsi_value = latest[rsi_col]
+                if pd.notna(rsi_value):
+                    if rsi_value > 70:
+                        signal = "🔴 Overbought"
+                        interpretation = "Sell Signal"
+                    elif rsi_value < 30:
+                        signal = "🟢 Oversold"
+                        interpretation = "Buy Signal"
+                    else:
+                        signal = "⚪ Normal"
+                        interpretation = "Neutral"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name=f"RSI_{self.settings.RSI_PERIOD}",
+                        value=f"{rsi_value:.2f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
             
-            self.indicators.append(IndicatorResult(
-                name=f"RSI_{self.settings.RSI_PERIOD}",
-                value=f"{rsi_value:.2f}",
-                signal=signal,
-                interpretation=interpretation
-            ))
+            # Analyze MACD
+            fast = self.settings.MACD_SETTINGS['fast']
+            slow = self.settings.MACD_SETTINGS['slow']
+            signal_period = self.settings.MACD_SETTINGS['signal']
             
-            # Add more indicator analysis here...
+            macd_col = f'MACD_{fast}_{slow}_{signal_period}'
+            signal_col = f'MACDs_{fast}_{slow}_{signal_period}'
+            
+            if macd_col in latest and signal_col in latest:
+                macd_value = latest[macd_col]
+                macd_signal = latest[signal_col]
+                
+                if pd.notna(macd_value) and pd.notna(macd_signal):
+                    if macd_value > macd_signal:
+                        signal = "📈 Bullish"
+                        interpretation = "Above Signal"
+                    else:
+                        signal = "📉 Bearish"
+                        interpretation = "Below Signal"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name="MACD",
+                        value=f"{macd_value:.4f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
+            
+            # Analyze ATR
+            atr_col = f'ATR_{self.settings.ATR_PERIOD}'
+            if atr_col in latest:
+                atr_value = latest[atr_col]
+                if pd.notna(atr_value):
+                    self.indicators.append(IndicatorResult(
+                        name=f"ATR_{self.settings.ATR_PERIOD}",
+                        value=f"{atr_value:.2f}",
+                        signal="📊 Volatility",
+                        interpretation="Risk Measure"
+                    ))
+            
+            # Analyze Stochastic
+            stoch_k_col = f'STOCHk_{self.settings.STOCH_PERIOD}_3_3'
+            stoch_d_col = f'STOCHd_{self.settings.STOCH_PERIOD}_3_3'
+            
+            if stoch_k_col in latest and stoch_d_col in latest:
+                stoch_k = latest[stoch_k_col]
+                stoch_d = latest[stoch_d_col]
+                
+                if pd.notna(stoch_k) and pd.notna(stoch_d):
+                    if stoch_k > 80:
+                        signal = "🔴 Overbought"
+                        interpretation = "Sell Zone"
+                    elif stoch_k < 20:
+                        signal = "🟢 Oversold"
+                        interpretation = "Buy Zone"
+                    else:
+                        signal = "⚪ Normal"
+                        interpretation = "Neutral"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name="Stochastic",
+                        value=f"{stoch_k:.1f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
+            
+            # Analyze VWAP
+            if 'VWAP' in latest:
+                vwap_value = latest['VWAP']
+                if pd.notna(vwap_value):
+                    if current_price > vwap_value:
+                        signal = "📈 Above VWAP"
+                        interpretation = "Bullish"
+                    else:
+                        signal = "📉 Below VWAP"
+                        interpretation = "Bearish"
+                    
+                    self.indicators.append(IndicatorResult(
+                        name="VWAP",
+                        value=f"{vwap_value:.2f}",
+                        signal=signal,
+                        interpretation=interpretation
+                    ))
+            
+            self.ui.print_success(f"Successfully analyzed {len(self.indicators)} indicators")
             
         except Exception as e:
             self.ui.print_error(f"Error analyzing indicators: {e}")
+            import traceback
+            traceback.print_exc()
     
     def analyze_strategies(self) -> None:
-        """Analyze trading strategies"""
+        """Analyze trading strategies using the strategy manager"""
         if self.df is None or self.df.empty:
             return
         
         try:
-            # Clear previous results
-            self.strategies = []
-            
-            # Trend Following Strategy
-            trend_conditions_met = []
-            trend_conditions_failed = []
-            
-            # Check EMAs
-            latest = self.df.iloc[-1]
-            current_price = latest['close']
-            
-            for period in self.settings.EMA_PERIODS:
-                ema_value = latest[f'EMA_{period}']
-                if current_price > ema_value:
-                    trend_conditions_met.append(f"Price above EMA_{period}")
-                else:
-                    trend_conditions_failed.append(f"Price below EMA_{period}")
-            
-            trend_strength = (len(trend_conditions_met) / len(self.settings.EMA_PERIODS)) * 100
-            
-            if trend_strength > 70:
-                trend_signal = "BUY"
-                trend_interpretation = "Strong uptrend"
-            elif trend_strength < 30:
-                trend_signal = "SELL"
-                trend_interpretation = "Strong downtrend"
-            else:
-                trend_signal = "NEUTRAL"
-                trend_interpretation = "Mixed trend signals"
-            
-            self.strategies.append(StrategyResult(
-                name="Trend Following",
-                signal=trend_signal,
-                strength=trend_strength,
-                interpretation=trend_interpretation,
-                conditions_met=trend_conditions_met,
-                conditions_failed=trend_conditions_failed
-            ))
-            
-            # Add more strategy analysis here...
+            # Use the strategy manager to analyze all strategies
+            self.strategy_results = self.strategy_manager.analyze_all(self.df)
             
         except Exception as e:
             self.ui.print_error(f"Error analyzing strategies: {e}")
+            self.strategy_results = []
     
     def get_analysis_results(self) -> Dict[str, Any]:
         """
@@ -260,12 +332,28 @@ class TechnicalAnalysis:
         Returns:
             Dict[str, Any]: Analysis results including indicators and strategies
         """
+        # Convert strategy results to dict format for UI
+        strategies_dict = []
+        for result in self.strategy_results:
+            strategies_dict.append({
+                'name': result.name,
+                'signal': result.signal.value if hasattr(result.signal, 'value') else str(result.signal),
+                'strength': result.strength,
+                'interpretation': result.interpretation,
+                'conditions_met': result.conditions_met,
+                'conditions_failed': result.conditions_failed
+            })
+        
+        # Get consensus signal
+        consensus = self.strategy_manager.get_consensus_signal(self.strategy_results)
+        
         return {
             'symbol': self.symbol,
             'resolution': self.resolution,
             'days': self.days,
             'indicators': [vars(i) for i in self.indicators],
-            'strategies': [vars(s) for s in self.strategies]
+            'strategies': strategies_dict,
+            'consensus': consensus
         }
     
     def refresh(self) -> bool:

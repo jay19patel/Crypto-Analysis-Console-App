@@ -117,6 +117,16 @@ class ConsoleUI:
         
         self.console.print("\n")
         self.console.print(strategies_table)
+        
+        # Display consensus signal if available
+        if 'consensus' in data:
+            consensus = data['consensus']
+            consensus_panel = Text()
+            consensus_panel.append(f"\n🎯 Consensus Signal: {consensus['signal']}\n", style="bold yellow")
+            consensus_panel.append(f"Confidence: {consensus['confidence']} | Strength: {consensus['strength']:.1f}%\n", style="cyan")
+            consensus_panel.append(f"{consensus['interpretation']}\n", style="white")
+            
+            self.console.print(Panel(consensus_panel, title="Strategy Consensus", box=box.ROUNDED))
     
     def print_error(self, message: str):
         """Print error message"""
