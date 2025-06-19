@@ -42,7 +42,7 @@ python app.py --check
 ### Live Price Monitoring
 Start real-time price monitoring for supported cryptocurrencies:
 ```bash
-python app.py --full
+python app.py --liveprice
 ```
 
 ### Technical Analysis
@@ -63,15 +63,22 @@ python app.py --analysis 10 --symbol ETHUSD --resolution 1h
 
 # More historical data
 python app.py --analysis --days 30
+
+# Save analysis results to MongoDB
+python app.py --analysis --save
+
+# Auto-refresh with MongoDB saving
+python app.py --analysis 5 --save
 ```
 
 ### Command Line Options
 - `--check`: Run system diagnostics
-- `--full`: Start live price monitoring
+- `--liveprice`: Start live price monitoring
 - `--analysis [SECONDS]`: Run technical analysis with optional refresh interval
 - `--symbol SYMBOL`: Trading pair (default: BTCUSD)
 - `--resolution TIMEFRAME`: Time resolution (1m, 5m, 15m, 1h, 1d)
 - `--days DAYS`: Historical data days (default: 10)
+- `--save`: Save analysis results to MongoDB database with timestamp
 
 ## Project Structure
 
@@ -115,7 +122,24 @@ The application uses Pydantic-settings for configuration management. You can ove
 ```bash
 export CRYPTO_WEBSOCKET_URL="wss://your-custom-websocket-server"
 export CRYPTO_PRICE_UPDATE_INTERVAL=10
+export CRYPTO_MONGODB_URL="mongodb://localhost:27017"
+export CRYPTO_MONGODB_DATABASE="crypto_analysis"
 ```
+
+### MongoDB Setup
+
+For saving analysis results to MongoDB:
+
+1. Install MongoDB on your system
+2. Start MongoDB service:
+   ```bash
+   # Linux/macOS
+   sudo systemctl start mongod
+   
+   # Windows
+   net start MongoDB
+   ```
+3. Use `--save` flag with `--analysis` to enable saving
 
 ## Development
 

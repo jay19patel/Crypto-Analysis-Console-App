@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # System Check Configuration
     SYSTEM_CHECK_TIMEOUT: int = 10
     
+    # MongoDB Configuration
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DATABASE: str = "crypto_analysis"
+    MONGODB_COLLECTION: str = "analysis_results"
+    MONGODB_TIMEOUT: int = 5
+    
     # AI Strategy Configuration
     GOOGLE_API_KEY: str = "AIzaSyCK2n2AoIwXNTvdpEQMiGiwnYZ00-MRLqE"  # Add your Google AI API key here
     AI_MODEL_NAME: str = "gemini-2.0-flash"

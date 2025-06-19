@@ -13,6 +13,7 @@ from src.config import get_settings
 from src.ui.console import ConsoleUI
 from src.data.websocket_client import WebSocketClient
 from src.data.technical_analysis import TechnicalAnalysis
+from src.data.mongodb_client import MongoDBClient
 from src.system.health_checker import SystemHealthChecker
 
 class Application:
@@ -85,7 +86,8 @@ class Application:
         refresh_interval: Optional[int] = None,
         symbol: str = 'BTCUSD',
         resolution: str = '5m',
-        days: int = 10
+        days: int = 10,
+        save_to_mongodb: bool = False
     ) -> bool:
         """
         Run technical analysis mode
@@ -95,6 +97,7 @@ class Application:
             symbol: Trading pair symbol
             resolution: Timeframe resolution
             days: Number of days of historical data
+            save_to_mongodb: Whether to save results to MongoDB
             
         Returns:
             bool: True if execution was successful
@@ -118,27 +121,54 @@ class Application:
                 analysis = TechnicalAnalysis(self.ui, symbol, resolution, days)
                 progress.update(analysis_task, completed=100)
             
+            # Initialize MongoDB client if saving is enabled
+            mongodb_client = None
+            if save_to_mongodb:
+                mongodb_client = MongoDBClient(self.ui)
+                if not mongodb_client.test_connection():
+                    self.ui.print_warning("MongoDB connection failed. Analysis will continue without saving.")
+                    mongodb_client = None
+            
             self.ui.print_success("Analysis initialization complete!")
             
             if refresh_interval and refresh_interval > 0:
                 self.ui.print_info(f"Analysis will refresh every {refresh_interval} seconds")
+                if save_to_mongodb and mongodb_client:
+                    self.ui.print_info("Results will be saved to MongoDB on each refresh")
                 self.ui.print_info("Press Ctrl+C to stop")
                 
                 while True:
                     if analysis.refresh():
-                        self.ui.print_analysis_results(analysis.get_analysis_results(), symbol)
+                        analysis_results = analysis.get_analysis_results()
+                        self.ui.print_analysis_results(analysis_results, symbol)
+                        
+                        # Save to MongoDB if enabled
+                        if save_to_mongodb and mongodb_client:
+                            mongodb_client.save_analysis_result(analysis_results)
                     time.sleep(refresh_interval)
             else:
                 if analysis.refresh():
-                    self.ui.print_analysis_results(analysis.get_analysis_results(), symbol)
+                    analysis_results = analysis.get_analysis_results()
+                    self.ui.print_analysis_results(analysis_results, symbol)
+                    
+                    # Save to MongoDB if enabled
+                    if save_to_mongodb and mongodb_client:
+                        mongodb_client.save_analysis_result(analysis_results)
+                    
                     return True
                 return False
             
         except KeyboardInterrupt:
             self.ui.print_warning("Analysis stopped by user")
+            # Disconnect MongoDB if it was connected
+            if save_to_mongodb and mongodb_client:
+                mongodb_client.disconnect()
             return True
         except Exception as e:
             self.ui.print_error(f"Analysis error: {e}")
+            # Disconnect MongoDB if it was connected
+            if save_to_mongodb and mongodb_client:
+                mongodb_client.disconnect()
             return False
 
 def main():
@@ -148,10 +178,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python app.py --check        Run system diagnostics
-  python app.py --full         Start live price monitoring
-  python app.py --analysis     Run technical analysis once
-  python app.py --analysis 5   Run technical analysis with 5-second refresh
+  python app.py --check                    Run system diagnostics
+  python app.py --liveprice                Start live price monitoring
+  python app.py --analysis                 Run technical analysis once
+  python app.py --analysis 5               Run technical analysis with 5-second refresh
+  python app.py --analysis --save          Run analysis and save to MongoDB
+  python app.py --analysis 5 --save        Run analysis with refresh and save to MongoDB
+
+  Developed by Jay Patel email: developer.jay19@gmail.com
         """
     )
     
@@ -162,7 +196,7 @@ Examples:
     )
     
     parser.add_argument(
-        '--full',
+        '--liveprice',
         action='store_true',
         help='Start live price monitoring'
     )
@@ -197,6 +231,12 @@ Examples:
         help='Number of days of historical data for technical analysis (default: 10)'
     )
     
+    parser.add_argument(
+        '--save',
+        action='store_true',
+        help='Save analysis results to MongoDB database with timestamp'
+    )
+    
     args = parser.parse_args()
     
     # Create application instance
@@ -221,12 +261,13 @@ Examples:
                 refresh_interval=args.analysis if args.analysis > 0 else None,
                 symbol=args.symbol,
                 resolution=args.resolution,
-                days=args.days
+                days=args.days,
+                save_to_mongodb=args.save
             )
             if not success:
                 sys.exit(1)
         
-        elif args.full:
+        elif args.liveprice:
             success = app.run_price_monitoring()
             if not success:
                 sys.exit(1)
