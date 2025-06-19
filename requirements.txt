@@ -1,6 +1,18 @@
-numpy==1.24.3
-pandas_ta
-httpx
-tqdm
-colorama
-websocket-client
+# Core Dependencies
+websocket-client>=1.6.0
+pandas>=2.0.0
+pandas-ta>=0.3.14b
+httpx>=0.24.0
+rich>=13.0.0
+colorama>=0.4.6
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Technical Analysis Dependencies
+numpy>=1.24.0
+
+# Development Dependencies
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+pytest>=7.0.0
