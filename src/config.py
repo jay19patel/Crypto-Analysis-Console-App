@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # System Check Configuration
     SYSTEM_CHECK_TIMEOUT: int = 10
     
+    # AI Strategy Configuration
+    GOOGLE_API_KEY: str = "AIzaSyCK2n2AoIwXNTvdpEQMiGiwnYZ00-MRLqE"  # Add your Google AI API key here
+    AI_MODEL_NAME: str = "gemini-2.0-flash"
+    AI_TEMPERATURE: float = 0.0
+    AI_MAX_RETRIES: int = 2
+    
     class Config:
         env_prefix = "CRYPTO_"  # Environment variables should be prefixed with CRYPTO_
         case_sensitive = True

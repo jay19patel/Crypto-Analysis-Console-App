@@ -2,14 +2,14 @@ import httpx
 import pandas as pd
 import pandas_ta as ta
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from typing import Dict, List, Optional, Union, Any
 from dataclasses import dataclass
 
 from ..config import get_settings
 from ..ui.console import ConsoleUI
-from ..strategies.strategy_manager import StrategyManager
+from ..strategies import StrategyManager
 
 @dataclass
 class IndicatorResult:
@@ -20,41 +20,30 @@ class IndicatorResult:
     interpretation: str
 
 class TechnicalAnalysis:
-    """Enhanced technical analysis engine using the working HistoricalData approach"""
+    """Technical analysis engine with strategies integration"""
     
     def __init__(self, ui: ConsoleUI, symbol: str = 'BTCUSD', resolution: str = '5m', days: int = 10):
-        """
-        Initialize technical analysis engine
-        
-        Args:
-            ui (ConsoleUI): Console UI instance
-            symbol (str): Trading pair symbol
-            resolution (str): Timeframe resolution
-            days (int): Number of days of historical data
-        """
-        self.settings = get_settings()
         self.ui = ui
         self.symbol = symbol
         self.resolution = resolution
         self.days = days
-        self.df: Optional[pd.DataFrame] = None
-        self.indicators: List[IndicatorResult] = []
+        self.settings = get_settings()
+        self.df = None
+        self.indicators = []
         self.strategy_manager = StrategyManager()
         self.strategy_results = []
+        self.ai_analysis_result = None
         self.applied_indicators = []  # Track applied indicators for refresh
     
     def fetch_historical_data(self) -> bool:
-        """
-        Fetch historical price data using the working Delta Exchange API approach
-        
-        Returns:
-            bool: True if data was fetched successfully
-        """
+        """Fetch historical data from Delta Exchange"""
         try:
-            end_time = int(time.time())
-            start_time = end_time - (self.days * 86400)
+            url = self.settings.HISTORICAL_URL
             
-            url = 'https://api.india.delta.exchange/v2/history/candles'
+            # Calculate time range
+            end_time = int(datetime.now(timezone.utc).timestamp())
+            start_time = int((datetime.now(timezone.utc) - timedelta(days=self.days)).timestamp())
+            
             params = {
                 'symbol': self.symbol,
                 'resolution': self.resolution,
@@ -132,9 +121,9 @@ class TechnicalAnalysis:
             # Calculate ATR
             atr_period = self.settings.ATR_PERIOD
             self.df[f'ATR_{atr_period}'] = ta.atr(
-                self.df['high'], 
-                self.df['low'], 
-                self.df['close'], 
+                self.df['high'],
+                self.df['low'],
+                self.df['close'],
                 length=atr_period
             )
             self.applied_indicators.append(('ATR', atr_period))
@@ -396,38 +385,35 @@ class TechnicalAnalysis:
                         interpretation = "Sideways Market"
                     
                     self.indicators.append(IndicatorResult(
-                        name=f"ADX_{adx_period}",
-                        value=f"{adx_value:.1f}",
+                        name="ADX",
+                        value=f"{adx_value:.2f}",
                         signal=signal,
                         interpretation=interpretation
                     ))
             
             # Analyze Z-Score
-            zscore_period = self.settings.ZSCORE_PERIOD
-            zscore_col = f'ZSCORE_{zscore_period}'
-            
+            zscore_col = f'ZSCORE_{self.settings.ZSCORE_PERIOD}'
             if zscore_col in latest:
                 zscore_value = latest[zscore_col]
-                
                 if pd.notna(zscore_value):
                     if zscore_value > 2:
-                        signal = "🔴 Extremely Overbought"
-                        interpretation = "Strong Sell Signal"
+                        signal = "🔴 Extremely High"
+                        interpretation = "Overbought"
                     elif zscore_value > 1:
-                        signal = "🟡 Overbought"
-                        interpretation = "Caution - Sell"
+                        signal = "🟡 High"
+                        interpretation = "Above Normal"
                     elif zscore_value < -2:
-                        signal = "🟢 Extremely Oversold"
-                        interpretation = "Strong Buy Signal"
+                        signal = "🟢 Extremely Low"
+                        interpretation = "Oversold"
                     elif zscore_value < -1:
-                        signal = "🟡 Oversold"
-                        interpretation = "Caution - Buy"
+                        signal = "🟡 Low"
+                        interpretation = "Below Normal"
                     else:
-                        signal = "⚪ Normal Range"
-                        interpretation = "Neutral"
+                        signal = "⚪ Normal"
+                        interpretation = "Average Range"
                     
                     self.indicators.append(IndicatorResult(
-                        name=f"Z-Score_{zscore_period}",
+                        name="Z-Score",
                         value=f"{zscore_value:.2f}",
                         signal=signal,
                         interpretation=interpretation
@@ -449,31 +435,39 @@ class TechnicalAnalysis:
             # Use the strategy manager to analyze all strategies
             self.strategy_results = self.strategy_manager.analyze_all(self.df)
             
+            # Get AI analysis result if available
+            for strategy in self.strategy_manager.strategies:
+                if hasattr(strategy, 'get_ai_analysis') and strategy.name == "AI Powered":
+                    self.ai_analysis_result = strategy.get_ai_analysis()
+                    break
+            
         except Exception as e:
             self.ui.print_error(f"Error analyzing strategies: {e}")
             self.strategy_results = []
     
     def get_analysis_results(self) -> Dict[str, Any]:
-        """
-        Get complete analysis results
-        
-        Returns:
-            Dict[str, Any]: Analysis results including indicators and strategies
-        """
-        # Convert strategy results to dict format for UI
+        """Get complete analysis results"""
+        # Get strategies results
         strategies_dict = []
         for result in self.strategy_results:
             strategies_dict.append({
                 'name': result.name,
-                'signal': result.signal.value if hasattr(result.signal, 'value') else str(result.signal),
+                'signal': result.signal.value,
+                'confidence': result.confidence.value,
                 'strength': result.strength,
-                'interpretation': result.interpretation,
-                'conditions_met': result.conditions_met,
-                'conditions_failed': result.conditions_failed
+                'interpretation': result.interpretation
             })
         
-        # Get consensus signal
-        consensus = self.strategy_manager.get_consensus_signal(self.strategy_results)
+        # Calculate consensus
+        if self.strategy_results:
+            consensus = self.strategy_manager.get_consensus_signal(self.strategy_results)
+        else:
+            consensus = {
+                'signal': 'NEUTRAL',
+                'confidence': 'VERY_LOW',
+                'strength': 0,
+                'interpretation': 'No strategies analyzed'
+            }
         
         return {
             'symbol': self.symbol,
@@ -481,23 +475,20 @@ class TechnicalAnalysis:
             'days': self.days,
             'indicators': [vars(i) for i in self.indicators],
             'strategies': strategies_dict,
-            'consensus': consensus
+            'consensus': consensus,
+            'ai_analysis': self.ai_analysis_result
         }
     
     def refresh(self) -> bool:
-        """
-        Refresh analysis with new data
-        
-        Returns:
-            bool: True if refresh was successful
-        """
+        """Refresh all data and analysis"""
         try:
-            if self.fetch_historical_data():
+            success = self.fetch_historical_data()
+            if success:
                 self.calculate_indicators()
                 self.analyze_indicators()
                 self.analyze_strategies()
                 return True
             return False
         except Exception as e:
-            self.ui.print_error(f"Error refreshing analysis: {e}")
+            self.ui.print_error(f"Error during refresh: {e}")
             return False 

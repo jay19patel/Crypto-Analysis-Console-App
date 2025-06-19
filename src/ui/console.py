@@ -117,7 +117,7 @@ class ConsoleUI:
         
         self.console.print("\n")
         self.console.print(strategies_table)
-        
+    
         # Display consensus signal if available
         if 'consensus' in data:
             consensus = data['consensus']
@@ -127,6 +127,58 @@ class ConsoleUI:
             consensus_panel.append(f"{consensus['interpretation']}\n", style="white")
             
             self.console.print(Panel(consensus_panel, title="Strategy Consensus", box=box.ROUNDED))
+        
+        # Display AI Analysis if available - ABOVE Strategy Consensus
+        if 'ai_analysis' in data and data['ai_analysis']:
+            ai_data = data['ai_analysis']
+            
+            # Create comprehensive AI analysis table with ALL fields
+            ai_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, title="🤖 AI Market Analysis")
+            ai_table.add_column("Field", style="white", width=25)
+            ai_table.add_column("Analysis", style="cyan", width=60)
+            
+            # Add ALL AI analysis fields
+            ai_table.add_row("Summary", ai_data.get("summary", "N/A"))
+            ai_table.add_row("Current Trend", ai_data.get("current_trend", "N/A"))
+            ai_table.add_row("Candlestick Patterns", ai_data.get("candlestick_patterns", "N/A"))
+            ai_table.add_row("Strength", ai_data.get("strength", "N/A"))
+            ai_table.add_row("Recommendation", ai_data.get("recommendation", "N/A"))
+            ai_table.add_row("Reason", ai_data.get("reason", "N/A"))
+            ai_table.add_row("Price Movement", ai_data.get("price_movement", "N/A"))
+            ai_table.add_row("Momentum Forecast", ai_data.get("momentum_forecast", "N/A"))
+            ai_table.add_row("Action Type", ai_data.get("action_type", "N/A"))
+            ai_table.add_row("Action Strength", f"{ai_data.get('action_strength', 0)}%")
+            
+            # Entry/Exit levels
+            if ai_data.get("entry_price"):
+                ai_table.add_row("Entry Price", f"${ai_data['entry_price']:.2f}")
+            else:
+                ai_table.add_row("Entry Price", "N/A")
+                
+            if ai_data.get("stoploss"):
+                ai_table.add_row("Stop Loss", f"${ai_data['stoploss']:.2f}")
+            else:
+                ai_table.add_row("Stop Loss", "N/A")
+                
+            if ai_data.get("target"):
+                ai_table.add_row("Target", f"${ai_data['target']:.2f}")
+            else:
+                ai_table.add_row("Target", "N/A")
+            
+            ai_table.add_row("Risk/Reward", ai_data.get("risk_to_reward", "N/A"))
+            ai_table.add_row("Max Holding Period", ai_data.get("max_holding_period", "N/A"))
+            
+            if ai_data.get("reason_to_hold"):
+                ai_table.add_row("Reason to Hold", ai_data.get("reason_to_hold", "N/A"))
+            
+            ai_table.add_row("Volatility Risk", ai_data.get("volatility_risk", "N/A"))
+            ai_table.add_row("Unusual Behavior", ai_data.get("unusual_behavior", "N/A"))
+            ai_table.add_row("Overbought/Oversold", ai_data.get("overbought_oversold_alert", "N/A"))
+            ai_table.add_row("Note", ai_data.get("note", "N/A"))
+            
+            self.console.print("\n")
+            self.console.print(ai_table)
+            self.console.print("\n")
     
     def print_error(self, message: str):
         """Print error message"""

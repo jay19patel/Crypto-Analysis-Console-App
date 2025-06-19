@@ -20,13 +20,16 @@ class StrategyManager:
             from .vwap_strategy import VWAPStrategy
             from .advanced_strategy import AdvancedTrendStrategy
             
+            from .ai_strategy import AIPoweredStrategy
+            
             self.strategies = [
                 TrendFollowingStrategy(),
                 MACDCrossoverStrategy(),
                 RSIStrategy(),
                 StochasticStrategy(),
                 VWAPStrategy(),
-                AdvancedTrendStrategy()
+                AdvancedTrendStrategy(),
+                AIPoweredStrategy()
             ]
         except ImportError as e:
             print(f"Warning: Could not load some strategies: {e}")
