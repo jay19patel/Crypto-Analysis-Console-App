@@ -6,8 +6,8 @@ import httpx
 from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
-from ..config import get_settings
-from ..ui.console import ConsoleUI
+from src.config import get_settings
+from src.ui.console import ConsoleUI
 
 @dataclass
 class HealthCheckResult:

@@ -1,5 +1,5 @@
 import pandas as pd
-from .base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
+from src.strategies.base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
 
 class TrendFollowingStrategy(BaseStrategy):
     """Multi-timeframe trend following strategy"""

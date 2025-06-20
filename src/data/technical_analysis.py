@@ -7,9 +7,9 @@ import time
 from typing import Dict, List, Optional, Union, Any
 from dataclasses import dataclass
 
-from ..config import get_settings
-from ..ui.console import ConsoleUI
-from ..strategies import StrategyManager
+from src.config import get_settings
+from src.ui.console import ConsoleUI
+from src.strategies import StrategyManager
 
 @dataclass
 class IndicatorResult:

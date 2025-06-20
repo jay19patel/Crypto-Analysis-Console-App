@@ -4,8 +4,8 @@ import threading
 import time
 from datetime import datetime
 from typing import Dict, Optional, Callable
-from ..config import get_settings
-from ..ui.console import ConsoleUI
+from src.config import get_settings
+from src.ui.console import ConsoleUI
 
 class WebSocketClient:
     """WebSocket client for real-time cryptocurrency price data"""

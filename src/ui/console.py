@@ -9,7 +9,7 @@ from rich import box
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeRemainingColumn
 from colorama import Fore, Style, init
 
-from ..config import get_settings
+from src.config import get_settings
 
 # Initialize colorama for Windows
 init()

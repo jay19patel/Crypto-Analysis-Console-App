@@ -6,7 +6,7 @@ No manual analysis - Real AI responses only!
 import pandas as pd
 import os
 from typing import Optional, Literal
-from .base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
+from src.strategies.base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
 
 # Try importing LangChain dependencies
 try:

@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import List, Optional, Dict, Any
-from .base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
+from src.strategies.base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
 
 class StrategyManager:
     """Manager class for all trading strategies"""

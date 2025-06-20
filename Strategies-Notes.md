@@ -277,14 +277,3 @@ When adding new strategies:
 3. Include example usage
 4. Test thoroughly
 5. Update this README if needed
-
-## Future Enhancements
-
-Potential improvements:
-- Backtesting framework
-- Parameter optimization
-- Machine learning strategies
-- Multi-timeframe analysis
-- Portfolio management integration
-- Advanced risk management
-- Strategy performance metrics 

@@ -1,167 +1,217 @@
 # Crypto Price Tracker
 
-A production-ready cryptocurrency price tracking system with real-time WebSocket data and technical analysis capabilities.
+A professional cryptocurrency analysis platform with real-time WebSocket monitoring, technical indicators, AI-powered strategies, and MongoDB data persistence.
 
-## Features
+## 🚀 Quick Start
 
-- **Live Price Monitoring**: Real-time cryptocurrency price updates via WebSocket connection
-- **Technical Analysis**: Comprehensive technical analysis with multiple indicators and strategies
-- **System Health Checks**: Robust system diagnostics and dependency verification
-- **Beautiful Console UI**: Rich console output with tables, progress bars, and color-coded information
-- **Error Handling**: Comprehensive error handling and user feedback
-- **Type Safety**: Full type hints and Pydantic-based configuration management
-
-## Installation
-
-1. Clone the repository:
 ```bash
+# Clone and setup
 git clone https://github.com/yourusername/crypto-price-tracker.git
 cd crypto-price-tracker
-```
-
-2. Create and activate a virtual environment:
-```bash
 python -m venv venv
-source venv/bin/activate  # Linux/macOS
 venv\Scripts\activate     # Windows
-```
+# source venv/bin/activate  # Linux/macOS
 
-3. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Run analysis
+python app.py --analysis --symbol BTCUSD
 ```
 
-## Usage
+## 📊 Features
 
-### System Health Check
-Run a comprehensive system check to verify all dependencies and connections:
+- **Real-time WebSocket Price Monitoring** - Live cryptocurrency price feeds
+- **Advanced Technical Analysis** - 11+ indicators (EMA, RSI, MACD, Supertrend, ADX, etc.)
+- **AI-Powered Strategies** - Google Gemini integration for smart analysis
+- **Multiple Trading Strategies** - Trend following, MACD, RSI, Stochastic, VWAP
+- **MongoDB Integration** - Store analysis results with timestamps
+- **Rich Console UI** - Beautiful tables, progress bars, and colored output
+
+## 🎯 Usage
+
+### Basic Commands
 ```bash
-python app.py --check
+python app.py --check                    # System diagnostics
+python app.py --liveprice                # Live price monitoring
+python app.py --analysis                 # One-time technical analysis
+python app.py --analysis 5               # Auto-refresh every 5 seconds
 ```
 
-### Live Price Monitoring
-Start real-time price monitoring for supported cryptocurrencies:
+### Advanced Options
 ```bash
-python app.py --liveprice
-```
+# Custom symbol and timeframe
+python app.py --analysis --symbol ETHUSD --resolution 1h --days 30
 
-### Technical Analysis
-Run technical analysis with various options:
-
-```bash
-# One-time analysis
-python app.py --analysis
-
-# Auto-refresh every 5 seconds
-python app.py --analysis 5
-
-# Different cryptocurrency
-python app.py --analysis --symbol ETHUSD
-
-# Custom timeframe and refresh
-python app.py --analysis 10 --symbol ETHUSD --resolution 1h
-
-# More historical data
-python app.py --analysis --days 30
-
-# Save analysis results to MongoDB
+# Save to MongoDB
 python app.py --analysis --save
-
-# Auto-refresh with MongoDB saving
-python app.py --analysis 5 --save
+python app.py --analysis 5 --save        # Auto-refresh + save
 ```
 
-### Command Line Options
-- `--check`: Run system diagnostics
-- `--liveprice`: Start live price monitoring
-- `--analysis [SECONDS]`: Run technical analysis with optional refresh interval
-- `--symbol SYMBOL`: Trading pair (default: BTCUSD)
-- `--resolution TIMEFRAME`: Time resolution (1m, 5m, 15m, 1h, 1d)
-- `--days DAYS`: Historical data days (default: 10)
-- `--save`: Save analysis results to MongoDB database with timestamp
+### Command Options
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--check` | Run system health checks | - |
+| `--liveprice` | Start live price monitoring | - |
+| `--analysis [SEC]` | Technical analysis with optional refresh | - |
+| `--symbol` | Trading pair (BTCUSD, ETHUSD, etc.) | BTCUSD |
+| `--resolution` | Timeframe (1m, 5m, 15m, 1h, 1d) | 5m |
+| `--days` | Historical data days | 10 |
+| `--save` | Save results to MongoDB | false |
 
-## Project Structure
+## 🛠️ MongoDB Setup (Optional)
 
-```
-├── app.py                  # Main application entry point
-├── requirements.txt        # Python dependencies
-├── README.md              # Documentation
-└── src/
-    ├── config.py          # Configuration management
-    ├── data/
-    │   ├── websocket_client.py    # WebSocket implementation
-    │   └── technical_analysis.py  # Technical analysis engine
-    ├── system/
-    │   └── health_checker.py      # System diagnostics
-    └── ui/
-        └── console.py             # Console UI components
-```
-
-## Technical Indicators
-
-The application includes the following technical indicators:
-- EMA (Exponential Moving Average)
-- RSI (Relative Strength Index)
-- MACD (Moving Average Convergence Divergence)
-- ATR (Average True Range)
-- Stochastic Oscillator
-- VWAP (Volume Weighted Average Price)
-
-## Trading Strategies
-
-Built-in trading strategies include:
-- Trend Following
-- Mean Reversion
-- Volatility Breakout
-- Volume Analysis
-
-## Configuration
-
-The application uses Pydantic-settings for configuration management. You can override default settings using environment variables prefixed with `CRYPTO_`. For example:
-
+For data persistence:
 ```bash
-export CRYPTO_WEBSOCKET_URL="wss://your-custom-websocket-server"
-export CRYPTO_PRICE_UPDATE_INTERVAL=10
+# Install MongoDB
+# Windows: Download from mongodb.com
+# Linux: sudo apt install mongodb
+
+# Start service
+net start MongoDB        # Windows
+sudo systemctl start mongod  # Linux
+
+# Configure (optional)
 export CRYPTO_MONGODB_URL="mongodb://localhost:27017"
 export CRYPTO_MONGODB_DATABASE="crypto_analysis"
 ```
 
-### MongoDB Setup
+## 🔧 Adding New Strategies
 
-For saving analysis results to MongoDB:
+### 1. Create Strategy File
+Create `src/strategies/your_strategy.py`:
 
-1. Install MongoDB on your system
-2. Start MongoDB service:
-   ```bash
-   # Linux/macOS
-   sudo systemctl start mongod
-   
-   # Windows
-   net start MongoDB
-   ```
-3. Use `--save` flag with `--analysis` to enable saving
+```python
+from .base_strategy import BaseStrategy, StrategySignal, StrategyResult
+import pandas as pd
 
-## Development
-
-### Code Style
-The project uses:
-- Black for code formatting
-- Flake8 for linting
-- MyPy for type checking
-
-### Running Tests
-```bash
-pytest
+class YourStrategy(BaseStrategy):
+    def __init__(self):
+        super().__init__("Your Strategy Name")
+    
+    def analyze(self, df: pd.DataFrame) -> StrategyResult:
+        # Your strategy logic here
+        signal = StrategySignal.BUY  # or SELL, HOLD, NEUTRAL
+        confidence = 75.0  # 0-100
+        interpretation = "Your analysis explanation"
+        
+        return StrategyResult(
+            name=self.name,
+            signal=signal,
+            confidence=confidence,
+            strength=confidence,
+            interpretation=interpretation
+        )
 ```
 
-## Contributing
+### 2. Register Strategy
+Add to `src/strategies/strategy_manager.py`:
+
+```python
+from .your_strategy import YourStrategy
+
+class StrategyManager:
+    def __init__(self):
+        self.strategies = [
+            # ... existing strategies
+            YourStrategy(),  # Add your strategy here
+        ]
+```
+
+### 3. Test Your Strategy
+```bash
+python app.py --analysis --symbol BTCUSD
+```
+
+## 📁 Project Structure
+
+```
+├── app.py                      # Main application
+├── requirements.txt            # Dependencies
+└── src/
+    ├── config.py              # Configuration settings
+    ├── data/
+    │   ├── websocket_client.py    # WebSocket implementation
+    │   ├── technical_analysis.py  # Technical indicators
+    │   └── mongodb_client.py      # Database operations
+    ├── strategies/
+    │   ├── base_strategy.py       # Strategy base class
+    │   ├── strategy_manager.py    # Strategy orchestration
+    │   ├── trend_strategy.py      # Trend following
+    │   ├── macd_strategy.py       # MACD crossover
+    │   ├── rsi_strategy.py        # RSI overbought/oversold
+    │   ├── ai_strategy.py         # AI-powered analysis
+    │   └── your_strategy.py       # Your custom strategies
+    ├── system/
+    │   └── health_checker.py      # System diagnostics
+    └── ui/
+        └── console.py             # Rich console interface
+```
+
+## ⚡ Technical Indicators
+
+| Indicator | Purpose | Configuration |
+|-----------|---------|---------------|
+| EMA | Trend direction | 5, 15, 50 periods |
+| RSI | Momentum oscillator | 14 period |
+| MACD | Trend changes | 12, 26, 9 settings |
+| Supertrend | Trend confirmation | 10 period, 3.0 multiplier |
+| ADX | Trend strength | 14 period |
+| Stochastic | Overbought/oversold | 14 period |
+| VWAP | Volume-weighted price | Daily |
+| ATR | Volatility measure | 14 period |
+| Z-Score | Price deviation | 20 period |
+
+## 🤖 AI Integration
+
+Uses Google Gemini AI for:
+- Market sentiment analysis
+- Pattern recognition
+- Trade recommendations
+- Risk assessment
+
+Set your API key:
+```bash
+export CRYPTO_GOOGLE_API_KEY="your-api-key"
+```
+
+## 🔒 Environment Variables
+
+```bash
+# WebSocket Configuration
+export CRYPTO_WEBSOCKET_URL="wss://socket.india.delta.exchange"
+export CRYPTO_PRICE_UPDATE_INTERVAL=5
+
+# MongoDB Configuration  
+export CRYPTO_MONGODB_URL="mongodb://localhost:27017"
+export CRYPTO_MONGODB_DATABASE="crypto_analysis"
+
+# AI Configuration
+export CRYPTO_GOOGLE_API_KEY="your-api-key"
+```
+
+## 📈 Strategy Types
+
+1. **Trend Following** - EMA crossovers and trend confirmation
+2. **MACD Strategy** - Signal line crossovers and histogram analysis
+3. **RSI Strategy** - Overbought/oversold conditions
+4. **Stochastic Strategy** - K/D line crossovers
+5. **VWAP Strategy** - Volume-weighted average price analysis
+6. **Advanced Trend** - Multi-indicator trend confirmation
+7. **AI Powered** - Machine learning-based analysis
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create your strategy: `src/strategies/your_strategy.py`
+3. Add tests and documentation
+4. Submit a pull request
 
-## License
+## 📧 Developer
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+**Jay Patel**  
+Email: developer.jay19@gmail.com
+
+## 📄 License
+
+MIT License - Feel free to use and modify. 

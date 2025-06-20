@@ -6,8 +6,8 @@ from pymongo import MongoClient, errors
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 import logging
-from ..config import get_settings
-from ..ui.console import ConsoleUI
+from src.config import get_settings
+from src.ui.console import ConsoleUI
 
 class MongoDBClient:
     """MongoDB client for analysis results storage"""
