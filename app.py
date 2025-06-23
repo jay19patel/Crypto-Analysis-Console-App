@@ -15,6 +15,7 @@ from src.data.websocket_client import WebSocketClient
 from src.data.technical_analysis import TechnicalAnalysis
 from src.data.mongodb_client import MongoDBClient
 from src.system.health_checker import SystemHealthChecker
+from src.broker.broker_client import BrokerClient
 
 class Application:
     """Main application class"""
@@ -87,7 +88,8 @@ class Application:
         symbol: str = 'BTCUSD',
         resolution: str = '5m',
         days: int = 10,
-        save_to_mongodb: bool = False
+        save_to_mongodb: bool = False,
+        enable_broker: bool = False
     ) -> bool:
         """
         Run technical analysis mode
@@ -98,6 +100,7 @@ class Application:
             resolution: Timeframe resolution
             days: Number of days of historical data
             save_to_mongodb: Whether to save results to MongoDB
+            enable_broker: Whether to enable automated trading
             
         Returns:
             bool: True if execution was successful
@@ -129,27 +132,98 @@ class Application:
                     self.ui.print_warning("MongoDB connection failed. Analysis will continue without saving.")
                     mongodb_client = None
             
+            # Initialize broker client if enabled
+            broker_client = None
+            if enable_broker:
+                broker_client = BrokerClient(self.ui)
+                if not broker_client.initialize():
+                    self.ui.print_warning("Broker initialization failed. Analysis will continue without trading.")
+                    broker_client = None
+                else:
+                    self.ui.print_success("🚀 Broker system activated! Automated trading enabled.")
+            
             self.ui.print_success("Analysis initialization complete!")
             
             if refresh_interval and refresh_interval > 0:
                 self.ui.print_info(f"Analysis will refresh every {refresh_interval} seconds")
                 if save_to_mongodb and mongodb_client:
                     self.ui.print_info("Results will be saved to MongoDB on each refresh")
+                if enable_broker and broker_client:
+                    self.ui.print_info("🤖 Automated trading is ACTIVE - signals will be executed automatically")
                 self.ui.print_info("Press Ctrl+C to stop")
                 
                 while True:
                     if analysis.refresh():
                         analysis_results = analysis.get_analysis_results()
-                        self.ui.print_analysis_results(analysis_results, symbol)
+                        
+                        # Process trading signals if broker is enabled
+                        broker_actions = {'has_actions': False}
+                        
+                        if enable_broker and broker_client:
+                            # Get current price from analysis data
+                            current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                            
+                            # Process signal
+                            trade_executed = broker_client.process_analysis_signal(
+                                symbol, analysis_results, current_price
+                            )
+                            
+                            # Monitor existing positions
+                            closed_positions = broker_client.monitor_positions({symbol: current_price})
+                            
+                            # Prepare broker actions for display
+                            if trade_executed or closed_positions:
+                                broker_actions['has_actions'] = True
+                                broker_actions['trade_executed'] = trade_executed
+                                broker_actions['positions_closed'] = [f"{symbol} position" for _ in closed_positions]
+                                broker_actions['monitoring_active'] = True
+                            else:
+                                broker_actions['monitoring_active'] = True
+                            
+                            # Display analysis with simple broker actions
+                            self.ui.print_analysis_with_simple_broker_actions(analysis_results, symbol, broker_actions)
+                        else:
+                            # Display normal analysis without broker actions
+                            self.ui.print_analysis_results(analysis_results, symbol)
                         
                         # Save to MongoDB if enabled
                         if save_to_mongodb and mongodb_client:
                             mongodb_client.save_analysis_result(analysis_results)
+                    
                     time.sleep(refresh_interval)
             else:
                 if analysis.refresh():
                     analysis_results = analysis.get_analysis_results()
-                    self.ui.print_analysis_results(analysis_results, symbol)
+                    
+                    # Process trading signals if broker is enabled (one-time)
+                    broker_actions = {'has_actions': False}
+                    
+                    if enable_broker and broker_client:
+                        # Get current price from analysis data
+                        current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                        
+                        # Process signal
+                        trade_executed = broker_client.process_analysis_signal(
+                            symbol, analysis_results, current_price
+                        )
+                        
+                        # Monitor existing positions
+                        closed_positions = broker_client.monitor_positions({symbol: current_price})
+                        
+                        # Prepare broker actions for display
+                        if trade_executed or closed_positions:
+                            broker_actions['has_actions'] = True
+                            broker_actions['trade_executed'] = trade_executed
+                            broker_actions['positions_closed'] = [f"{symbol} position" for _ in closed_positions]
+                            broker_actions['monitoring_active'] = True
+                        else:
+                            broker_actions['monitoring_active'] = True
+                        
+                        # Display analysis with simple broker actions
+                        self.ui.print_analysis_with_simple_broker_actions(analysis_results, symbol, broker_actions)
+                    else:
+                        # Display normal analysis without broker actions
+                        self.ui.print_analysis_results(analysis_results, symbol)
                     
                     # Save to MongoDB if enabled
                     if save_to_mongodb and mongodb_client:
@@ -163,12 +237,67 @@ class Application:
             # Disconnect MongoDB if it was connected
             if save_to_mongodb and mongodb_client:
                 mongodb_client.disconnect()
+            # Disconnect broker if it was connected
+            if enable_broker and broker_client:
+                broker_client.disconnect()
             return True
         except Exception as e:
             self.ui.print_error(f"Analysis error: {e}")
             # Disconnect MongoDB if it was connected
             if save_to_mongodb and mongodb_client:
                 mongodb_client.disconnect()
+            # Disconnect broker if it was connected
+            if enable_broker and broker_client:
+                broker_client.disconnect()
+            return False
+    
+    def run_broker_dashboard(self) -> bool:
+        """
+        Run broker dashboard mode - display current broker status with auto-refresh
+        
+        Returns:
+            bool: True if execution was successful
+        """
+        try:
+            # Initialize broker client
+            broker_client = BrokerClient(self.ui)
+            if not broker_client.initialize():
+                self.ui.print_error("Failed to initialize broker system")
+                return False
+            
+            refresh_interval = broker_client.settings.BROKER_UI_REFRESH_INTERVAL
+            
+            self.ui.print_info(f"🔄 Broker Dashboard - Auto-refreshing every {refresh_interval} seconds")
+            self.ui.print_info("Press Ctrl+C to stop")
+            self.ui.print_info("")
+            
+            # Initial display
+            broker_client.display_broker_dashboard(show_last_updated=True)
+            
+            # Auto-refresh loop
+            while True:
+                time.sleep(refresh_interval)
+                
+                # Reload positions and account data
+                broker_client.position_manager.load_positions()
+                all_positions = broker_client.position_manager.positions
+                broker_client.account_manager.update_statistics(all_positions)
+                
+                # Display updated dashboard
+                broker_client.display_broker_dashboard(show_last_updated=True)
+            
+        except KeyboardInterrupt:
+            self.ui.print_warning("Broker dashboard stopped by user")
+            # Disconnect
+            if 'broker_client' in locals():
+                broker_client.disconnect()
+            return True
+            
+        except Exception as e:
+            self.ui.print_error(f"Broker dashboard error: {e}")
+            # Disconnect
+            if 'broker_client' in locals():
+                broker_client.disconnect()
             return False
 
 def main():
@@ -184,6 +313,8 @@ Examples:
   python app.py --analysis 5               Run technical analysis with 5-second refresh
   python app.py --analysis --save          Run analysis and save to MongoDB
   python app.py --analysis 5 --save        Run analysis with refresh and save to MongoDB
+  python app.py --analysis 5 --broker      Run analysis with automated trading (simple actions)
+  python app.py --brokerui                 Display detailed broker dashboard (auto-refreshes every 1 minute)
 
   Developed by Jay Patel email: developer.jay19@gmail.com
         """
@@ -237,6 +368,18 @@ Examples:
         help='Save analysis results to MongoDB database with timestamp'
     )
     
+    parser.add_argument(
+        '--broker',
+        action='store_true',
+        help='Enable automated trading with analysis'
+    )
+    
+    parser.add_argument(
+        '--brokerui',
+        action='store_true',
+        help='Display detailed broker dashboard with auto-refresh (configurable interval)'
+    )
+    
     args = parser.parse_args()
     
     # Create application instance
@@ -262,8 +405,15 @@ Examples:
                 symbol=args.symbol,
                 resolution=args.resolution,
                 days=args.days,
-                save_to_mongodb=args.save
+                save_to_mongodb=args.save,
+                enable_broker=args.broker
             )
+            if not success:
+                sys.exit(1)
+        
+        elif args.brokerui:
+            # Display broker dashboard
+            success = app.run_broker_dashboard()
             if not success:
                 sys.exit(1)
         

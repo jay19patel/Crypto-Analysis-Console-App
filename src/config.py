@@ -44,7 +44,8 @@ class Settings(BaseSettings):
     SYSTEM_CHECK_TIMEOUT: int = 10
     
     # MongoDB Configuration
-    MONGODB_URL: str = "mongodb+srv://justj:justjay19@cluster0.fsgzjrl.mongodb.net/"
+    # MONGODB_URL: str = "mongodb+srv://justj:justjay19@cluster0.fsgzjrl.mongodb.net/"
+    MONGODB_URL: str = "mongodb://localhost:27017/"
     MONGODB_DATABASE: str = "crypto_analysis"
     MONGODB_COLLECTION: str = "analysis_results"
     MONGODB_TIMEOUT: int = 5
@@ -54,6 +55,16 @@ class Settings(BaseSettings):
     AI_MODEL_NAME: str = "gemini-2.0-flash"
     AI_TEMPERATURE: float = 0.0
     AI_MAX_RETRIES: int = 2
+    
+    # Broker Configuration
+    BROKER_INITIAL_BALANCE: float = 10000.0  # Starting balance
+    BROKER_MAX_POSITION_SIZE: float = 1000.0  # Max amount per position
+    BROKER_RISK_PER_TRADE: float = 0.02  # 2% risk per trade
+    BROKER_DAILY_TRADE_LIMIT: int = 5  # Max trades per day
+    BROKER_STOP_LOSS_PCT: float = 0.02  # 2% stop loss
+    BROKER_TARGET_PCT: float = 0.04  # 4% target (2:1 risk:reward)
+    BROKER_MIN_CONFIDENCE: float = 60.0  # Minimum signal confidence for trade execution
+    BROKER_UI_REFRESH_INTERVAL: int = 60  # Broker UI refresh interval in seconds (1 minute)
     
     class Config:
         env_prefix = "CRYPTO_"  # Environment variables should be prefixed with CRYPTO_

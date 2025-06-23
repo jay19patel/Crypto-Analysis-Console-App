@@ -194,4 +194,28 @@ class ConsoleUI:
     
     def print_info(self, message: str):
         """Print info message"""
-        self.console.print(f"ℹ️ {message}", style="bold blue") 
+        self.console.print(f"ℹ️ {message}", style="bold blue")
+    
+    def print_analysis_with_simple_broker_actions(self, data: Dict, symbol: str, broker_actions: Dict):
+        """Print analysis results with simple broker action messages"""
+        # First print normal analysis
+        self.print_analysis_results(data, symbol)
+        
+        # Then add simple one-line broker actions if any
+        if broker_actions.get('has_actions', False):
+            self.console.print("\n")
+            self.console.print("=" * 70, style="dim")
+            
+            # Simple one-line messages for actions
+            if broker_actions.get('trade_executed'):
+                self.console.print("🚀 BROKER: Trade executed - New position opened", style="bold green")
+            
+            if broker_actions.get('positions_closed'):
+                for pos_info in broker_actions.get('positions_closed', []):
+                    self.console.print(f"🔔 BROKER: Position closed - {pos_info}", style="bold yellow")
+            
+            if broker_actions.get('monitoring_active') and not broker_actions.get('trade_executed') and not broker_actions.get('positions_closed'):
+                self.console.print("👁️ BROKER: Monitoring positions for stop loss/target hits", style="bold blue")
+            
+            self.console.print("=" * 70, style="dim")
+            self.console.print("\n") 
