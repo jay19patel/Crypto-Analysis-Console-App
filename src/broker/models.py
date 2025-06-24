@@ -45,6 +45,12 @@ class Position:
     quantity: float = 0.0
     invested_amount: float = 0.0
     
+    # Margin trading details
+    leverage: float = 1.0  # Leverage used for this position
+    margin_used: float = 0.0  # Actual margin amount used
+    trading_fee: float = 0.0  # Trading fee charged (2% of invested amount)
+    analysis_id: str = ""  # ID of analysis that triggered this trade
+    
     # Exit details
     exit_price: Optional[float] = None
     exit_time: Optional[datetime] = None
@@ -82,6 +88,30 @@ class Position:
         
         self.profit_after_amount = self.invested_amount + self.pnl
         return self.pnl
+    
+    def calculate_margin_usage(self, current_price: float) -> float:
+        """Calculate current margin usage percentage"""
+        if self.margin_used == 0:
+            return 0.0
+        
+        # Calculate current loss
+        current_pnl = self.calculate_pnl(current_price)
+        
+        # If losing money, calculate how much of margin is used
+        if current_pnl < 0:
+            loss_amount = abs(current_pnl)
+            margin_usage = loss_amount / self.margin_used
+            return margin_usage
+        
+        return 0.0  # No margin risk if profitable
+    
+    def should_liquidate(self, current_price: float, liquidation_threshold: float = 0.95) -> bool:
+        """Check if position should be liquidated due to margin"""
+        if self.margin_used == 0 or self.leverage <= 1:
+            return False  # No margin trading
+        
+        margin_usage = self.calculate_margin_usage(current_price)
+        return margin_usage >= liquidation_threshold
     
     def calculate_holding_time(self) -> str:
         """Calculate holding time"""
@@ -132,6 +162,10 @@ class Position:
             'entry_time': self.entry_time,
             'quantity': self.quantity,
             'invested_amount': self.invested_amount,
+            'leverage': self.leverage,
+            'margin_used': self.margin_used,
+            'trading_fee': self.trading_fee,
+            'analysis_id': self.analysis_id,
             'exit_price': self.exit_price,
             'exit_time': self.exit_time,
             'stop_loss': self.stop_loss,
@@ -158,6 +192,10 @@ class Position:
         position.entry_time = data.get('entry_time', datetime.now(timezone.utc))
         position.quantity = data.get('quantity', 0.0)
         position.invested_amount = data.get('invested_amount', 0.0)
+        position.leverage = data.get('leverage', 1.0)
+        position.margin_used = data.get('margin_used', 0.0)
+        position.trading_fee = data.get('trading_fee', 0.0)
+        position.analysis_id = data.get('analysis_id', '')
         position.exit_price = data.get('exit_price')
         position.exit_time = data.get('exit_time')
         position.stop_loss = data.get('stop_loss')
@@ -198,6 +236,11 @@ class Account:
     # Risk management
     max_position_size: float = 1000.0  # Max amount per position
     risk_per_trade: float = 0.02  # 2% risk per trade
+    
+    # Margin trading
+    max_leverage: float = 100.0  # Maximum leverage allowed (100x)
+    total_margin_used: float = 0.0  # Total margin currently being used
+    available_margin: float = 10000.0  # Available margin for trading
     
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -264,6 +307,9 @@ class Account:
             'last_trade_date': self.last_trade_date,
             'max_position_size': self.max_position_size,
             'risk_per_trade': self.risk_per_trade,
+            'max_leverage': self.max_leverage,
+            'total_margin_used': self.total_margin_used,
+            'available_margin': self.available_margin,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
@@ -289,6 +335,9 @@ class Account:
         account.last_trade_date = data.get('last_trade_date')
         account.max_position_size = data.get('max_position_size', 1000.0)
         account.risk_per_trade = data.get('risk_per_trade', 0.02)
+        account.max_leverage = data.get('max_leverage', 100.0)
+        account.total_margin_used = data.get('total_margin_used', 0.0)
+        account.available_margin = data.get('available_margin', 10000.0)
         account.created_at = data.get('created_at', datetime.now(timezone.utc))
         account.updated_at = data.get('updated_at', datetime.now(timezone.utc))
         return account 

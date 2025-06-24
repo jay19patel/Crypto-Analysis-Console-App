@@ -33,7 +33,9 @@ class TradeExecutor:
         confidence: float,
         current_price: float,
         strategy_name: str = "",
-        analysis_data: Optional[Dict[str, Any]] = None
+        analysis_data: Optional[Dict[str, Any]] = None,
+        leverage: Optional[float] = None,
+        analysis_id: str = ""
     ) -> bool:
         """Process trading signal and execute if conditions are met"""
         
@@ -62,15 +64,28 @@ class TradeExecutor:
         if not self.position_manager.can_open_position(symbol, position_type):
             return False
         
-        # Calculate position size
-        position_amount = self.account_manager.calculate_position_size(current_price)
+        # Set default leverage if not provided
+        if leverage is None:
+            leverage = self.settings.BROKER_DEFAULT_LEVERAGE
         
-        if position_amount <= 0:
-            self.ui.print_warning("Cannot execute trade: Insufficient funds")
+        # Ensure leverage is within limits
+        account = self.account_manager.get_account()
+        max_leverage = account.max_leverage if account else self.settings.BROKER_MAX_LEVERAGE
+        if leverage > max_leverage:
+            leverage = max_leverage
+            self.ui.print_warning(f"Leverage reduced to maximum allowed: {max_leverage}x")
+        
+        # Calculate position size with margin requirements
+        position_value, margin_required, trading_fee = self.account_manager.calculate_position_size(
+            current_price, leverage=leverage
+        )
+        
+        if position_value <= 0 or margin_required <= 0:
+            self.ui.print_warning("Cannot execute trade: Insufficient margin or invalid position size")
             return False
         
-        # Calculate quantity
-        quantity = position_amount / current_price
+        # Calculate quantity based on position value
+        quantity = position_value / current_price
         
         # Calculate stop loss and target
         stop_loss, target = self._calculate_risk_levels(
@@ -80,26 +95,33 @@ class TradeExecutor:
             self.target_percentage
         )
         
-        # Reserve funds
-        if not self.account_manager.reserve_funds(position_amount):
-            self.ui.print_error("Failed to reserve funds for trade")
+        # Reserve margin and pay trading fee
+        if not self.account_manager.reserve_margin(margin_required, trading_fee):
+            self.ui.print_error("Failed to reserve margin for trade")
             return False
         
-        # Create position
+        # Create position with margin details
         position = self.position_manager.create_position(
             symbol=symbol,
             position_type=position_type,
             entry_price=current_price,
             quantity=quantity,
-            invested_amount=position_amount,
+            invested_amount=position_value,
             strategy_name=strategy_name,
             stop_loss=stop_loss,
-            target=target
+            target=target,
+            leverage=leverage,
+            margin_used=margin_required,
+            trading_fee=trading_fee,
+            analysis_id=analysis_id
         )
         
         if position:
-            # Enhanced logging for trade execution
-            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Amount: ${position_amount:.2f} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
+            # Enhanced logging for margin trade execution
+            leverage_text = f" | {leverage}x Leverage" if leverage > 1 else ""
+            margin_text = f" | Margin: ${margin_required:.2f}" if leverage > 1 else ""
+            fee_text = f" | Fee: ${trading_fee:.2f}" if trading_fee > 0 else ""
+            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
             
             # Save trade execution details
             if analysis_data:
@@ -107,8 +129,9 @@ class TradeExecutor:
             
             return True
         else:
-            # Release funds if position creation failed
-            self.account_manager.update_balance(position_amount, "Trade execution failed - funds released")
+            # Release margin if position creation failed
+            self.account_manager.release_margin(margin_required, 0)
+            self.account_manager.update_balance(trading_fee, "Trade execution failed - fee refunded")
             return False
     
     def _calculate_risk_levels(
@@ -164,15 +187,28 @@ class TradeExecutor:
             # Update PnL for all positions
             self.position_manager.update_positions_pnl(current_prices)
             
-            # Check stop loss and targets
+            # Check margin health for leveraged positions
+            margin_health = self.position_manager.check_margin_health(current_prices)
+            
+            # Issue warnings for positions at risk
+            if margin_health['margin_call_positions'] > 0:
+                self.ui.print_warning(f"⚠️  MARGIN CALL: {margin_health['margin_call_positions']} position(s) need attention")
+            
+            if margin_health['positions_near_liquidation'] > 0:
+                self.ui.print_error(f"🚨 LIQUIDATION WARNING: {margin_health['positions_near_liquidation']} position(s) at high risk")
+            
+            # Check stop loss and targets (including margin liquidation)
             closed_position_ids = self.position_manager.check_stop_loss_and_targets(current_prices)
             
             # Process closed positions
             for position_id in closed_position_ids:
                 position = self.position_manager.get_position_by_id(position_id)
                 if position and position.status == PositionStatus.CLOSED:
-                    # Release funds back to account
-                    self.account_manager.release_funds(position.invested_amount, position.pnl)
+                    # Release margin back to account (for leveraged trades) or funds (for regular trades)
+                    if position.leverage > 1 and position.margin_used > 0:
+                        self.account_manager.release_margin(position.margin_used, position.pnl)
+                    else:
+                        self.account_manager.release_funds(position.invested_amount, position.pnl)
                     closed_positions.append(position_id)
                     
                     # Update account statistics
@@ -204,8 +240,11 @@ class TradeExecutor:
         
         # Close the position
         if self.position_manager.close_position(position_id, current_price, reason):
-            # Release funds back to account
-            self.account_manager.release_funds(position.invested_amount, position.pnl)
+            # Release margin back to account (for leveraged trades) or funds (for regular trades)
+            if position.leverage > 1 and position.margin_used > 0:
+                self.account_manager.release_margin(position.margin_used, position.pnl)
+            else:
+                self.account_manager.release_funds(position.invested_amount, position.pnl)
             
             # Update account statistics
             all_positions = self.position_manager.positions

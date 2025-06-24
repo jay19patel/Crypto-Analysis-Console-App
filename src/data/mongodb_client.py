@@ -57,7 +57,7 @@ class MongoDBClient:
             self.is_connected = False
             self.ui.print_info("Disconnected from MongoDB")
     
-    def save_analysis_result(self, analysis_data: Dict[str, Any]) -> bool:
+    def save_analysis_result(self, analysis_data: Dict[str, Any]) -> Optional[str]:
         """
         Save analysis result to MongoDB with datetime
         
@@ -65,11 +65,11 @@ class MongoDBClient:
             analysis_data: Complete analysis results dictionary
             
         Returns:
-            bool: True if saved successfully
+            str: MongoDB document ID if saved successfully, None otherwise
         """
         if not self.is_connected:
             if not self.connect():
-                return False
+                return None
         
         try:
             # Prepare document for MongoDB
@@ -83,15 +83,16 @@ class MongoDBClient:
             result = self.collection.insert_one(document)
             
             if result.inserted_id:
-                self.ui.print_success(f"Analysis result saved to MongoDB with ID: {result.inserted_id}")
-                return True
+                document_id = str(result.inserted_id)
+                self.ui.print_success(f"Analysis result saved to MongoDB with ID: {document_id}")
+                return document_id
             else:
                 self.ui.print_error("Failed to save analysis result to MongoDB")
-                return False
+                return None
                 
         except Exception as e:
             self.ui.print_error(f"Error saving to MongoDB: {e}")
-            return False
+            return None
     
     def get_recent_analyses(self, limit: int = 10) -> List[Dict[str, Any]]:
         """

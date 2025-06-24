@@ -156,12 +156,24 @@ class Application:
                     if analysis.refresh():
                         analysis_results = analysis.get_analysis_results()
                         
+                        # Save to MongoDB first if enabled to get document ID
+                        mongodb_document_id = None
+                        if save_to_mongodb and mongodb_client:
+                            # Save to MongoDB and get the document ID
+                            saved_result = mongodb_client.save_analysis_result(analysis_results)
+                            if saved_result:
+                                mongodb_document_id = saved_result
+                        
                         # Process trading signals if broker is enabled
                         broker_actions = {'has_actions': False}
                         
                         if enable_broker and broker_client:
                             # Get current price from analysis data
                             current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                            
+                            # Add MongoDB document ID to analysis_results
+                            if mongodb_document_id:
+                                analysis_results['_id'] = str(mongodb_document_id)
                             
                             # Process signal
                             trade_executed = broker_client.process_analysis_signal(
@@ -185,15 +197,19 @@ class Application:
                         else:
                             # Display normal analysis without broker actions
                             self.ui.print_analysis_results(analysis_results, symbol)
-                        
-                        # Save to MongoDB if enabled
-                        if save_to_mongodb and mongodb_client:
-                            mongodb_client.save_analysis_result(analysis_results)
                     
                     time.sleep(refresh_interval)
             else:
                 if analysis.refresh():
                     analysis_results = analysis.get_analysis_results()
+                    
+                    # Save to MongoDB first if enabled to get document ID
+                    mongodb_document_id = None
+                    if save_to_mongodb and mongodb_client:
+                        # Save to MongoDB and get the document ID
+                        saved_result = mongodb_client.save_analysis_result(analysis_results)
+                        if saved_result:
+                            mongodb_document_id = saved_result
                     
                     # Process trading signals if broker is enabled (one-time)
                     broker_actions = {'has_actions': False}
@@ -201,6 +217,10 @@ class Application:
                     if enable_broker and broker_client:
                         # Get current price from analysis data
                         current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                        
+                        # Add MongoDB document ID to analysis_results
+                        if mongodb_document_id:
+                            analysis_results['_id'] = str(mongodb_document_id)
                         
                         # Process signal
                         trade_executed = broker_client.process_analysis_signal(
@@ -224,10 +244,6 @@ class Application:
                     else:
                         # Display normal analysis without broker actions
                         self.ui.print_analysis_results(analysis_results, symbol)
-                    
-                    # Save to MongoDB if enabled
-                    if save_to_mongodb and mongodb_client:
-                        mongodb_client.save_analysis_result(analysis_results)
                     
                     return True
                 return False

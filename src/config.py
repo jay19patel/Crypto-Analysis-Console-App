@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     BROKER_MIN_CONFIDENCE: float = 60.0  # Minimum signal confidence for trade execution
     BROKER_UI_REFRESH_INTERVAL: int = 60  # Broker UI refresh interval in seconds (1 minute)
     
+    # Margin Trading Configuration
+    BROKER_DEFAULT_LEVERAGE: float = 50.0  # Default leverage (50x)
+    BROKER_MAX_LEVERAGE: float = 100.0  # Maximum leverage (100x)
+    BROKER_TRADING_FEE_PCT: float = 0.02  # 2% trading fee on invested amount
+    BROKER_MARGIN_CALL_THRESHOLD: float = 0.8  # Margin call at 80% of margin used
+    BROKER_LIQUIDATION_THRESHOLD: float = 0.95  # Liquidation at 95% of margin used
+    
     class Config:
         env_prefix = "CRYPTO_"  # Environment variables should be prefixed with CRYPTO_
         case_sensitive = True

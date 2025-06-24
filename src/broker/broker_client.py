@@ -80,13 +80,17 @@ class BrokerClient:
                 if action_type in ['BUY', 'SELL'] and action_strength > 0:
                     self.ui.print_info(f"🤖 AI Analysis Signal: {action_type} | Strength: {action_strength}%")
                     
+                    # Use actual MongoDB _id from analysis_results
+                    analysis_id = str(analysis_results.get('_id', ''))
+                    
                     return self.trade_executor.process_signal(
                         symbol=symbol,
                         signal=action_type,
                         confidence=action_strength,
                         current_price=current_price,
                         strategy_name="AI Market Analysis",
-                        analysis_data=analysis_results
+                        analysis_data=analysis_results,
+                        analysis_id=analysis_id
                     )
             
             # Fallback to consensus signal if AI analysis not available
@@ -107,13 +111,17 @@ class BrokerClient:
             if signal in ['BUY', 'SELL']:
                 self.ui.print_info(f"📊 Consensus Signal: {signal} | Confidence: {confidence}%")
                 
+                # Use actual MongoDB _id from analysis_results
+                analysis_id = str(analysis_results.get('_id', ''))
+                
                 return self.trade_executor.process_signal(
                     symbol=symbol,
                     signal=signal,
                     confidence=confidence,
                     current_price=current_price,
                     strategy_name=contributing_strategy,
-                    analysis_data=analysis_results
+                    analysis_data=analysis_results,
+                    analysis_id=analysis_id
                 )
             
             self.ui.print_info(f"⚪ No trading signal: {signal} (Strength: {confidence}%)")
@@ -217,6 +225,25 @@ class BrokerClient:
         account_table.add_row("Daily Trades", f"[{status_color}]{daily_count}/{daily_limit}[/{status_color}]")
         account_table.add_row("Trades Remaining", f"[{status_color}]{trades_remaining}[/{status_color}]")
         
+        # Margin trading information
+        max_leverage = account.get('max_leverage', 1)
+        total_margin_used = account.get('total_margin_used', 0)
+        available_margin = account.get('available_margin', 0)
+        margin_usage_pct = account.get('margin_usage_percentage', 0)
+        
+        account_table.add_row("Max Leverage", f"[bright_magenta]{max_leverage:.0f}x[/bright_magenta]")
+        account_table.add_row("Margin Used", f"${total_margin_used:.2f}")
+        account_table.add_row("Available Margin", f"${available_margin:.2f}")
+        
+        # Margin usage percentage with color coding
+        if margin_usage_pct >= 80:
+            margin_color = "red"
+        elif margin_usage_pct >= 60:
+            margin_color = "yellow"
+        else:
+            margin_color = "green"
+        account_table.add_row("Margin Usage", f"[{margin_color}]{margin_usage_pct:.1f}%[/{margin_color}]")
+        
         self.console.print(account_table)
         self.console.print()
     
@@ -279,7 +306,7 @@ class BrokerClient:
         self.console.print()
     
     def _display_open_positions(self, open_positions: List[Any]) -> None:
-        """Display open positions"""
+        """Display open positions with margin trading information"""
         
         if not open_positions:
             self.console.print(Panel("🔄 No open positions", style="blue"))
@@ -290,11 +317,16 @@ class BrokerClient:
         positions_table.add_column("Symbol", style="cyan")
         positions_table.add_column("Type", style="magenta")
         positions_table.add_column("Entry", style="blue")
+        positions_table.add_column("Leverage", style="bright_magenta")
         positions_table.add_column("Quantity", style="white")
-        positions_table.add_column("Invested", style="green")
+        positions_table.add_column("Position Value", style="green")
+        positions_table.add_column("Margin Used", style="yellow")
+        positions_table.add_column("Trading Fee", style="dim")
         positions_table.add_column("Current P&L", style="white")
+        positions_table.add_column("Margin Risk", style="red")
         positions_table.add_column("Stop Loss", style="red")
         positions_table.add_column("Target", style="green")
+        positions_table.add_column("Analysis ID", style="dim")
         positions_table.add_column("Duration", style="yellow")
         
         for position in open_positions:
@@ -304,6 +336,45 @@ class BrokerClient:
                 pnl_color = "green" if pnl >= 0 else "red"
                 pnl_symbol = "+" if pnl >= 0 else ""
                 pnl_str = f"[{pnl_color}]{pnl_symbol}${pnl:.2f}[/{pnl_color}]"
+                
+                # Leverage display
+                leverage_str = f"{position.leverage:.0f}x" if position.leverage > 1 else "1x"
+                if position.leverage > 1:
+                    leverage_str = f"[bright_magenta]{leverage_str}[/bright_magenta]"
+                
+                # Margin risk calculation and display
+                margin_risk_str = "N/A"
+                if position.leverage > 1 and position.margin_used > 0:
+                    # Get current price to calculate margin usage
+                    current_price = position.entry_price  # Fallback to entry price
+                    # In real scenario, you would pass current prices here
+                    margin_usage = position.calculate_margin_usage(current_price)
+                    
+                    if margin_usage >= 0.95:
+                        margin_risk_str = f"[red]💀 {margin_usage*100:.1f}%[/red]"
+                    elif margin_usage >= 0.8:
+                        margin_risk_str = f"[yellow]⚠️  {margin_usage*100:.1f}%[/yellow]"
+                    elif margin_usage > 0:
+                        margin_risk_str = f"[orange]{margin_usage*100:.1f}%[/orange]"
+                    else:
+                        margin_risk_str = f"[green]✅ Safe[/green]"
+                else:
+                    margin_risk_str = "[green]No Risk[/green]"
+                
+                # Margin used display
+                margin_used_str = f"${position.margin_used:.2f}" if position.margin_used > 0 else "N/A"
+                
+                # Trading fee display
+                trading_fee_str = f"${position.trading_fee:.2f}" if position.trading_fee > 0 else "N/A"
+                
+                # Analysis ID display (MongoDB _id format)
+                analysis_id_str = "Manual"
+                if position.analysis_id and position.analysis_id.strip():
+                    # Display shortened MongoDB _id (first 8 characters)
+                    if len(position.analysis_id) >= 8:
+                        analysis_id_str = position.analysis_id[:8] + "..."
+                    else:
+                        analysis_id_str = position.analysis_id
                 
                 # Safe holding time calculation
                 try:
@@ -315,11 +386,16 @@ class BrokerClient:
                     position.symbol,
                     position.position_type.value,
                     f"${position.entry_price:.2f}",
+                    leverage_str,
                     f"{position.quantity:.6f}",
                     f"${position.invested_amount:.2f}",
+                    margin_used_str,
+                    trading_fee_str,
                     pnl_str,
+                    margin_risk_str,
                     f"${position.stop_loss:.2f}" if position.stop_loss else "N/A",
                     f"${position.target:.2f}" if position.target else "N/A",
+                    analysis_id_str,
                     holding_time
                 )
             except Exception as e:

@@ -96,7 +96,11 @@ class PositionManager:
         invested_amount: float,
         strategy_name: str = "",
         stop_loss: Optional[float] = None,
-        target: Optional[float] = None
+        target: Optional[float] = None,
+        leverage: float = 1.0,
+        margin_used: float = 0.0,
+        trading_fee: float = 0.0,
+        analysis_id: str = ""
     ) -> Optional[Position]:
         """Create a new position"""
         
@@ -114,6 +118,10 @@ class PositionManager:
         position.strategy_name = strategy_name
         position.stop_loss = stop_loss
         position.target = target
+        position.leverage = leverage
+        position.margin_used = margin_used
+        position.trading_fee = trading_fee
+        position.analysis_id = analysis_id
         position.status = PositionStatus.OPEN
         
         # Calculate initial PnL (should be 0)
@@ -207,7 +215,7 @@ class PositionManager:
                 self.save_position(position)
     
     def check_stop_loss_and_targets(self, current_prices: Dict[str, float]) -> List[str]:
-        """Check stop loss and targets for open positions - only those that haven't hit limits"""
+        """Check margin liquidation, stop loss and targets for open positions"""
         positions_to_close = []
         
         for position in self.get_open_positions():
@@ -218,8 +226,14 @@ class PositionManager:
             should_close = False
             reason = ""
             
-            # Only check stop loss if it exists and hasn't been hit
-            if position.stop_loss and position.status == PositionStatus.OPEN:
+            # PRIORITY 1: Check margin liquidation first (higher priority than stop loss)
+            if position.should_liquidate(current_price, self.settings.BROKER_LIQUIDATION_THRESHOLD):
+                should_close = True
+                margin_usage = position.calculate_margin_usage(current_price)
+                reason = f"💀 MARGIN LIQUIDATION: Loss {margin_usage*100:.1f}% of margin used | Price: ${current_price:.2f}"
+            
+            # PRIORITY 2: Check stop loss only if no liquidation and position still open
+            elif position.stop_loss and position.status == PositionStatus.OPEN:
                 if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
                     should_close = True
                     reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} <= ${position.stop_loss:.2f}"
@@ -227,8 +241,8 @@ class PositionManager:
                     should_close = True
                     reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} >= ${position.stop_loss:.2f}"
             
-            # Only check target if no stop loss hit and target exists
-            if not should_close and position.target and position.status == PositionStatus.OPEN:
+            # PRIORITY 3: Check target only if no liquidation/stop loss hit
+            elif position.target and position.status == PositionStatus.OPEN:
                 if position.position_type == PositionType.LONG and current_price >= position.target:
                     should_close = True
                     reason = f"🎯 Target Hit: ${current_price:.2f} >= ${position.target:.2f}"
@@ -242,6 +256,44 @@ class PositionManager:
                     positions_to_close.append(position.id)
         
         return positions_to_close
+    
+    def check_margin_health(self, current_prices: Dict[str, float]) -> Dict[str, Any]:
+        """Check margin health for all open positions"""
+        margin_stats = {
+            'positions_at_risk': [],
+            'total_margin_used': 0.0,
+            'positions_near_liquidation': 0,
+            'margin_call_positions': 0
+        }
+        
+        for position in self.get_open_positions():
+            if position.symbol not in current_prices or position.leverage <= 1:
+                continue
+            
+            current_price = current_prices[position.symbol]
+            margin_usage = position.calculate_margin_usage(current_price)
+            margin_stats['total_margin_used'] += position.margin_used
+            
+            position_risk = {
+                'id': position.id,
+                'symbol': position.symbol,
+                'margin_usage': margin_usage,
+                'margin_used': position.margin_used,
+                'leverage': position.leverage,
+                'current_pnl': position.calculate_pnl(current_price)
+            }
+            
+            # Check if position is at risk
+            if margin_usage >= self.settings.BROKER_LIQUIDATION_THRESHOLD:
+                position_risk['status'] = 'LIQUIDATION_RISK'
+                margin_stats['positions_near_liquidation'] += 1
+                margin_stats['positions_at_risk'].append(position_risk)
+            elif margin_usage >= self.settings.BROKER_MARGIN_CALL_THRESHOLD:
+                position_risk['status'] = 'MARGIN_CALL'
+                margin_stats['margin_call_positions'] += 1
+                margin_stats['positions_at_risk'].append(position_risk)
+        
+        return margin_stats
     
     def calculate_unrealized_pnl(self, current_prices: Dict[str, float]) -> float:
         """Calculate total unrealized PnL"""
