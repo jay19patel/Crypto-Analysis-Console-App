@@ -7,7 +7,7 @@ A WebSocket-based cryptocurrency price tracking system with technical analysis
 import argparse
 import sys
 import time
-from typing import Optional
+from typing import Optional, List
 
 from src.config import get_settings
 from src.ui.console import ConsoleUI
@@ -20,10 +20,10 @@ from src.broker.broker_client import BrokerClient
 class Application:
     """Main application class"""
     
-    def __init__(self):
+    def __init__(self, ui_enabled: bool = True):
         """Initialize application components"""
         self.settings = get_settings()
-        self.ui = ConsoleUI()
+        self.ui = ConsoleUI(ui_enabled=ui_enabled)
         self.health_checker = SystemHealthChecker(self.ui)
     
     def run_system_check(self) -> bool:
@@ -267,6 +267,124 @@ class Application:
                 broker_client.disconnect()
             return False
     
+    def run_multi_symbol_analysis(
+        self,
+        symbols: List[str],
+        refresh_interval: Optional[int] = None,
+        resolution: str = '5m',
+        days: int = 10,
+        save_to_mongodb: bool = False,
+        enable_broker: bool = False
+    ) -> bool:
+        """
+        Run technical analysis for multiple symbols
+        """
+        try:
+            self.ui.print_banner()
+            
+            # Create progress bar for initialization
+            with self.ui.create_progress_bar("Multi-symbol analysis initialization") as progress:
+                # Add tasks
+                system_task = progress.add_task("Running system checks...", total=100)
+                symbols_task = progress.add_task(f"Initializing analysis for {len(symbols)} symbols...", total=100)
+                
+                # Run system checks
+                if not self.health_checker.run_all_checks():
+                    self.ui.print_error("System check failed. Please resolve issues before continuing.")
+                    return False
+                progress.update(system_task, completed=100)
+                
+                # Initialize analysis engines for all symbols
+                analysis_engines = {}
+                for symbol in symbols:
+                    analysis_engines[symbol] = TechnicalAnalysis(self.ui, symbol, resolution, days)
+                progress.update(symbols_task, completed=100)
+            
+            # Initialize MongoDB client if saving is enabled
+            mongodb_client = None
+            if save_to_mongodb:
+                mongodb_client = MongoDBClient(self.ui)
+                if not mongodb_client.test_connection():
+                    self.ui.print_warning("MongoDB connection failed. Analysis will continue without saving.")
+                    mongodb_client = None
+            
+            # Initialize broker client if enabled
+            broker_client = None
+            if enable_broker:
+                broker_client = BrokerClient(self.ui)
+                if not broker_client.initialize():
+                    self.ui.print_warning("Broker initialization failed. Analysis will continue without trading.")
+                    broker_client = None
+                else:
+                    self.ui.print_success(f"🚀 Broker system activated! Automated trading enabled for {len(symbols)} symbols.")
+            
+            self.ui.print_success(f"Multi-symbol analysis initialization complete for: {', '.join(symbols)}")
+            
+            if refresh_interval and refresh_interval > 0:
+                self.ui.print_info(f"Analysis will refresh every {refresh_interval} seconds for {len(symbols)} symbols")
+                self.ui.print_info("Press Ctrl+C to stop")
+                
+                while True:
+                    current_prices = {}
+                    
+                    # Process each symbol
+                    for symbol in symbols:
+                        analysis = analysis_engines[symbol]
+                        
+                        if analysis.refresh():
+                            analysis_results = analysis.get_analysis_results()
+                            current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                            current_prices[symbol] = current_price
+                            
+                            # Save to MongoDB first if enabled
+                            if save_to_mongodb and mongodb_client:
+                                mongodb_client.save_analysis_result(analysis_results)
+                            
+                            # Process trading signals if broker is enabled
+                            if enable_broker and broker_client:
+                                broker_client.process_analysis_signal(symbol, analysis_results, current_price)
+                            
+                            # Display analysis results for this symbol
+                            self.ui.print_analysis_results(analysis_results, symbol)
+                            
+                            # Add separator between symbols
+                            if len(symbols) > 1 and symbol != symbols[-1]:
+                                self.ui.print_info("─" * 80)
+                    
+                    # Monitor all positions if broker is enabled
+                    if enable_broker and broker_client and current_prices:
+                        broker_client.monitor_positions(current_prices)
+                    
+                    # Wait for next refresh
+                    time.sleep(refresh_interval)
+            else:
+                # Single run for all symbols
+                for symbol in symbols:
+                    analysis = analysis_engines[symbol]
+                    
+                    if analysis.refresh():
+                        analysis_results = analysis.get_analysis_results()
+                        
+                        # Save to MongoDB if enabled
+                        if save_to_mongodb and mongodb_client:
+                            mongodb_client.save_analysis_result(analysis_results)
+                        
+                        # Display results
+                        self.ui.print_analysis_results(analysis_results, symbol)
+                        
+                        # Add separator between symbols
+                        if len(symbols) > 1 and symbol != symbols[-1]:
+                            self.ui.print_info("─" * 80)
+                
+                return True
+            
+        except KeyboardInterrupt:
+            self.ui.print_warning("Multi-symbol analysis stopped by user")
+            return True
+        except Exception as e:
+            self.ui.print_error(f"Multi-symbol analysis error: {e}")
+            return False
+
     def run_broker_dashboard(self) -> bool:
         """
         Run broker dashboard mode - display current broker status with auto-refresh
@@ -331,6 +449,12 @@ Examples:
   python app.py --analysis 5 --save        Run analysis with refresh and save to MongoDB
   python app.py --analysis 5 --broker      Run analysis with automated trading (simple actions)
   python app.py --brokerui                 Display detailed broker dashboard (auto-refreshes every 1 minute)
+  
+  ✨ NEW FEATURES:
+  python app.py --analysis --symbols BTCUSD ETHUSD    Multi-symbol analysis
+  python app.py --analysis 5 --symbols BTCUSD ETHUSD --broker    Multi-symbol auto-trading
+  python app.py --analysis --uiOff         Run analysis with no UI output (silent mode)
+  python app.py --analysis 5 --symbols BTCUSD ETHUSD --uiOff    Silent multi-symbol analysis
 
   Developed by Jay Patel email: developer.jay19@gmail.com
         """
@@ -361,6 +485,19 @@ Examples:
         type=str,
         default='BTCUSD',
         help='Trading pair symbol for technical analysis (default: BTCUSD)'
+    )
+    
+    parser.add_argument(
+        '--symbols',
+        type=str,
+        nargs='+',
+        help='Multiple trading pair symbols for analysis (e.g., --symbols BTCUSD ETHUSD)'
+    )
+    
+    parser.add_argument(
+        '--uiOff',
+        action='store_true',
+        help='Disable all UI output including tables and console messages'
     )
     
     parser.add_argument(
@@ -399,7 +536,7 @@ Examples:
     args = parser.parse_args()
     
     # Create application instance
-    app = Application()
+    app = Application(ui_enabled=not args.uiOff)
     
     # Handle arguments
     try:
@@ -416,14 +553,28 @@ Examples:
                 sys.exit(1)
         
         elif args.analysis is not None:
-            success = app.run_technical_analysis(
-                refresh_interval=args.analysis if args.analysis > 0 else None,
-                symbol=args.symbol,
-                resolution=args.resolution,
-                days=args.days,
-                save_to_mongodb=args.save,
-                enable_broker=args.broker
-            )
+            # Check if multiple symbols are specified
+            if args.symbols:
+                # Use DEFAULT_SYMBOLS from config or provided symbols
+                symbols = args.symbols
+                success = app.run_multi_symbol_analysis(
+                    symbols=symbols,
+                    refresh_interval=args.analysis if args.analysis > 0 else None,
+                    resolution=args.resolution,
+                    days=args.days,
+                    save_to_mongodb=args.save,
+                    enable_broker=args.broker
+                )
+            else:
+                # Single symbol analysis (existing functionality)
+                success = app.run_technical_analysis(
+                    refresh_interval=args.analysis if args.analysis > 0 else None,
+                    symbol=args.symbol,
+                    resolution=args.resolution,
+                    days=args.days,
+                    save_to_mongodb=args.save,
+                    enable_broker=args.broker
+                )
             if not success:
                 sys.exit(1)
         

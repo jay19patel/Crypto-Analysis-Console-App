@@ -17,9 +17,10 @@ init()
 class ConsoleUI:
     """Console UI manager for consistent output styling"""
     
-    def __init__(self):
+    def __init__(self, ui_enabled: bool = True):
         self.console = Console()
         self.settings = get_settings()
+        self.ui_enabled = ui_enabled
     
     def clear_screen(self):
         """Clear the console screen"""
@@ -70,6 +71,9 @@ class ConsoleUI:
     
     def print_analysis_results(self, data: Dict, symbol: str):
         """Print technical analysis results"""
+        if not self.ui_enabled:
+            return
+        
         self.clear_screen()
         self.print_banner()
         
@@ -182,19 +186,23 @@ class ConsoleUI:
     
     def print_error(self, message: str):
         """Print error message"""
-        self.console.print(f"❌ Error: {message}", style="bold red")
+        if self.ui_enabled:
+            self.console.print(f"❌ Error: {message}", style="bold red")
     
     def print_success(self, message: str):
         """Print success message"""
-        self.console.print(f"✅ {message}", style="bold green")
+        if self.ui_enabled:
+            self.console.print(f"✅ {message}", style="bold green")
     
     def print_warning(self, message: str):
         """Print warning message"""
-        self.console.print(f"⚠️ {message}", style="bold yellow")
+        if self.ui_enabled:
+            self.console.print(f"⚠️ {message}", style="bold yellow")
     
     def print_info(self, message: str):
         """Print info message"""
-        self.console.print(f"ℹ️ {message}", style="bold blue")
+        if self.ui_enabled:
+            self.console.print(f"ℹ️ {message}", style="bold blue")
     
     def print_analysis_with_simple_broker_actions(self, data: Dict, symbol: str, broker_actions: Dict):
         """Print analysis results with simple broker action messages"""
