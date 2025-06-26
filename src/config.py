@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     SYSTEM_CHECK_TIMEOUT: int = 10
     
     # MongoDB Configuration
-    # MONGODB_URL: str = "mongodb+srv://justj:justjay19@cluster0.fsgzjrl.mongodb.net/"
-    MONGODB_URL: str = "mongodb://localhost:27017/"
+    MONGODB_URL: str = "mongodb+srv://justj:justjay19@cluster0.fsgzjrl.mongodb.net/"
+    # MONGODB_URL: str = "mongodb://localhost:27017/"
     MONGODB_DATABASE: str = "crypto_analysis"
     MONGODB_COLLECTION: str = "analysis_results"
     MONGODB_TIMEOUT: int = 5
