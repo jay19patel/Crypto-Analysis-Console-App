@@ -197,7 +197,15 @@ class TradeExecutor:
             if margin_health['positions_near_liquidation'] > 0:
                 self.ui.print_error(f"🚨 LIQUIDATION WARNING: {margin_health['positions_near_liquidation']} position(s) at high risk")
             
-            # Check stop loss and targets (including margin liquidation)
+            # Check for positions approaching 24-hour time limit
+            approaching_limit = self.position_manager.get_positions_approaching_time_limit()
+            if approaching_limit:
+                for position in approaching_limit:
+                    holding_hours = self.position_manager.get_holding_time_hours(position)
+                    time_remaining = self.position_manager.settings.BROKER_MAX_HOLDING_HOURS - holding_hours
+                    self.ui.print_warning(f"⏰ TIME WARNING: {position.symbol} held for {holding_hours:.1f}h - {time_remaining:.1f}h remaining before auto-close")
+            
+            # Check stop loss and targets (including margin liquidation and 24-hour limit)
             closed_position_ids = self.position_manager.check_stop_loss_and_targets(current_prices)
             
             # Process closed positions
@@ -256,7 +264,7 @@ class TradeExecutor:
     
     def get_trading_summary(self) -> Dict[str, Any]:
         """Get trading summary for display"""
-        positions_summary = self.position_manager.get_positions_summary()
+        positions_summary = self.position_manager.get_positions_summary_with_time_info()
         account_summary = self.account_manager.get_account_summary()
         
         return {
@@ -267,7 +275,8 @@ class TradeExecutor:
                 'trades_remaining': max(0, account_summary.get('daily_trades_limit', 5) - account_summary.get('daily_trades_count', 0)),
                 'stop_loss_percentage': self.stop_loss_percentage * 100,
                 'target_percentage': self.target_percentage * 100,
-                'min_confidence_threshold': self.min_confidence_threshold
+                'min_confidence_threshold': self.min_confidence_threshold,
+                'max_holding_time_hours': self.position_manager.settings.BROKER_MAX_HOLDING_HOURS
             }
         }
     

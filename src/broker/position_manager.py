@@ -190,6 +190,50 @@ class PositionManager:
                 return position
         return None
     
+    def check_holding_time_exceeded(self, position: Position) -> bool:
+        """Check if position has exceeded maximum holding time"""
+        if position.status != PositionStatus.OPEN:
+            return False
+        
+        try:
+            # Ensure entry time is timezone-aware
+            entry_time = position.entry_time
+            if entry_time.tzinfo is None:
+                entry_time = entry_time.replace(tzinfo=timezone.utc)
+            
+            # Calculate time difference
+            current_time = datetime.now(timezone.utc)
+            time_diff = current_time - entry_time
+            
+            # Convert to hours
+            holding_hours = time_diff.total_seconds() / 3600
+            
+            # Check if exceeded maximum holding time
+            return holding_hours >= self.settings.BROKER_MAX_HOLDING_HOURS
+            
+        except Exception as e:
+            self.ui.print_error(f"Error checking holding time for position {position.id}: {e}")
+            return False
+    
+    def get_holding_time_hours(self, position: Position) -> float:
+        """Get holding time in hours for a position"""
+        try:
+            # Ensure entry time is timezone-aware
+            entry_time = position.entry_time
+            if entry_time.tzinfo is None:
+                entry_time = entry_time.replace(tzinfo=timezone.utc)
+            
+            # Calculate time difference
+            current_time = datetime.now(timezone.utc)
+            time_diff = current_time - entry_time
+            
+            # Convert to hours
+            return time_diff.total_seconds() / 3600
+            
+        except Exception as e:
+            self.ui.print_error(f"Error calculating holding time for position {position.id}: {e}")
+            return 0.0
+    
     def can_open_position(self, symbol: str, position_type: PositionType) -> bool:
         """Check if can open position of given type for symbol"""
         # Check if there's already an open position of the same type for this symbol
@@ -215,7 +259,7 @@ class PositionManager:
                 self.save_position(position)
     
     def check_stop_loss_and_targets(self, current_prices: Dict[str, float]) -> List[str]:
-        """Check margin liquidation, stop loss and targets for open positions"""
+        """Check holding time, margin liquidation, stop loss and targets for open positions"""
         positions_to_close = []
         
         for position in self.get_open_positions():
@@ -226,13 +270,19 @@ class PositionManager:
             should_close = False
             reason = ""
             
-            # PRIORITY 1: Check margin liquidation first (higher priority than stop loss)
-            if position.should_liquidate(current_price, self.settings.BROKER_LIQUIDATION_THRESHOLD):
+            # PRIORITY 1: Check 24-hour holding time limit first (highest priority)
+            if self.check_holding_time_exceeded(position):
+                should_close = True
+                holding_hours = self.get_holding_time_hours(position)
+                reason = f"⏰ 24 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h | Price: ${current_price:.2f}"
+            
+            # PRIORITY 2: Check margin liquidation (higher priority than stop loss)
+            elif position.should_liquidate(current_price, self.settings.BROKER_LIQUIDATION_THRESHOLD):
                 should_close = True
                 margin_usage = position.calculate_margin_usage(current_price)
                 reason = f"💀 MARGIN LIQUIDATION: Loss {margin_usage*100:.1f}% of margin used | Price: ${current_price:.2f}"
             
-            # PRIORITY 2: Check stop loss only if no liquidation and position still open
+            # PRIORITY 3: Check stop loss only if no time limit/liquidation and position still open
             elif position.stop_loss and position.status == PositionStatus.OPEN:
                 if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
                     should_close = True
@@ -241,7 +291,7 @@ class PositionManager:
                     should_close = True
                     reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} >= ${position.stop_loss:.2f}"
             
-            # PRIORITY 3: Check target only if no liquidation/stop loss hit
+            # PRIORITY 4: Check target only if no time limit/liquidation/stop loss hit
             elif position.target and position.status == PositionStatus.OPEN:
                 if position.position_type == PositionType.LONG and current_price >= position.target:
                     should_close = True
@@ -256,6 +306,65 @@ class PositionManager:
                     positions_to_close.append(position.id)
         
         return positions_to_close
+    
+    def check_and_close_expired_positions(self, current_prices: Dict[str, float]) -> List[str]:
+        """Check and close positions that have exceeded maximum holding time"""
+        expired_positions = []
+        
+        for position in self.get_open_positions():
+            if self.check_holding_time_exceeded(position):
+                if position.symbol in current_prices:
+                    current_price = current_prices[position.symbol]
+                    holding_hours = self.get_holding_time_hours(position)
+                    reason = f"⏰ 24 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h"
+                    
+                    if self.close_position(position.id, current_price, reason):
+                        expired_positions.append(position.id)
+                        self.ui.print_warning(f"🕐 Position {position.symbol} automatically closed after {holding_hours:.1f} hours")
+        
+        return expired_positions
+    
+    def get_positions_approaching_time_limit(self, warning_hours: float = 22.0) -> List[Position]:
+        """Get positions that are approaching the 24-hour holding time limit"""
+        approaching_limit = []
+        
+        for position in self.get_open_positions():
+            holding_hours = self.get_holding_time_hours(position)
+            if holding_hours >= warning_hours and holding_hours < self.settings.BROKER_MAX_HOLDING_HOURS:
+                approaching_limit.append(position)
+        
+        return approaching_limit
+    
+    def get_positions_summary_with_time_info(self) -> Dict[str, Any]:
+        """Get positions summary including time-based information"""
+        summary = self.get_positions_summary()
+        
+        # Add time-based information
+        open_positions = self.get_open_positions()
+        approaching_limit = self.get_positions_approaching_time_limit()
+        
+        # Calculate average holding time for open positions
+        if open_positions:
+            total_holding_time = sum(self.get_holding_time_hours(pos) for pos in open_positions)
+            avg_holding_time = total_holding_time / len(open_positions)
+        else:
+            avg_holding_time = 0.0
+        
+        summary.update({
+            'positions_approaching_time_limit': len(approaching_limit),
+            'average_holding_time_hours': avg_holding_time,
+            'max_holding_time_hours': self.settings.BROKER_MAX_HOLDING_HOURS,
+            'time_limit_warnings': [
+                {
+                    'id': pos.id,
+                    'symbol': pos.symbol,
+                    'holding_hours': self.get_holding_time_hours(pos),
+                    'time_remaining': self.settings.BROKER_MAX_HOLDING_HOURS - self.get_holding_time_hours(pos)
+                } for pos in approaching_limit
+            ]
+        })
+        
+        return summary
     
     def check_margin_health(self, current_prices: Dict[str, float]) -> Dict[str, Any]:
         """Check margin health for all open positions"""

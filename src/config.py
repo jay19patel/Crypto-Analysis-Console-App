@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     BROKER_TRADING_FEE_PCT: float = 0.02  # 2% trading fee on invested amount
     BROKER_MARGIN_CALL_THRESHOLD: float = 0.8  # Margin call at 80% of margin used
     BROKER_LIQUIDATION_THRESHOLD: float = 0.95  # Liquidation at 95% of margin used
+    BROKER_MAX_HOLDING_HOURS: float = 24.0  # Maximum holding time in hours (24 hours)
     
     class Config:
         env_prefix = "CRYPTO_"  # Environment variables should be prefixed with CRYPTO_
