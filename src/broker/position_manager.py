@@ -156,13 +156,27 @@ class PositionManager:
         position.close_position(exit_price)
         position.notes = reason
         
-        # Save to database
+        # Calculate exit trading fee (if any)
+        exit_fee = position.trading_fee * 0.5  # Assume exit fee is half of entry fee
+        
+        # Save to database first
         if self.save_position(position):
+            # Release margin back to account balance with PnL
+            # This needs to be imported or accessed properly
+            try:
+                # Try to get account manager reference (this might need to be passed in constructor)
+                from src.broker.account_manager import AccountManager
+                # This is not ideal - we should pass account_manager as dependency
+                # For now, we'll handle this in the trade_executor level
+                pass
+            except:
+                pass
+            
             # Simple one-line logging for position closure
             pnl_emoji = "🟢" if position.pnl >= 0 else "🔴"
             pnl_symbol = "+" if position.pnl >= 0 else ""
             
-            self.ui.print_warning(f"🔔 POSITION CLOSED: {position.position_type.value} {position.symbol} at ${exit_price:.2f} | {pnl_emoji} P&L: {pnl_symbol}${position.pnl:.2f} | {reason}")
+            self.ui.print_warning(f"🔔 POSITION CLOSED: {position.position_type.value} {position.symbol} at ${exit_price:.2f} | {pnl_emoji} P&L: {pnl_symbol}${position.pnl:.2f} | Margin: ${position.margin_used:.2f} | {reason}")
             return True
         
         return False

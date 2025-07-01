@@ -51,10 +51,15 @@ class TradeExecutor:
             self.ui.print_warning(f"❌ Signal ignored: {signal} | Confidence: {confidence:.1f}% < {self.min_confidence_threshold}%")
             return False
         
+        # Refresh daily trades count from database first
+        if not self.account_manager.refresh_daily_trades_count():
+            self.ui.print_error("Failed to verify daily trades count")
+            return False
+        
         # Check if we can trade today
         account = self.account_manager.get_account()
         if not account or not account.can_trade_today():
-            self.ui.print_warning("Cannot execute trade: Daily limit reached or account not available")
+            self.ui.print_warning(f"Cannot execute trade: Daily limit reached ({account.daily_trades_count}/{account.daily_trades_limit}) or account not available")
             return False
         
         # Determine position type
@@ -95,7 +100,7 @@ class TradeExecutor:
             self.target_percentage
         )
         
-        # Reserve margin and pay trading fee
+        # Reserve margin and pay trading fee (deduct from current balance)
         if not self.account_manager.reserve_margin(margin_required, trading_fee):
             self.ui.print_error("Failed to reserve margin for trade")
             return False
@@ -121,7 +126,8 @@ class TradeExecutor:
             leverage_text = f" | {leverage}x Leverage" if leverage > 1 else ""
             margin_text = f" | Margin: ${margin_required:.2f}" if leverage > 1 else ""
             fee_text = f" | Fee: ${trading_fee:.2f}" if trading_fee > 0 else ""
-            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
+            balance_text = f" | Balance: ${account.current_balance:.2f}"
+            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text}{balance_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
             
             # Save trade execution details
             if analysis_data:
@@ -129,9 +135,8 @@ class TradeExecutor:
             
             return True
         else:
-            # Release margin if position creation failed
-            self.account_manager.release_margin(margin_required, 0)
-            self.account_manager.update_balance(trading_fee, "Trade execution failed - fee refunded")
+            # Release margin if position creation failed (add back to balance)
+            self.account_manager.release_margin(margin_required, 0, -trading_fee)  # Negative fee to refund
             return False
     
     def _calculate_risk_levels(
@@ -200,34 +205,37 @@ class TradeExecutor:
             # Check for positions approaching 48-hour time limit
             approaching_limit = self.position_manager.get_positions_approaching_time_limit()
             if approaching_limit:
-                for position in approaching_limit:
-                    holding_hours = self.position_manager.get_holding_time_hours(position)
-                    time_remaining = self.position_manager.settings.BROKER_MAX_HOLDING_HOURS - holding_hours
-                    self.ui.print_warning(f"⏰ TIME WARNING: {position.symbol} held for {holding_hours:.1f}h - {time_remaining:.1f}h remaining before auto-close")
+                for pos in approaching_limit:
+                    holding_hours = self.position_manager.get_holding_time_hours(pos)
+                    self.ui.print_warning(f"⏰ Position {pos.symbol} approaching time limit: {holding_hours:.1f}/48 hours")
             
-            # Check stop loss and targets (including margin liquidation and 48-hour limit)
-            closed_position_ids = self.position_manager.check_stop_loss_and_targets(current_prices)
+            # Check stop loss and targets
+            closed_positions.extend(self.position_manager.check_stop_loss_and_targets(current_prices))
             
-            # Process closed positions
-            for position_id in closed_position_ids:
+            # Check and close expired positions
+            closed_positions.extend(self.position_manager.check_and_close_expired_positions(current_prices))
+            
+            # Release margin for all closed positions
+            for position_id in closed_positions:
                 position = self.position_manager.get_position_by_id(position_id)
                 if position and position.status == PositionStatus.CLOSED:
-                    # Release margin back to account (for leveraged trades) or funds (for regular trades)
-                    if position.leverage > 1 and position.margin_used > 0:
-                        self.account_manager.release_margin(position.margin_used, position.pnl)
-                    else:
-                        self.account_manager.release_funds(position.invested_amount, position.pnl)
-                    closed_positions.append(position_id)
+                    # Release margin with PnL and exit fee
+                    exit_fee = position.trading_fee * 0.5  # Exit fee is half of entry fee
+                    self.account_manager.release_margin(position.margin_used, position.pnl, exit_fee)
                     
-                    # Update account statistics
-                    all_positions = self.position_manager.positions
-                    self.account_manager.update_statistics(all_positions)
+                    # Log margin release
+                    balance_after = self.account_manager.get_account().current_balance
+                    self.ui.print_info(f"💰 Margin released: ${position.margin_used:.2f} + P&L: ${position.pnl:.2f} - Exit fee: ${exit_fee:.2f} | Balance: ${balance_after:.2f}")
             
-            return closed_positions
+            # Update account statistics if any positions were closed
+            if closed_positions:
+                all_positions = self.position_manager.positions
+                self.account_manager.update_statistics(all_positions)
             
         except Exception as e:
             self.ui.print_error(f"Error checking positions: {e}")
-            return []
+        
+        return closed_positions
     
     def force_close_position(
         self,
@@ -237,28 +245,30 @@ class TradeExecutor:
     ) -> bool:
         """Force close a position manually"""
         
-        position = self.position_manager.get_position_by_id(position_id)
-        if not position:
-            self.ui.print_error(f"Position {position_id} not found")
-            return False
-        
-        if position.status != PositionStatus.OPEN:
-            self.ui.print_warning(f"Position {position_id} is not open")
-            return False
-        
-        # Close the position
-        if self.position_manager.close_position(position_id, current_price, reason):
-            # Release margin back to account (for leveraged trades) or funds (for regular trades)
-            if position.leverage > 1 and position.margin_used > 0:
-                self.account_manager.release_margin(position.margin_used, position.pnl)
-            else:
-                self.account_manager.release_funds(position.invested_amount, position.pnl)
-            
-            # Update account statistics
-            all_positions = self.position_manager.positions
-            self.account_manager.update_statistics(all_positions)
-            
-            return True
+        try:
+            # Close the position
+            if self.position_manager.close_position(position_id, current_price, reason):
+                # Get the closed position to release margin
+                position = self.position_manager.get_position_by_id(position_id)
+                if position and position.status == PositionStatus.CLOSED:
+                    # Release margin with PnL and exit fee
+                    exit_fee = position.trading_fee * 0.5  # Exit fee is half of entry fee
+                    self.account_manager.release_margin(position.margin_used, position.pnl, exit_fee)
+                    
+                    # Log the closure with balance update
+                    balance_after = self.account_manager.get_account().current_balance
+                    pnl_emoji = "🟢" if position.pnl >= 0 else "🔴"
+                    pnl_symbol = "+" if position.pnl >= 0 else ""
+                    self.ui.print_success(f"✅ Position manually closed: {position.symbol} | {pnl_emoji} P&L: {pnl_symbol}${position.pnl:.2f} | Balance: ${balance_after:.2f}")
+                    
+                    # Update account statistics
+                    all_positions = self.position_manager.positions
+                    self.account_manager.update_statistics(all_positions)
+                    
+                return True
+                
+        except Exception as e:
+            self.ui.print_error(f"Error force closing position: {e}")
         
         return False
     

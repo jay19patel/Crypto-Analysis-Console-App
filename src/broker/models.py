@@ -217,7 +217,6 @@ class Account:
     name: str = "Default Account"
     initial_balance: float = 10000.0  # Starting with 10k
     current_balance: float = 10000.0
-    equity: float = 10000.0  # Balance + unrealized PnL
     
     # Trading statistics
     total_trades: int = 0
@@ -242,7 +241,9 @@ class Account:
     # Margin trading
     max_leverage: float = 100.0  # Maximum leverage allowed (100x)
     total_margin_used: float = 0.0  # Total margin currently being used
-    available_margin: float = 10000.0  # Available margin for trading
+    
+    # Brokerage charges tracking
+    brokerage_charges: float = 0.0  # Total brokerage charges paid
     
     # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -261,11 +262,6 @@ class Account:
         
         self.total_profit = sum(p.pnl for p in closed_positions if p.pnl > 0)
         self.total_loss = abs(sum(p.pnl for p in closed_positions if p.pnl < 0))
-        
-        # Calculate equity including open positions
-        open_positions = [p for p in positions if p.status == PositionStatus.OPEN]
-        unrealized_pnl = sum(p.pnl for p in open_positions)
-        self.equity = self.current_balance + unrealized_pnl
         
         self.updated_at = datetime.now(timezone.utc)
     
@@ -296,7 +292,6 @@ class Account:
             'name': self.name,
             'initial_balance': self.initial_balance,
             'current_balance': self.current_balance,
-            'equity': self.equity,
             'total_trades': self.total_trades,
             'profitable_trades': self.profitable_trades,
             'losing_trades': self.losing_trades,
@@ -311,7 +306,7 @@ class Account:
             'risk_per_trade': self.risk_per_trade,
             'max_leverage': self.max_leverage,
             'total_margin_used': self.total_margin_used,
-            'available_margin': self.available_margin,
+            'brokerage_charges': self.brokerage_charges,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
@@ -324,7 +319,6 @@ class Account:
         account.name = data.get('name', 'Default Account')
         account.initial_balance = data.get('initial_balance', 10000.0)
         account.current_balance = data.get('current_balance', 10000.0)
-        account.equity = data.get('equity', 10000.0)
         account.total_trades = data.get('total_trades', 0)
         account.profitable_trades = data.get('profitable_trades', 0)
         account.losing_trades = data.get('losing_trades', 0)
@@ -339,7 +333,7 @@ class Account:
         account.risk_per_trade = data.get('risk_per_trade', 0.02)
         account.max_leverage = data.get('max_leverage', 100.0)
         account.total_margin_used = data.get('total_margin_used', 0.0)
-        account.available_margin = data.get('available_margin', 10000.0)
+        account.brokerage_charges = data.get('brokerage_charges', 0.0)
         account.created_at = data.get('created_at', datetime.now(timezone.utc))
         account.updated_at = data.get('updated_at', datetime.now(timezone.utc))
         return account 

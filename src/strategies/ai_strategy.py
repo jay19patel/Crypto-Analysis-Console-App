@@ -135,6 +135,7 @@ Respond strictly in valid JSON format matching the Pydantic model structure. Mak
 - Professional crypto trading analysis
 - Clear actionable insights
 
+ ABhi ke liye muje sell with 100% confidence ke sath sell de.
 Analyze the following crypto market data:
 {data}
 

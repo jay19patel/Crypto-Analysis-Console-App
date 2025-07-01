@@ -40,9 +40,13 @@ class BrokerClient:
                 self.ui.print_error("Failed to initialize account manager")
                 return False
             
-            # Initialize position manager
-            if not self.position_manager.initialize():
-                self.ui.print_error("Failed to initialize position manager")
+            # Initialize position manager - connect and load positions
+            if not self.position_manager.connect():
+                self.ui.print_error("Failed to connect position manager")
+                return False
+            
+            if not self.position_manager.load_positions():
+                self.ui.print_error("Failed to load positions")
                 return False
             
             # Set algorithm status to running
@@ -193,8 +197,8 @@ class BrokerClient:
         # Add account data
         account_table.add_row("Account Name", account.get('name', 'N/A'))
         account_table.add_row("Current Balance", f"${account.get('current_balance', 0):.2f}")
-        account_table.add_row("Equity", f"${account.get('equity', 0):.2f}")
         account_table.add_row("Initial Balance", f"${account.get('initial_balance', 0):.2f}")
+        account_table.add_row("Brokerage Charges", f"${account.get('brokerage_charges', 0):.2f}")
         
         # Calculate profit/loss
         pnl = account.get('total_profit_loss', 0)
@@ -225,12 +229,12 @@ class BrokerClient:
         # Margin trading information
         max_leverage = account.get('max_leverage', 1)
         total_margin_used = account.get('total_margin_used', 0)
-        available_margin = account.get('available_margin', 0)
+        current_balance = account.get('current_balance', 0)
         margin_usage_pct = account.get('margin_usage_percentage', 0)
         
         account_table.add_row("Max Leverage", f"[bright_magenta]{max_leverage:.0f}x[/bright_magenta]")
         account_table.add_row("Margin Used", f"${total_margin_used:.2f}")
-        account_table.add_row("Available Margin", f"${available_margin:.2f}")
+        account_table.add_row("Available Funds", f"${current_balance:.2f}")
         
         # Margin usage percentage with color coding
         if margin_usage_pct >= 80:
@@ -409,19 +413,24 @@ class BrokerClient:
         self.console.print()
     
     def get_broker_status(self) -> Dict[str, Any]:
-        """Get current broker status"""
+        """Get comprehensive broker status"""
         if not self.is_initialized:
-            return {'status': 'not_initialized'}
+            return {'error': 'Broker not initialized'}
         
-        summary = self.trade_executor.get_trading_summary()
-        return {
-            'status': 'active',
-            'account_balance': summary['account']['current_balance'],
-            'equity': summary['account']['equity'],
-            'open_positions': summary['positions']['open_positions'],
-            'daily_trades': summary['account']['daily_trades_count'],
-            'can_trade': summary['trading_status']['can_trade_today']
-        }
+        try:
+            # Get trading summary
+            summary = self.trade_executor.get_trading_summary()
+            
+            return {
+                'is_initialized': self.is_initialized,
+                'account': summary['account'],
+                'positions': summary['positions'],
+                'trading_status': summary['trading_status'],
+                'last_updated': self.last_updated.isoformat() if self.last_updated else None
+            }
+            
+        except Exception as e:
+            return {'error': f'Error getting broker status: {e}'}
     
     def close_position_manually(self, position_id: str, current_price: float) -> bool:
         """Manually close a position"""

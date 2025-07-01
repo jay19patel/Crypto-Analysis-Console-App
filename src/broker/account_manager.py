@@ -63,12 +63,10 @@ class AccountManager:
                 self.account = Account(
                     initial_balance=self.settings.BROKER_INITIAL_BALANCE,
                     current_balance=self.settings.BROKER_INITIAL_BALANCE,
-                    equity=self.settings.BROKER_INITIAL_BALANCE,
                     max_position_size=self.settings.BROKER_MAX_POSITION_SIZE,
                     risk_per_trade=self.settings.BROKER_RISK_PER_TRADE,
                     daily_trades_limit=self.settings.BROKER_DAILY_TRADE_LIMIT,
-                    max_leverage=self.settings.BROKER_MAX_LEVERAGE,
-                    available_margin=self.settings.BROKER_INITIAL_BALANCE
+                    max_leverage=self.settings.BROKER_MAX_LEVERAGE
                 )
                 self.save_account()
                 self.ui.print_success(f"Created new account: {self.account.name}")
@@ -126,6 +124,11 @@ class AccountManager:
         if not self.account:
             return False
         
+        # First refresh daily trades count from database
+        if not self.refresh_daily_trades_count():
+            self.ui.print_warning("Could not verify daily trades count")
+            return False
+        
         # Check if have enough balance
         if self.account.current_balance < amount:
             self.ui.print_warning(f"Insufficient balance: {self.account.current_balance:.2f} < {amount:.2f}")
@@ -143,62 +146,68 @@ class AccountManager:
         
         return True
     
+    def refresh_daily_trades_count(self) -> bool:
+        """Refresh daily trades count from database based on today's date"""
+        if not self.account or not self.is_connected:
+            return False
+        
+        try:
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            
+            # If it's a new day, reset the counter
+            if self.account.last_trade_date != today:
+                self.account.daily_trades_count = 0
+                self.account.last_trade_date = today
+                self.save_account()
+                self.ui.print_info(f"New trading day: {today} - Daily trades reset to 0")
+            
+            return True
+            
+        except Exception as e:
+            self.ui.print_error(f"Error refreshing daily trades count: {e}")
+            return False
+    
     def reserve_margin(self, margin_amount: float, trading_fee: float) -> bool:
-        """Reserve margin for a position"""
+        """Reserve margin for a position and deduct from current balance"""
         if not self.account:
             return False
         
         total_required = margin_amount + trading_fee
         
-        # Check if we have enough available margin
-        if total_required > self.account.available_margin:
-            self.ui.print_warning(f"Insufficient margin: {self.account.available_margin:.2f} < {total_required:.2f}")
+        # Check if we have enough current balance (margin comes from balance)
+        if total_required > self.account.current_balance:
+            self.ui.print_warning(f"Insufficient balance for margin: {self.account.current_balance:.2f} < {total_required:.2f}")
             return False
         
-        # Reserve margin and deduct trading fee from balance
-        self.account.available_margin -= total_required
+        # Deduct margin and trading fee from current balance
+        self.account.current_balance -= total_required
         self.account.total_margin_used += margin_amount
-        self.account.current_balance -= trading_fee  # Trading fee is paid immediately
+        
+        # Track brokerage charges
+        self.account.brokerage_charges += trading_fee
+        
+        # Increment daily trades count
         self.account.increment_daily_trades()
         
         return self.save_account()
     
-    def reserve_funds(self, amount: float) -> bool:
-        """Reserve funds for a position (legacy method for compatibility)"""
-        if not self.can_open_position(amount):
-            return False
-        
-        # Deduct from balance
-        self.account.current_balance -= amount
-        self.account.increment_daily_trades()
-        
-        return self.save_account()
-    
-    def release_margin(self, margin_amount: float, pnl: float) -> bool:
-        """Release margin from closed position"""
+    def release_margin(self, margin_amount: float, pnl: float, trading_fee: float = 0.0) -> bool:
+        """Release margin from closed position and add back to current balance with PnL"""
         if not self.account:
             return False
         
-        # Release margin back to available margin
-        self.account.available_margin += margin_amount
+        # Add margin back to current balance along with PnL
+        self.account.current_balance += margin_amount + pnl
         self.account.total_margin_used -= margin_amount
         
-        # Add PnL to balance (can be positive or negative)
-        self.account.current_balance += pnl
+        # If there was an exit fee, deduct it and track it
+        if trading_fee > 0:
+            self.account.current_balance -= trading_fee
+            self.account.brokerage_charges += trading_fee
         
         # Ensure margin used doesn't go negative
         if self.account.total_margin_used < 0:
             self.account.total_margin_used = 0
-        
-        return self.save_account()
-    
-    def release_funds(self, amount: float, pnl: float) -> bool:
-        """Release funds from closed position (legacy method for compatibility)"""
-        if not self.account:
-            return False
-        
-        # Return invested amount plus PnL
-        self.account.current_balance += amount + pnl
         
         return self.save_account()
     
@@ -219,52 +228,60 @@ class AccountManager:
         # Calculate trading fee (2% of invested amount)
         trading_fee = required_margin * self.settings.BROKER_TRADING_FEE_PCT
         
-        # Ensure we have enough margin available
-        if required_margin + trading_fee > self.account.available_margin:
-            # Reduce position size to fit available margin
-            available_for_position = self.account.available_margin - trading_fee
+        # Ensure we have enough balance available for margin + fee
+        total_required = required_margin + trading_fee
+        if total_required > self.account.current_balance:
+            # Reduce position size to fit available balance
+            available_for_position = self.account.current_balance * 0.95  # Leave 5% buffer
             if available_for_position > 0:
-                required_margin = available_for_position
+                total_available = available_for_position
+                trading_fee = total_available * self.settings.BROKER_TRADING_FEE_PCT / (1 + self.settings.BROKER_TRADING_FEE_PCT)
+                required_margin = total_available - trading_fee
                 max_position_value = required_margin * leverage
-                trading_fee = required_margin * self.settings.BROKER_TRADING_FEE_PCT
             else:
                 return 0.0, 0.0, 0.0
         
         return max_position_value, required_margin, trading_fee
     
     def update_statistics(self, positions: List[Position]) -> None:
-        """Update account statistics"""
+        """Update account statistics from positions"""
         if not self.account:
             return
         
-        self.account.calculate_statistics(positions)
-        self.save_account()
+        try:
+            self.account.calculate_statistics(positions)
+            self.save_account()
+        except Exception as e:
+            self.ui.print_error(f"Error updating statistics: {e}")
     
     def get_account_summary(self) -> Dict[str, Any]:
-        """Get account summary for display"""
+        """Get account summary"""
         if not self.account:
             return {}
         
         return {
+            'id': self.account.id,
             'name': self.account.name,
-            'current_balance': self.account.current_balance,
-            'equity': self.account.equity,
             'initial_balance': self.account.initial_balance,
-            'total_profit_loss': self.account.current_balance - self.account.initial_balance,
+            'current_balance': self.account.current_balance,
             'total_trades': self.account.total_trades,
             'profitable_trades': self.account.profitable_trades,
             'losing_trades': self.account.losing_trades,
+            'total_profit': self.account.total_profit,
+            'total_loss': self.account.total_loss,
             'win_rate': self.account.win_rate,
             'daily_trades_count': self.account.daily_trades_count,
             'daily_trades_limit': self.account.daily_trades_limit,
-            'max_position_size': self.account.max_position_size,
-            'growth_percentage': ((self.account.current_balance - self.account.initial_balance) / self.account.initial_balance) * 100,
+            'last_trade_date': self.account.last_trade_date,
             'algo_status': self.account.algo_status,
-            # Margin trading info
+            'max_position_size': self.account.max_position_size,
+            'risk_per_trade': self.account.risk_per_trade,
             'max_leverage': self.account.max_leverage,
             'total_margin_used': self.account.total_margin_used,
-            'available_margin': self.account.available_margin,
-            'margin_usage_percentage': (self.account.total_margin_used / (self.account.total_margin_used + self.account.available_margin)) * 100 if (self.account.total_margin_used + self.account.available_margin) > 0 else 0
+            'brokerage_charges': self.account.brokerage_charges,
+            'total_profit_loss': self.account.total_profit - self.account.total_loss,
+            'created_at': self.account.created_at,
+            'updated_at': self.account.updated_at
         }
     
     def reset_daily_trades(self) -> bool:

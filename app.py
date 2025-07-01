@@ -433,6 +433,118 @@ class Application:
             if 'broker_client' in locals():
                 broker_client.disconnect()
             return False
+    
+    def run_database_cleanup(self) -> bool:
+        """
+        Delete all data from MongoDB collections with confirmation
+        
+        Returns:
+            bool: True if deletion was successful
+        """
+        try:
+            self.ui.print_banner()
+            self.ui.print_warning("🗑️  DATABASE CLEANUP MODE")
+            self.ui.print_warning("This will permanently delete ALL data from MongoDB collections:")
+            self.ui.print_warning("  • accounts")
+            self.ui.print_warning("  • analysis_results") 
+            self.ui.print_warning("  • positions")
+            self.ui.print_warning("")
+            
+            # First confirmation
+            confirmation1 = input("⚠️  Are you sure you want to delete ALL data? Type 'YES' to confirm: ")
+            if confirmation1 != 'YES':
+                self.ui.print_info("Operation cancelled by user")
+                return True
+            
+            # Second confirmation with database name
+            self.ui.print_warning("⚠️  THIS CANNOT BE UNDONE!")
+            confirmation2 = input(f"💀 Type 'DELETE ALL DATA' to confirm deletion from database '{self.settings.MONGODB_DATABASE}': ")
+            if confirmation2 != 'DELETE ALL DATA':
+                self.ui.print_info("Operation cancelled by user")
+                return True
+            
+            self.ui.print_info("🔌 Connecting to MongoDB...")
+            
+            # Initialize MongoDB client
+            mongodb_client = MongoDBClient(self.ui)
+            if not mongodb_client.test_connection():
+                self.ui.print_error("Failed to connect to MongoDB")
+                return False
+            
+            self.ui.print_success("✅ Connected to MongoDB")
+            
+            # Get database and collections
+            database = mongodb_client.client[self.settings.MONGODB_DATABASE]
+            collections_to_delete = ['accounts', 'analysis_results', 'positions']
+            
+            # Create progress bar
+            with self.ui.create_progress_bar("🗑️  Deleting database collections") as progress:
+                total_deleted = 0
+                
+                for i, collection_name in enumerate(collections_to_delete):
+                    task = progress.add_task(f"Deleting {collection_name}...", total=100)
+                    
+                    try:
+                        collection = database[collection_name]
+                        
+                        # Get count before deletion
+                        count_before = collection.count_documents({})
+                        progress.update(task, completed=30)
+                        
+                        if count_before > 0:
+                            # Delete all documents
+                            result = collection.delete_many({})
+                            progress.update(task, completed=70)
+                            
+                            # Verify deletion
+                            count_after = collection.count_documents({})
+                            progress.update(task, completed=100)
+                            
+                            if count_after == 0:
+                                self.ui.print_success(f"✅ {collection_name}: {result.deleted_count} documents deleted")
+                                total_deleted += result.deleted_count
+                            else:
+                                self.ui.print_error(f"❌ {collection_name}: Failed to delete all documents ({count_after} remaining)")
+                                return False
+                        else:
+                            progress.update(task, completed=100)
+                            self.ui.print_info(f"ℹ️  {collection_name}: Already empty (0 documents)")
+                    
+                    except Exception as e:
+                        self.ui.print_error(f"❌ Error deleting {collection_name}: {e}")
+                        return False
+            
+            # Final verification
+            self.ui.print_info("🔍 Verifying deletion...")
+            verification_passed = True
+            
+            for collection_name in collections_to_delete:
+                collection = database[collection_name]
+                remaining_count = collection.count_documents({})
+                if remaining_count > 0:
+                    self.ui.print_error(f"❌ {collection_name}: {remaining_count} documents still remain!")
+                    verification_passed = False
+                else:
+                    self.ui.print_success(f"✅ {collection_name}: Completely clean")
+            
+            if verification_passed:
+                self.ui.print_success(f"🎉 Database cleanup completed successfully!")
+                self.ui.print_success(f"📊 Total documents deleted: {total_deleted}")
+                self.ui.print_info("💡 All collections are now empty and ready for fresh data")
+            else:
+                self.ui.print_error("❌ Database cleanup completed with errors")
+                return False
+            
+            # Close connection
+            mongodb_client.disconnect()
+            return True
+            
+        except KeyboardInterrupt:
+            self.ui.print_warning("Database cleanup cancelled by user")
+            return False
+        except Exception as e:
+            self.ui.print_error(f"Database cleanup error: {e}")
+            return False
 
 def main():
     """Application entry point"""
@@ -455,6 +567,9 @@ Examples:
   python app.py --analysis 5 --symbols BTCUSD ETHUSD --broker    Multi-symbol auto-trading
   python app.py --analysis --uiOff         Run analysis with no UI output (silent mode)
   python app.py --analysis 5 --symbols BTCUSD ETHUSD --uiOff    Silent multi-symbol analysis
+  
+  🗑️  DATABASE MANAGEMENT:
+  python app.py --delete               Delete ALL data from MongoDB (with confirmation)
 
   Developed by Jay Patel email: developer.jay19@gmail.com
         """
@@ -533,6 +648,12 @@ Examples:
         help='Display detailed broker dashboard with auto-refresh (configurable interval)'
     )
     
+    parser.add_argument(
+        '--delete',
+        action='store_true',
+        help='Delete all data from MongoDB collections (accounts, analysis_results, positions)'
+    )
+    
     args = parser.parse_args()
     
     # Create application instance
@@ -586,6 +707,11 @@ Examples:
         
         elif args.liveprice:
             success = app.run_price_monitoring()
+            if not success:
+                sys.exit(1)
+        
+        elif args.delete:
+            success = app.run_database_cleanup()
             if not success:
                 sys.exit(1)
     

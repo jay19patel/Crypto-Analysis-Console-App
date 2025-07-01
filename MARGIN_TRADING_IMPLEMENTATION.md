@@ -27,7 +27,7 @@ BROKER_LIQUIDATION_THRESHOLD: float = 0.95  # Auto-liquidation at 95% usage
 **New Fields Added:**
 - `max_leverage: float = 50.0` - Maximum allowed leverage
 - `total_margin_used: float = 0.0` - Total margin currently in use
-- `available_margin: float = 10000.0` - Available margin for trading
+
 
 ### 🔧 Account Manager Enhancements (src/broker/account_manager.py)
 **New Methods:**
@@ -167,7 +167,6 @@ trading_fee = margin_required * 0.02  # $2
   // ... existing fields ...
   max_leverage: 50.0,
   total_margin_used: 500.0,
-  available_margin: 9500.0,
   // ... existing fields ...
 }
 ```
