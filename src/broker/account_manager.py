@@ -259,6 +259,7 @@ class AccountManager:
             'daily_trades_limit': self.account.daily_trades_limit,
             'max_position_size': self.account.max_position_size,
             'growth_percentage': ((self.account.current_balance - self.account.initial_balance) / self.account.initial_balance) * 100,
+            'algo_status': self.account.algo_status,
             # Margin trading info
             'max_leverage': self.account.max_leverage,
             'total_margin_used': self.account.total_margin_used,
@@ -278,6 +279,30 @@ class AccountManager:
             return self.save_account()
         
         return True
+    
+    def set_algo_status(self, status: bool) -> bool:
+        """Set algorithm running status"""
+        if not self.account:
+            return False
+        
+        self.account.algo_status = status
+        self.account.updated_at = datetime.now(timezone.utc)
+        return self.save_account()
+    
+    def get_algo_status(self) -> bool:
+        """Get algorithm running status"""
+        if not self.account:
+            return False
+        
+        return self.account.algo_status
+    
+    def start_algo(self) -> bool:
+        """Set algorithm status to running (True)"""
+        return self.set_algo_status(True)
+    
+    def stop_algo(self) -> bool:
+        """Set algorithm status to stopped (False)"""
+        return self.set_algo_status(False)
     
     def disconnect(self) -> None:
         """Disconnect from MongoDB"""

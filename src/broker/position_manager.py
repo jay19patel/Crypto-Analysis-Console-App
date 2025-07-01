@@ -270,11 +270,11 @@ class PositionManager:
             should_close = False
             reason = ""
             
-            # PRIORITY 1: Check 24-hour holding time limit first (highest priority)
+            # PRIORITY 1: Check 48-hour holding time limit first (highest priority)
             if self.check_holding_time_exceeded(position):
                 should_close = True
                 holding_hours = self.get_holding_time_hours(position)
-                reason = f"⏰ 24 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h | Price: ${current_price:.2f}"
+                reason = f"⏰ 48 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h | Price: ${current_price:.2f}"
             
             # PRIORITY 2: Check margin liquidation (higher priority than stop loss)
             elif position.should_liquidate(current_price, self.settings.BROKER_LIQUIDATION_THRESHOLD):
@@ -316,7 +316,7 @@ class PositionManager:
                 if position.symbol in current_prices:
                     current_price = current_prices[position.symbol]
                     holding_hours = self.get_holding_time_hours(position)
-                    reason = f"⏰ 24 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h"
+                    reason = f"⏰ 48 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h"
                     
                     if self.close_position(position.id, current_price, reason):
                         expired_positions.append(position.id)
@@ -324,8 +324,8 @@ class PositionManager:
         
         return expired_positions
     
-    def get_positions_approaching_time_limit(self, warning_hours: float = 22.0) -> List[Position]:
-        """Get positions that are approaching the 24-hour holding time limit"""
+    def get_positions_approaching_time_limit(self, warning_hours: float = 46.0) -> List[Position]:
+        """Get positions that are approaching the 48-hour holding time limit"""
         approaching_limit = []
         
         for position in self.get_open_positions():

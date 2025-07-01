@@ -33,30 +33,27 @@ class BrokerClient:
         self.last_updated = None
     
     def initialize(self) -> bool:
-        """Initialize broker system"""
+        """Initialize all broker components"""
         try:
-            self.ui.print_info("Initializing broker system...")
-            
             # Initialize account manager
             if not self.account_manager.initialize_account():
-                self.ui.print_error("Failed to initialize account")
+                self.ui.print_error("Failed to initialize account manager")
                 return False
             
-            # Load positions
-            if not self.position_manager.load_positions():
-                self.ui.print_error("Failed to load positions")
+            # Initialize position manager
+            if not self.position_manager.initialize():
+                self.ui.print_error("Failed to initialize position manager")
                 return False
             
-            # Update account statistics
-            all_positions = self.position_manager.positions
-            self.account_manager.update_statistics(all_positions)
+            # Set algorithm status to running
+            self.account_manager.start_algo()
             
             self.is_initialized = True
-            self.ui.print_success("Broker system initialized successfully!")
+            self.ui.print_success("Broker system initialized successfully")
             return True
             
         except Exception as e:
-            self.ui.print_error(f"Failed to initialize broker system: {e}")
+            self.ui.print_error(f"Error initializing broker system: {e}")
             return False
     
     def process_analysis_signal(
@@ -243,6 +240,12 @@ class BrokerClient:
         else:
             margin_color = "green"
         account_table.add_row("Margin Usage", f"[{margin_color}]{margin_usage_pct:.1f}%[/{margin_color}]")
+        
+        # Algorithm status
+        algo_status = account.get('algo_status', False)
+        status_color = "green" if algo_status else "red"
+        status_text = "🟢 RUNNING" if algo_status else "🔴 STOPPED"
+        account_table.add_row("Algorithm Status", f"[{status_color}]{status_text}[/{status_color}]")
         
         self.console.print(account_table)
         self.console.print()
@@ -467,6 +470,10 @@ class BrokerClient:
     def disconnect(self) -> None:
         """Disconnect all components"""
         try:
+            # Set algorithm status to stopped before disconnecting
+            if self.account_manager and self.account_manager.account:
+                self.account_manager.stop_algo()
+            
             self.account_manager.disconnect()
             self.position_manager.disconnect()
             self.ui.print_info("Broker system disconnected")

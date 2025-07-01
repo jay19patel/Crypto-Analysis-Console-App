@@ -225,13 +225,15 @@ class Account:
     losing_trades: int = 0
     total_profit: float = 0.0
     total_loss: float = 0.0
-    max_drawdown: float = 0.0
     win_rate: float = 0.0
     
     # Daily limits
     daily_trades_count: int = 0
     daily_trades_limit: int = 5
     last_trade_date: Optional[str] = None
+    
+    # Algorithm status
+    algo_status: bool = False  # True when Python script is running, False when stopped
     
     # Risk management
     max_position_size: float = 1000.0  # Max amount per position
@@ -300,11 +302,11 @@ class Account:
             'losing_trades': self.losing_trades,
             'total_profit': self.total_profit,
             'total_loss': self.total_loss,
-            'max_drawdown': self.max_drawdown,
             'win_rate': self.win_rate,
             'daily_trades_count': self.daily_trades_count,
             'daily_trades_limit': self.daily_trades_limit,
             'last_trade_date': self.last_trade_date,
+            'algo_status': self.algo_status,
             'max_position_size': self.max_position_size,
             'risk_per_trade': self.risk_per_trade,
             'max_leverage': self.max_leverage,
@@ -328,11 +330,11 @@ class Account:
         account.losing_trades = data.get('losing_trades', 0)
         account.total_profit = data.get('total_profit', 0.0)
         account.total_loss = data.get('total_loss', 0.0)
-        account.max_drawdown = data.get('max_drawdown', 0.0)
         account.win_rate = data.get('win_rate', 0.0)
         account.daily_trades_count = data.get('daily_trades_count', 0)
         account.daily_trades_limit = data.get('daily_trades_limit', 5)
         account.last_trade_date = data.get('last_trade_date')
+        account.algo_status = data.get('algo_status', False)
         account.max_position_size = data.get('max_position_size', 1000.0)
         account.risk_per_trade = data.get('risk_per_trade', 0.02)
         account.max_leverage = data.get('max_leverage', 100.0)

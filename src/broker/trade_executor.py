@@ -197,7 +197,7 @@ class TradeExecutor:
             if margin_health['positions_near_liquidation'] > 0:
                 self.ui.print_error(f"🚨 LIQUIDATION WARNING: {margin_health['positions_near_liquidation']} position(s) at high risk")
             
-            # Check for positions approaching 24-hour time limit
+            # Check for positions approaching 48-hour time limit
             approaching_limit = self.position_manager.get_positions_approaching_time_limit()
             if approaching_limit:
                 for position in approaching_limit:
@@ -205,7 +205,7 @@ class TradeExecutor:
                     time_remaining = self.position_manager.settings.BROKER_MAX_HOLDING_HOURS - holding_hours
                     self.ui.print_warning(f"⏰ TIME WARNING: {position.symbol} held for {holding_hours:.1f}h - {time_remaining:.1f}h remaining before auto-close")
             
-            # Check stop loss and targets (including margin liquidation and 24-hour limit)
+            # Check stop loss and targets (including margin liquidation and 48-hour limit)
             closed_position_ids = self.position_manager.check_stop_loss_and_targets(current_prices)
             
             # Process closed positions

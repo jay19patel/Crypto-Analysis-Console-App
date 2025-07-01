@@ -57,12 +57,12 @@ class Settings(BaseSettings):
     AI_MAX_RETRIES: int = 2
     
     # Broker Configuration
-    BROKER_INITIAL_BALANCE: float = 10000.0  # Starting balance
+    BROKER_INITIAL_BALANCE: float = 10000.0
     BROKER_MAX_POSITION_SIZE: float = 1000.0  # Max amount per position
     BROKER_RISK_PER_TRADE: float = 0.02  # 2% risk per trade
     BROKER_DAILY_TRADE_LIMIT: int = 5  # Max trades per day
-    BROKER_STOP_LOSS_PCT: float = 0.02  # 2% stop loss
-    BROKER_TARGET_PCT: float = 0.04  # 4% target (2:1 risk:reward)
+    BROKER_STOP_LOSS_PCT: float = 0.01  # 1% stop loss
+    BROKER_TARGET_PCT: float = 0.02  # 2% target (2:1 risk:reward)
     BROKER_MIN_CONFIDENCE: float = 60.0  # Minimum signal confidence for trade execution
     BROKER_UI_REFRESH_INTERVAL: int = 60  # Broker UI refresh interval in seconds (1 minute)
     
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     BROKER_TRADING_FEE_PCT: float = 0.02  # 2% trading fee on invested amount
     BROKER_MARGIN_CALL_THRESHOLD: float = 0.8  # Margin call at 80% of margin used
     BROKER_LIQUIDATION_THRESHOLD: float = 0.95  # Liquidation at 95% of margin used
-    BROKER_MAX_HOLDING_HOURS: float = 24.0  # Maximum holding time in hours (24 hours)
+    BROKER_MAX_HOLDING_HOURS: float = 48.0  # Maximum holding time in hours (48 hours)
     
     class Config:
         env_prefix = "CRYPTO_"  # Environment variables should be prefixed with CRYPTO_
