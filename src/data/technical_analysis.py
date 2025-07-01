@@ -1,4 +1,3 @@
-
 import httpx
 import pandas as pd
 import pandas_ta as ta
@@ -470,6 +469,20 @@ class TechnicalAnalysis:
                 'interpretation': 'No strategies analyzed'
             }
         
+        # Get latest OHLC data if available
+        latest_data = {}
+        if self.df is not None and not self.df.empty:
+            latest = self.df.iloc[-1]
+            latest_data = {
+                'open': float(latest['open']) if pd.notna(latest['open']) else None,
+                'high': float(latest['high']) if pd.notna(latest['high']) else None,
+                'low': float(latest['low']) if pd.notna(latest['low']) else None,
+                'close': float(latest['close']) if pd.notna(latest['close']) else None,
+                'volume': float(latest['volume']) if pd.notna(latest['volume']) else None,
+                'timestamp': latest['time'] if 'time' in latest and pd.notna(latest['time']) else None,
+                'datetime': latest['datetime'].strftime('%Y-%m-%d %H:%M:%S') if 'datetime' in latest and pd.notna(latest['datetime']) else None
+            }
+        
         return {
             'symbol': self.symbol,
             'resolution': self.resolution,
@@ -477,7 +490,8 @@ class TechnicalAnalysis:
             'indicators': [vars(i) for i in self.indicators],
             'strategies': strategies_dict,
             'consensus': consensus,
-            'ai_analysis': self.ai_analysis_result
+            'ai_analysis': self.ai_analysis_result,
+            'latest_data': latest_data
         }
     
     def refresh(self) -> bool:
