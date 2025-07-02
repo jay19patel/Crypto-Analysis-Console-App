@@ -129,14 +129,17 @@ class AccountManager:
             self.ui.print_warning("Could not verify daily trades count")
             return False
         
+        # Check daily trade limit BEFORE checking other conditions
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        actual_daily_count = self.get_daily_positions_count(today)
+        
+        if actual_daily_count >= self.account.daily_trades_limit:
+            self.ui.print_warning(f"Daily trade limit reached: {actual_daily_count}/{self.account.daily_trades_limit} positions taken today")
+            return False
+        
         # Check if have enough balance
         if self.account.current_balance < amount:
             self.ui.print_warning(f"Insufficient balance: {self.account.current_balance:.2f} < {amount:.2f}")
-            return False
-        
-        # Check daily trade limit
-        if not self.account.can_trade_today():
-            self.ui.print_warning(f"Daily trade limit reached: {self.account.daily_trades_count}/{self.account.daily_trades_limit}")
             return False
         
         # Check max position size
@@ -146,6 +149,37 @@ class AccountManager:
         
         return True
     
+    def get_daily_positions_count(self, date_str: Optional[str] = None) -> int:
+        """Get count of positions created on specific date from database"""
+        if not self.is_connected:
+            if not self.connect():
+                return 0
+        
+        try:
+            if date_str is None:
+                date_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            
+            # Get positions collection reference
+            positions_collection = self.db['positions']
+            
+            # Create date range for the entire day
+            start_date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+            end_date = start_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            # Count positions created within this date range
+            count = positions_collection.count_documents({
+                "entry_time": {
+                    "$gte": start_date,
+                    "$lte": end_date
+                }
+            })
+            
+            return count
+            
+        except Exception as e:
+            self.ui.print_error(f"Error getting daily positions count: {e}")
+            return 0
+
     def refresh_daily_trades_count(self) -> bool:
         """Refresh daily trades count from database based on today's date"""
         if not self.account or not self.is_connected:
@@ -154,12 +188,22 @@ class AccountManager:
         try:
             today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
             
+            # Get actual count of positions created today from database
+            actual_daily_count = self.get_daily_positions_count(today)
+            
             # If it's a new day, reset the counter
             if self.account.last_trade_date != today:
                 self.account.daily_trades_count = 0
                 self.account.last_trade_date = today
-                self.save_account()
                 self.ui.print_info(f"New trading day: {today} - Daily trades reset to 0")
+            
+            # Update account with actual count from database
+            if self.account.daily_trades_count != actual_daily_count:
+                self.ui.print_info(f"Syncing daily trades count: {self.account.daily_trades_count} → {actual_daily_count}")
+                self.account.daily_trades_count = actual_daily_count
+            
+            # Save updated account
+            self.save_account()
             
             return True
             
@@ -186,8 +230,8 @@ class AccountManager:
         # Track brokerage charges
         self.account.brokerage_charges += trading_fee
         
-        # Increment daily trades count
-        self.account.increment_daily_trades()
+        # Update timestamp only
+        self.account.updated_at = datetime.now(timezone.utc)
         
         return self.save_account()
     
@@ -325,4 +369,64 @@ class AccountManager:
         """Disconnect from MongoDB"""
         if self.client:
             self.client.close()
-            self.is_connected = False 
+            self.is_connected = False
+    
+    def check_and_reset_daily_trades(self) -> bool:
+        """Check and reset daily trades if it's a new day with no positions"""
+        if not self.account or not self.is_connected:
+            return False
+        
+        try:
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            
+            # If it's same day, no need to reset
+            if self.account.last_trade_date == today:
+                return True
+            
+            # It's a new day - get actual positions count for today
+            actual_daily_count = self.get_daily_positions_count(today)
+            
+            # Reset account values for new day
+            self.account.daily_trades_count = actual_daily_count
+            self.account.last_trade_date = today
+            self.account.updated_at = datetime.now(timezone.utc)
+            
+            # Save updated account
+            if self.save_account():
+                if actual_daily_count == 0:
+                    self.ui.print_info(f"New trading day: {today} - Daily trades reset to 0")
+                else:
+                    self.ui.print_info(f"New trading day: {today} - Daily trades synced to {actual_daily_count}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.ui.print_error(f"Error checking and resetting daily trades: {e}")
+            return False
+    
+    def sync_daily_trades_after_position_creation(self) -> bool:
+        """Sync daily trades count with database after position creation"""
+        if not self.account or not self.is_connected:
+            return False
+        
+        try:
+            today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+            
+            # Get actual count of positions created today from database
+            actual_daily_count = self.get_daily_positions_count(today)
+            
+            # Update account with actual count from database
+            self.account.daily_trades_count = actual_daily_count
+            self.account.last_trade_date = today
+            self.account.updated_at = datetime.now(timezone.utc)
+            
+            # Save updated account
+            if self.save_account():
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.ui.print_error(f"Error syncing daily trades after position creation: {e}")
+            return False 

@@ -230,20 +230,10 @@ class BrokerClient:
         max_leverage = account.get('max_leverage', 1)
         total_margin_used = account.get('total_margin_used', 0)
         current_balance = account.get('current_balance', 0)
-        margin_usage_pct = account.get('margin_usage_percentage', 0)
         
         account_table.add_row("Max Leverage", f"[bright_magenta]{max_leverage:.0f}x[/bright_magenta]")
         account_table.add_row("Margin Used", f"${total_margin_used:.2f}")
         account_table.add_row("Available Funds", f"${current_balance:.2f}")
-        
-        # Margin usage percentage with color coding
-        if margin_usage_pct >= 80:
-            margin_color = "red"
-        elif margin_usage_pct >= 60:
-            margin_color = "yellow"
-        else:
-            margin_color = "green"
-        account_table.add_row("Margin Usage", f"[{margin_color}]{margin_usage_pct:.1f}%[/{margin_color}]")
         
         # Algorithm status
         algo_status = account.get('algo_status', False)

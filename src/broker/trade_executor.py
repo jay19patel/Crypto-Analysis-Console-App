@@ -51,15 +51,23 @@ class TradeExecutor:
             self.ui.print_warning(f"❌ Signal ignored: {signal} | Confidence: {confidence:.1f}% < {self.min_confidence_threshold}%")
             return False
         
-        # Refresh daily trades count from database first
-        if not self.account_manager.refresh_daily_trades_count():
-            self.ui.print_error("Failed to verify daily trades count")
+        # Check and reset daily trades for new day first
+        if not self.account_manager.check_and_reset_daily_trades():
+            self.ui.print_error("Failed to check daily trades status")
             return False
         
-        # Check if we can trade today
+        # Get actual daily position count from database
+        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        actual_daily_count = self.account_manager.get_daily_positions_count(today)
+        
+        # Check if we can trade today based on actual database count
         account = self.account_manager.get_account()
-        if not account or not account.can_trade_today():
-            self.ui.print_warning(f"Cannot execute trade: Daily limit reached ({account.daily_trades_count}/{account.daily_trades_limit}) or account not available")
+        if not account:
+            self.ui.print_warning("Account not available")
+            return False
+        
+        if actual_daily_count >= account.daily_trades_limit:
+            self.ui.print_warning(f"Cannot execute trade: Daily limit reached ({actual_daily_count}/{account.daily_trades_limit}) positions taken today")
             return False
         
         # Determine position type
@@ -122,12 +130,19 @@ class TradeExecutor:
         )
         
         if position:
+            # Sync daily trades count with actual database count after position creation
+            self.account_manager.sync_daily_trades_after_position_creation()
+            
+            # Get updated account for display
+            account = self.account_manager.get_account()
+            
             # Enhanced logging for margin trade execution
             leverage_text = f" | {leverage}x Leverage" if leverage > 1 else ""
             margin_text = f" | Margin: ${margin_required:.2f}" if leverage > 1 else ""
             fee_text = f" | Fee: ${trading_fee:.2f}" if trading_fee > 0 else ""
             balance_text = f" | Balance: ${account.current_balance:.2f}"
-            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text}{balance_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
+            trades_text = f" | Daily Trades: {account.daily_trades_count}/{account.daily_trades_limit}"
+            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text}{balance_text}{trades_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
             
             # Save trade execution details
             if analysis_data:
