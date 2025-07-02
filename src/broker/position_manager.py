@@ -284,6 +284,16 @@ class PositionManager:
             should_close = False
             reason = ""
             
+            # Update position PnL first
+            position.calculate_pnl(current_price)
+            
+            # Debug logging for each position (only if debug mode is enabled)
+            if self.settings.BROKER_DEBUG_POSITION_MONITORING:
+                self.ui.print_info(f"🔍 Checking position {position.symbol} ({position.position_type.value}): "
+                                 f"Entry: ${position.entry_price:.2f}, Current: ${current_price:.2f}, "
+                                 f"Target: ${position.target:.2f}, Stop Loss: ${position.stop_loss:.2f}, "
+                                 f"P&L: ${position.pnl:.2f}")
+            
             # PRIORITY 1: Check 48-hour holding time limit first (highest priority)
             if self.check_holding_time_exceeded(position):
                 should_close = True
@@ -296,28 +306,44 @@ class PositionManager:
                 margin_usage = position.calculate_margin_usage(current_price)
                 reason = f"💀 MARGIN LIQUIDATION: Loss {margin_usage*100:.1f}% of margin used | Price: ${current_price:.2f}"
             
-            # PRIORITY 3: Check stop loss only if no time limit/liquidation and position still open
-            elif position.stop_loss and position.status == PositionStatus.OPEN:
-                if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
-                    should_close = True
-                    reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} <= ${position.stop_loss:.2f}"
-                elif position.position_type == PositionType.SHORT and current_price >= position.stop_loss:
-                    should_close = True
-                    reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} >= ${position.stop_loss:.2f}"
-            
-            # PRIORITY 4: Check target only if no time limit/liquidation/stop loss hit
+            # PRIORITY 3: Check target first (before stop loss for profit-taking)
             elif position.target and position.status == PositionStatus.OPEN:
+                target_hit = False
                 if position.position_type == PositionType.LONG and current_price >= position.target:
-                    should_close = True
+                    target_hit = True
                     reason = f"🎯 Target Hit: ${current_price:.2f} >= ${position.target:.2f}"
                 elif position.position_type == PositionType.SHORT and current_price <= position.target:
-                    should_close = True
+                    target_hit = True
                     reason = f"🎯 Target Hit: ${current_price:.2f} <= ${position.target:.2f}"
+                
+                if target_hit:
+                    should_close = True
+                    self.ui.print_success(f"✅ TARGET ACHIEVED for {position.symbol}: {reason}")
+            
+            # PRIORITY 4: Check stop loss only if target was not hit
+            elif position.stop_loss and position.status == PositionStatus.OPEN:
+                stop_loss_hit = False
+                if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
+                    stop_loss_hit = True
+                    reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} <= ${position.stop_loss:.2f}"
+                elif position.position_type == PositionType.SHORT and current_price >= position.stop_loss:
+                    stop_loss_hit = True
+                    reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} >= ${position.stop_loss:.2f}"
+                
+                if stop_loss_hit:
+                    should_close = True
+                    self.ui.print_warning(f"⚠️ STOP LOSS TRIGGERED for {position.symbol}: {reason}")
             
             # If position should be closed, close it
             if should_close:
+                if self.settings.BROKER_DEBUG_POSITION_MONITORING:
+                    self.ui.print_info(f"🔄 Attempting to close position {position.id} for {position.symbol}: {reason}")
                 if self.close_position(position.id, current_price, reason):
                     positions_to_close.append(position.id)
+                    if self.settings.BROKER_DEBUG_POSITION_MONITORING:
+                        self.ui.print_success(f"✅ Position {position.symbol} closed successfully")
+                else:
+                    self.ui.print_error(f"❌ Failed to close position {position.symbol}")
         
         return positions_to_close
     

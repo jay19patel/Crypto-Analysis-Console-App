@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     BROKER_TARGET_PCT: float = 0.02  # 2% target (2:1 risk:reward)
     BROKER_MIN_CONFIDENCE: float = 60.0  # Minimum signal confidence for trade execution
     BROKER_UI_REFRESH_INTERVAL: int = 60  # Broker UI refresh interval in seconds (1 minute)
+    BROKER_DEBUG_POSITION_MONITORING: bool = True  # Enable detailed position monitoring logs
     
     # Margin Trading Configuration
     BROKER_DEFAULT_LEVERAGE: float = 50.0  # Default leverage (50x)
