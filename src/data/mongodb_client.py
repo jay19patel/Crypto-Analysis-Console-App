@@ -2,28 +2,49 @@
 MongoDB client for storing analysis results
 """
 
-from pymongo import MongoClient, errors
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
 import logging
+from typing import Dict, Any, Optional, List
+from datetime import datetime, timezone
+from pymongo import MongoClient, errors
+from src.system.message_formatter import MessageFormatter, MessageType
 from src.config import get_settings
-from src.ui.console import ConsoleUI
+
+logger = logging.getLogger(__name__)
 
 class MongoDBClient:
     """MongoDB client for analysis results storage"""
     
-    def __init__(self, ui: ConsoleUI):
-        """Initialize MongoDB client"""
-        self.ui = ui
+    def __init__(self, websocket_server=None):
+        """Initialize MongoDB client
+        
+        Args:
+            websocket_server: WebSocket server instance for sending messages
+        """
+        self.logger = logging.getLogger(__name__)
+        self.websocket_server = websocket_server
         self.settings = get_settings()
         self.client = None
         self.db = None
         self.collection = None
         self.is_connected = False
         
+    def send_message(self, message: Dict):
+        """Send message through WebSocket if available"""
+        if self.websocket_server:
+            self.websocket_server.queue_message(message)
+
+    def log_message(self, message: str, level: str = "info"):
+        """Send log message"""
+        self.logger.log(getattr(logging, level.upper()), message)
+        if self.websocket_server:
+            self.send_message(
+                MessageFormatter.format_log(message, level, "mongodb_client")
+            )
+
     def connect(self) -> bool:
-        """Connect to MongoDB"""
+        """Connect to MongoDB database"""
         try:
+            # Connect to MongoDB
             self.client = MongoClient(
                 self.settings.MONGODB_URL,
                 serverSelectionTimeoutMS=self.settings.MONGODB_TIMEOUT * 1000
@@ -36,27 +57,84 @@ class MongoDBClient:
             self.db = self.client[self.settings.MONGODB_DATABASE]
             self.collection = self.db[self.settings.MONGODB_COLLECTION]
             
+            # Create indexes
+            self.create_indexes()
+            
             self.is_connected = True
-            self.ui.print_success(f"Connected to MongoDB: {self.settings.MONGODB_DATABASE}.{self.settings.MONGODB_COLLECTION}")
+            self.log_message("Connected to MongoDB successfully", "info")
             return True
             
-        except errors.ServerSelectionTimeoutError:
-            self.ui.print_error("MongoDB connection timeout. Make sure MongoDB is running.")
-            return False
-        except errors.ConnectionFailure:
-            self.ui.print_error("MongoDB connection failed.")
-            return False
         except Exception as e:
-            self.ui.print_error(f"MongoDB connection error: {e}")
+            self.log_message(f"MongoDB connection error: {e}", "error")
             return False
-    
-    def disconnect(self) -> None:
+
+    def disconnect(self):
         """Disconnect from MongoDB"""
         if self.client:
             self.client.close()
             self.is_connected = False
-            self.ui.print_info("Disconnected from MongoDB")
-    
+            self.log_message("Disconnected from MongoDB", "info")
+
+    def insert_document(self, collection: str, document: Dict) -> bool:
+        """Insert a document into collection"""
+        if not self.is_connected:
+            if not self.connect():
+                return False
+        
+        try:
+            result = self.db[collection].insert_one(document)
+            if result.acknowledged:
+                self.log_message(f"Document inserted into {collection}", "info")
+                return True
+            return False
+        except Exception as e:
+            self.log_message(f"Error inserting document: {e}", "error")
+            return False
+
+    def find_document(self, collection: str, query: Dict) -> Optional[Dict]:
+        """Find a document in collection"""
+        if not self.is_connected:
+            if not self.connect():
+                return None
+        
+        try:
+            return self.db[collection].find_one(query)
+        except Exception as e:
+            self.log_message(f"Error finding document: {e}", "error")
+            return None
+
+    def update_document(self, collection: str, query: Dict, update: Dict) -> bool:
+        """Update a document in collection"""
+        if not self.is_connected:
+            if not self.connect():
+                return False
+        
+        try:
+            result = self.db[collection].update_one(query, {"$set": update})
+            if result.modified_count > 0:
+                self.log_message(f"Document updated in {collection}", "info")
+                return True
+            return False
+        except Exception as e:
+            self.log_message(f"Error updating document: {e}", "error")
+            return False
+
+    def delete_document(self, collection: str, query: Dict) -> bool:
+        """Delete a document from collection"""
+        if not self.is_connected:
+            if not self.connect():
+                return False
+        
+        try:
+            result = self.db[collection].delete_one(query)
+            if result.deleted_count > 0:
+                self.log_message(f"Document deleted from {collection}", "info")
+                return True
+            return False
+        except Exception as e:
+            self.log_message(f"Error deleting document: {e}", "error")
+            return False
+
     def save_analysis_result(self, analysis_data: Dict[str, Any]) -> Optional[str]:
         """
         Save analysis result to MongoDB with datetime
@@ -84,14 +162,14 @@ class MongoDBClient:
             
             if result.inserted_id:
                 document_id = str(result.inserted_id)
-                self.ui.print_success(f"Analysis result saved to MongoDB with ID: {document_id}")
+                self.log_message(f"Analysis result saved to MongoDB with ID: {document_id}", "info")
                 return document_id
             else:
-                self.ui.print_error("Failed to save analysis result to MongoDB")
+                self.log_message("Failed to save analysis result to MongoDB", "error")
                 return None
                 
         except Exception as e:
-            self.ui.print_error(f"Error saving to MongoDB: {e}")
+            self.log_message(f"Error saving to MongoDB: {e}", "error")
             return None
     
     def get_recent_analyses(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -119,7 +197,7 @@ class MongoDBClient:
             return results
             
         except Exception as e:
-            self.ui.print_error(f"Error retrieving from MongoDB: {e}")
+            self.log_message(f"Error retrieving from MongoDB: {e}", "error")
             return []
     
     def test_connection(self) -> bool:
@@ -133,7 +211,7 @@ class MongoDBClient:
             return True
             
         except Exception as e:
-            self.ui.print_error(f"MongoDB connection test failed: {e}")
+            self.log_message(f"MongoDB connection test failed: {e}", "error")
             return False
     
     def create_indexes(self) -> bool:
@@ -148,9 +226,9 @@ class MongoDBClient:
             self.collection.create_index("analysis_data.symbol")
             self.collection.create_index([("timestamp", -1), ("analysis_data.symbol", 1)])
             
-            self.ui.print_success("MongoDB indexes created successfully")
+            self.log_message("MongoDB indexes created successfully", "info")
             return True
             
         except Exception as e:
-            self.ui.print_error(f"Error creating MongoDB indexes: {e}")
+            self.log_message(f"Error creating MongoDB indexes: {e}", "error")
             return False 

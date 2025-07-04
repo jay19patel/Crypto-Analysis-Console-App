@@ -2,21 +2,30 @@
 Trade Executor for broker system
 """
 
+import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
-from src.broker.models import Position, PositionType, PositionStatus
+from src.system.message_formatter import MessageFormatter, MessageType
 from src.broker.account_manager import AccountManager
 from src.broker.position_manager import PositionManager
-from src.ui.console import ConsoleUI
+from src.broker.models import Position, PositionType, PositionStatus
 from src.config import get_settings
 
+logger = logging.getLogger(__name__)
 
 class TradeExecutor:
     """Executes trades based on analysis signals"""
     
-    def __init__(self, ui: ConsoleUI, account_manager: AccountManager, position_manager: PositionManager):
-        """Initialize trade executor"""
-        self.ui = ui
+    def __init__(self, websocket_server, account_manager: AccountManager, position_manager: PositionManager):
+        """Initialize trade executor
+        
+        Args:
+            websocket_server: WebSocket server instance
+            account_manager: Account manager instance
+            position_manager: Position manager instance
+        """
+        self.logger = logging.getLogger(__name__)
+        self.websocket_server = websocket_server
         self.account_manager = account_manager
         self.position_manager = position_manager
         self.settings = get_settings()
@@ -26,6 +35,19 @@ class TradeExecutor:
         self.target_percentage = self.settings.BROKER_TARGET_PCT
         self.min_confidence_threshold = self.settings.BROKER_MIN_CONFIDENCE
     
+    def send_message(self, message: Dict):
+        """Send message through WebSocket if available"""
+        if self.websocket_server:
+            self.websocket_server.queue_message(message)
+
+    def log_message(self, message: str, level: str = "info"):
+        """Send log message"""
+        self.logger.log(getattr(logging, level.upper()), message)
+        if self.websocket_server:
+            self.send_message(
+                MessageFormatter.format_log(message, level, "trade_executor")
+            )
+
     def process_signal(
         self,
         symbol: str,
@@ -43,17 +65,17 @@ class TradeExecutor:
         
         # Validate signal
         if signal not in ['BUY', 'SELL']:
-            self.ui.print_warning(f"⚠️  Invalid signal: {signal} - Only BUY/SELL allowed")
+            self.log_message(f"⚠️  Invalid signal: {signal} - Only BUY/SELL allowed", "warning")
             return False
         
         # Check confidence threshold
         if confidence < self.min_confidence_threshold:
-            self.ui.print_warning(f"❌ Signal ignored: {signal} | Confidence: {confidence:.1f}% < {self.min_confidence_threshold}%")
+            self.log_message(f"❌ Signal ignored: {signal} | Confidence: {confidence:.1f}% < {self.min_confidence_threshold}%", "warning")
             return False
         
         # Check and reset daily trades for new day first
         if not self.account_manager.check_and_reset_daily_trades():
-            self.ui.print_error("Failed to check daily trades status")
+            self.log_message("Failed to check daily trades status", "error")
             return False
         
         # Get actual daily position count from database
@@ -63,11 +85,11 @@ class TradeExecutor:
         # Check if we can trade today based on actual database count
         account = self.account_manager.get_account()
         if not account:
-            self.ui.print_warning("Account not available")
+            self.log_message("Account not available", "warning")
             return False
         
         if actual_daily_count >= account.daily_trades_limit:
-            self.ui.print_warning(f"Cannot execute trade: Daily limit reached ({actual_daily_count}/{account.daily_trades_limit}) positions taken today")
+            self.log_message(f"Cannot execute trade: Daily limit reached ({actual_daily_count}/{account.daily_trades_limit}) positions taken today", "warning")
             return False
         
         # Determine position type
@@ -86,7 +108,7 @@ class TradeExecutor:
         max_leverage = account.max_leverage if account else self.settings.BROKER_MAX_LEVERAGE
         if leverage > max_leverage:
             leverage = max_leverage
-            self.ui.print_warning(f"Leverage reduced to maximum allowed: {max_leverage}x")
+            self.log_message(f"Leverage reduced to maximum allowed: {max_leverage}x", "warning")
         
         # Calculate position size with margin requirements
         position_value, margin_required, trading_fee = self.account_manager.calculate_position_size(
@@ -94,7 +116,7 @@ class TradeExecutor:
         )
         
         if position_value <= 0 or margin_required <= 0:
-            self.ui.print_warning("Cannot execute trade: Insufficient margin or invalid position size")
+            self.log_message("Cannot execute trade: Insufficient margin or invalid position size", "warning")
             return False
         
         # Calculate quantity based on position value
@@ -110,7 +132,7 @@ class TradeExecutor:
         
         # Reserve margin and pay trading fee (deduct from current balance)
         if not self.account_manager.reserve_margin(margin_required, trading_fee):
-            self.ui.print_error("Failed to reserve margin for trade")
+            self.log_message("Failed to reserve margin for trade", "error")
             return False
         
         # Create position with margin details
@@ -142,7 +164,7 @@ class TradeExecutor:
             fee_text = f" | Fee: ${trading_fee:.2f}" if trading_fee > 0 else ""
             balance_text = f" | Balance: ${account.current_balance:.2f}"
             trades_text = f" | Daily Trades: {account.daily_trades_count}/{account.daily_trades_limit}"
-            self.ui.print_success(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text}{balance_text}{trades_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}")
+            self.log_message(f"🚀 TRADE EXECUTED: {signal} {symbol} at ${current_price:.2f} | Value: ${position_value:.2f}{leverage_text}{margin_text}{fee_text}{balance_text}{trades_text} | SL: ${stop_loss:.2f} | Target: ${target:.2f}", "info")
             
             # Save trade execution details
             if analysis_data:
@@ -197,7 +219,7 @@ class TradeExecutor:
             self.position_manager.save_position(position)
             
         except Exception as e:
-            self.ui.print_warning(f"Failed to log trade execution details: {e}")
+            self.log_message(f"Failed to log trade execution details: {e}", "warning")
     
     def check_open_positions(self, current_prices: Dict[str, float]) -> List[str]:
         """Check open positions for stop loss/target hits"""
@@ -212,17 +234,17 @@ class TradeExecutor:
             
             # Issue warnings for positions at risk
             if margin_health['margin_call_positions'] > 0:
-                self.ui.print_warning(f"⚠️  MARGIN CALL: {margin_health['margin_call_positions']} position(s) need attention")
+                self.log_message(f"⚠️  MARGIN CALL: {margin_health['margin_call_positions']} position(s) need attention", "warning")
             
             if margin_health['positions_near_liquidation'] > 0:
-                self.ui.print_error(f"🚨 LIQUIDATION WARNING: {margin_health['positions_near_liquidation']} position(s) at high risk")
+                self.log_message(f"🚨 LIQUIDATION WARNING: {margin_health['positions_near_liquidation']} position(s) at high risk", "error")
             
             # Check for positions approaching 48-hour time limit
             approaching_limit = self.position_manager.get_positions_approaching_time_limit()
             if approaching_limit:
                 for pos in approaching_limit:
                     holding_hours = self.position_manager.get_holding_time_hours(pos)
-                    self.ui.print_warning(f"⏰ Position {pos.symbol} approaching time limit: {holding_hours:.1f}/48 hours")
+                    self.log_message(f"⏰ Position {pos.symbol} approaching time limit: {holding_hours:.1f}/48 hours", "warning")
             
             # Check stop loss and targets
             closed_positions.extend(self.position_manager.check_stop_loss_and_targets(current_prices))
@@ -240,7 +262,7 @@ class TradeExecutor:
                     
                     # Log margin release
                     balance_after = self.account_manager.get_account().current_balance
-                    self.ui.print_info(f"💰 Margin released: ${position.margin_used:.2f} + P&L: ${position.pnl:.2f} - Exit fee: ${exit_fee:.2f} | Balance: ${balance_after:.2f}")
+                    self.log_message(f"💰 Margin released: ${position.margin_used:.2f} + P&L: ${position.pnl:.2f} - Exit fee: ${exit_fee:.2f} | Balance: ${balance_after:.2f}", "info")
             
             # Update account statistics if any positions were closed
             if closed_positions:
@@ -248,7 +270,7 @@ class TradeExecutor:
                 self.account_manager.update_statistics(all_positions)
             
         except Exception as e:
-            self.ui.print_error(f"Error checking positions: {e}")
+            self.log_message(f"Error checking positions: {e}", "error")
         
         return closed_positions
     
@@ -274,7 +296,7 @@ class TradeExecutor:
                     balance_after = self.account_manager.get_account().current_balance
                     pnl_emoji = "🟢" if position.pnl >= 0 else "🔴"
                     pnl_symbol = "+" if position.pnl >= 0 else ""
-                    self.ui.print_success(f"✅ Position manually closed: {position.symbol} | {pnl_emoji} P&L: {pnl_symbol}${position.pnl:.2f} | Balance: ${balance_after:.2f}")
+                    self.log_message(f"✅ Position manually closed: {position.symbol} | {pnl_emoji} P&L: {pnl_symbol}${position.pnl:.2f} | Balance: ${balance_after:.2f}", "info")
                     
                     # Update account statistics
                     all_positions = self.position_manager.positions
@@ -283,7 +305,7 @@ class TradeExecutor:
                 return True
                 
         except Exception as e:
-            self.ui.print_error(f"Error force closing position: {e}")
+            self.log_message(f"Error force closing position: {e}", "error")
         
         return False
     
@@ -315,15 +337,15 @@ class TradeExecutor:
         
         if stop_loss_percentage is not None:
             self.stop_loss_percentage = stop_loss_percentage
-            self.ui.print_info(f"Stop loss percentage updated to {stop_loss_percentage * 100:.1f}%")
+            self.log_message(f"Stop loss percentage updated to {stop_loss_percentage * 100:.1f}%")
         
         if target_percentage is not None:
             self.target_percentage = target_percentage
-            self.ui.print_info(f"Target percentage updated to {target_percentage * 100:.1f}%")
+            self.log_message(f"Target percentage updated to {target_percentage * 100:.1f}%")
         
         if min_confidence_threshold is not None:
             self.min_confidence_threshold = min_confidence_threshold
-            self.ui.print_info(f"Minimum confidence threshold updated to {min_confidence_threshold:.1f}%")
+            self.log_message(f"Minimum confidence threshold updated to {min_confidence_threshold:.1f}%")
     
     def get_position_details(self, position_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed information about a specific position"""
@@ -350,4 +372,80 @@ class TradeExecutor:
             'entry_time': position.entry_time,
             'exit_time': position.exit_time,
             'notes': position.notes
-        } 
+        }
+
+    def execute_trade(self, signal: Dict) -> bool:
+        """Execute a trade based on signal"""
+        try:
+            # Trade execution logic here
+            trade_type = signal.get("type", "unknown")
+            symbol = signal.get("symbol", "unknown")
+            entry_price = signal.get("price", 0)
+            
+            self.log_message(
+                f"Executing {trade_type} trade for {symbol} at ${entry_price}",
+                "info"
+            )
+            
+            # Send trade signal
+            if self.websocket_server:
+                self.send_message(
+                    MessageFormatter.format_trade_log(
+                        f"New trade signal: {trade_type} {symbol} at ${entry_price}",
+                        "signal",
+                        None,
+                        "trade_executor"
+                    )
+                )
+            
+            # Execute trade logic here
+            success = self.process_signal(
+                symbol,
+                trade_type,
+                signal.get("confidence", 0),
+                entry_price,
+                signal.get("strategy_name", ""),
+                signal.get("analysis_data", {}),
+                signal.get("leverage"),
+                signal.get("analysis_id", "")
+            )
+            
+            if success:
+                self.log_message(
+                    f"Trade executed successfully: {trade_type} {symbol}",
+                    "info"
+                )
+            else:
+                self.log_message(
+                    f"Trade execution failed: {trade_type} {symbol}",
+                    "error"
+                )
+            
+            return success
+            
+        except Exception as e:
+            self.log_message(f"Error executing trade: {e}", "error")
+            return False
+
+    def process_analysis_signal(self, analysis_results: Dict) -> bool:
+        """Process analysis signal for potential trade"""
+        try:
+            signal = analysis_results.get("signal")
+            confidence = analysis_results.get("confidence", 0)
+            
+            if signal in ["BUY", "SELL"] and confidence >= 75:
+                self.log_message(
+                    f"Processing {signal} signal with {confidence}% confidence",
+                    "info"
+                )
+                return self.execute_trade(analysis_results)
+            
+            self.log_message(
+                f"Signal not strong enough: {signal} ({confidence}%)",
+                "info"
+            )
+            return False
+            
+        except Exception as e:
+            self.log_message(f"Error processing analysis signal: {e}", "error")
+            return False 

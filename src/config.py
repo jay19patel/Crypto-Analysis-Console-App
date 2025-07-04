@@ -1,17 +1,22 @@
 from pydantic_settings import BaseSettings
-from typing import Dict, List
+from typing import Dict, List, ClassVar
 from functools import lru_cache
+import os
+from dataclasses import dataclass
 
 
 class Settings(BaseSettings):
     """Application settings using Pydantic-settings"""
     
     # WebSocket Configuration
-    WEBSOCKET_URL: str = "wss://socket.india.delta.exchange"
+    WEBSOCKET_URL: str = "ws://localhost:8765"  # Local WebSocket server URL
+    DELTA_WEBSOCKET_URL: str = "wss://socket.delta.exchange"  # Delta Exchange WebSocket URL
     HISTORICAL_URL: str = "https://api.india.delta.exchange/v2/history/candles"
-    WEBSOCKET_TIMEOUT: int = 10
-    PRICE_UPDATE_INTERVAL: int = 10  # seconds
-    DEFAULT_SYMBOLS: List[str] = ["BTCUSD", "ETHUSD"]
+    WEBSOCKET_TIMEOUT: int = 10  # Seconds to wait for WebSocket connection
+    PRICE_UPDATE_INTERVAL: int = 10  # Seconds between price updates
+    ANALYSIS_INTERVAL: int = 600  # Seconds between analysis updates (10 minutes)
+    DEFAULT_SYMBOLS: List[str] = ["BTC-USD", "ETH-USD"]  # Default trading pairs
+    POSITION_CHECK_INTERVAL: int = 10  # Seconds between position checks
     
     # Technical Analysis Configuration
     DEFAULT_RESOLUTION: str = "5m"
@@ -48,10 +53,8 @@ class Settings(BaseSettings):
     SYSTEM_CHECK_TIMEOUT: int = 10
     
     # MongoDB Configuration
-    MONGODB_URL: str = "mongodb+srv://justj:justjay19@cluster0.fsgzjrl.mongodb.net/"
-    # MONGODB_URL: str = "mongodb://localhost:27017/"
-    MONGODB_DATABASE: str = "crypto_analysis"
-    MONGODB_COLLECTION: str = "analysis_results"
+    MONGODB_URI: str = "mongodb://localhost:27017/"
+    DATABASE_NAME: str = "trading_bot"
     MONGODB_TIMEOUT: int = 5
     
     # AI Strategy Configuration
@@ -83,6 +86,27 @@ class Settings(BaseSettings):
     BROKER_MARGIN_CALL_THRESHOLD: float = 0.8  # Margin call at 80% of margin used
     BROKER_LIQUIDATION_THRESHOLD: float = 0.95  # Liquidation at 95% of margin used
     BROKER_MAX_HOLDING_HOURS: float = 48.0  # Maximum holding time in hours (48 hours)
+    
+    # WebSocket Configuration
+    WEBSOCKET_HOST: ClassVar[str] = "0.0.0.0"
+    WEBSOCKET_PORT: ClassVar[int] = 8765
+    WEBSOCKET_UPDATE_INTERVAL: ClassVar[int] = 10  # seconds
+    
+    # Data Types for WebSocket Messages
+    class WSMessageTypes:
+        TRADE_LOGS: ClassVar[str] = "tradelogs"
+        LIVE_PRICE: ClassVar[str] = "liveprice"
+        ANALYSIS: ClassVar[str] = "analysis"
+        POSITIONS: ClassVar[str] = "positions"
+    
+    # Position Update Thresholds
+    POSITION_WARNING_THRESHOLD: ClassVar[float] = 0.8  # 80% of stop loss/target
+    LIQUIDATION_WARNING_THRESHOLD: ClassVar[float] = 0.9  # 90% of liquidation price
+    
+    # Logging settings
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_FILE: str = "logs/trading_bot.log"
     
     class Config:
         env_prefix = "CRYPTO_"  # Environment variables should be prefixed with CRYPTO_

@@ -2,20 +2,29 @@
 Position Manager for broker system
 """
 
-from typing import List, Optional, Dict, Any
+import logging
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
+import uuid
+import json
+import threading
+import time
 from pymongo import MongoClient
+
 from src.broker.models import Position, PositionType, PositionStatus
 from src.config import get_settings
-from src.ui.console import ConsoleUI
+from src.system.message_formatter import MessageFormatter, MessageType
 
+logger = logging.getLogger(__name__)
 
 class PositionManager:
     """Manages trading positions"""
     
-    def __init__(self, ui: ConsoleUI):
+    def __init__(self, broker_client, websocket_server=None):
         """Initialize position manager"""
-        self.ui = ui
+        self.logger = logging.getLogger(__name__)
+        self.broker_client = broker_client
+        self.websocket_server = websocket_server
         self.settings = get_settings()
         self.client = None
         self.db = None
@@ -23,6 +32,19 @@ class PositionManager:
         self.positions: List[Position] = []
         self.is_connected = False
     
+    def send_message(self, message: Dict):
+        """Send message through WebSocket if available"""
+        if self.websocket_server:
+            self.websocket_server.queue_message(message)
+
+    def log_message(self, message: str, level: str = "info"):
+        """Send log message"""
+        self.logger.log(getattr(logging, level.upper()), message)
+        if self.websocket_server:
+            self.send_message(
+                MessageFormatter.format_log(message, level, "position_manager")
+            )
+
     def connect(self) -> bool:
         """Connect to MongoDB"""
         try:
@@ -39,10 +61,11 @@ class PositionManager:
             self.positions_collection = self.db['positions']
             
             self.is_connected = True
+            self.log_message("Position manager connected successfully", "info")
             return True
             
         except Exception as e:
-            self.ui.print_error(f"MongoDB connection error: {e}")
+            self.log_message(f"MongoDB connection error: {e}", "error")
             return False
     
     def load_positions(self) -> bool:
@@ -59,11 +82,11 @@ class PositionManager:
                 position = Position.from_dict(doc)
                 self.positions.append(position)
             
-            self.ui.print_success(f"Loaded {len(self.positions)} positions")
+            self.log_message(f"Loaded {len(self.positions)} positions", "info")
             return True
             
         except Exception as e:
-            self.ui.print_error(f"Error loading positions: {e}")
+            self.log_message(f"Error loading positions: {e}", "error")
             return False
     
     def save_position(self, position: Position) -> bool:
@@ -81,10 +104,11 @@ class PositionManager:
                 upsert=True
             )
             
+            self.log_message(f"Position {position.id} saved successfully", "info")
             return result.acknowledged
             
         except Exception as e:
-            self.ui.print_error(f"Error saving position: {e}")
+            self.log_message(f"Error saving position: {e}", "error")
             return False
     
     def create_position(
@@ -130,7 +154,18 @@ class PositionManager:
         # Save to database
         if self.save_position(position):
             self.positions.append(position)
-            self.ui.print_success(f"Created {position_type.value} position for {symbol} at ${entry_price:.2f}")
+            self.log_message(f"Created {position_type.value} position for {symbol} at ${entry_price:.2f}", "info")
+            
+            # Send trade log
+            if self.websocket_server:
+                self.send_message(
+                    MessageFormatter.format_trade_log(
+                        f"New position opened: {position_type.value} {symbol} at ${entry_price:.2f}",
+                        "open",
+                        position.id,
+                        "position_manager"
+                    )
+                )
             return position
         
         return None
@@ -145,11 +180,11 @@ class PositionManager:
         
         position = self.get_position_by_id(position_id)
         if not position:
-            self.ui.print_error(f"Position {position_id} not found")
+            self.log_message(f"Position {position_id} not found", "error")
             return False
         
         if position.status != PositionStatus.OPEN:
-            self.ui.print_warning(f"Position {position_id} is not open")
+            self.log_message(f"Position {position_id} is not open", "warning")
             return False
         
         # Close the position
@@ -161,22 +196,29 @@ class PositionManager:
         
         # Save to database first
         if self.save_position(position):
-            # Release margin back to account balance with PnL
-            # This needs to be imported or accessed properly
-            try:
-                # Try to get account manager reference (this might need to be passed in constructor)
-                from src.broker.account_manager import AccountManager
-                # This is not ideal - we should pass account_manager as dependency
-                # For now, we'll handle this in the trade_executor level
-                pass
-            except:
-                pass
+            # Calculate PnL and format message
+            pnl = position.calculate_pnl()
+            pnl_emoji = "📈" if pnl >= 0 else "📉"
+            pnl_symbol = "+" if pnl >= 0 else ""
             
-            # Simple one-line logging for position closure
-            pnl_emoji = "🟢" if position.pnl >= 0 else "🔴"
-            pnl_symbol = "+" if position.pnl >= 0 else ""
+            message = (
+                f"Position closed: {position.position_type.value} {position.symbol} "
+                f"at ${exit_price:.2f} | {pnl_emoji} P&L: {pnl_symbol}${pnl:.2f} | "
+                f"Margin: ${position.margin_used:.2f} | {reason}"
+            )
             
-            self.ui.print_warning(f"🔔 POSITION CLOSED: {position.position_type.value} {position.symbol} at ${exit_price:.2f} | {pnl_emoji} P&L: {pnl_symbol}${position.pnl:.2f} | Margin: ${position.margin_used:.2f} | {reason}")
+            self.log_message(message, "info")
+            
+            # Send trade log
+            if self.websocket_server:
+                self.send_message(
+                    MessageFormatter.format_trade_log(
+                        message,
+                        "close",
+                        position.id,
+                        "position_manager"
+                    )
+                )
             return True
         
         return False
@@ -226,7 +268,7 @@ class PositionManager:
             return holding_hours >= self.settings.BROKER_MAX_HOLDING_HOURS
             
         except Exception as e:
-            self.ui.print_error(f"Error checking holding time for position {position.id}: {e}")
+            self.log_message(f"Error checking holding time for position {position.id}: {e}", "error")
             return False
     
     def get_holding_time_hours(self, position: Position) -> float:
@@ -245,7 +287,7 @@ class PositionManager:
             return time_diff.total_seconds() / 3600
             
         except Exception as e:
-            self.ui.print_error(f"Error calculating holding time for position {position.id}: {e}")
+            self.log_message(f"Error calculating holding time for position {position.id}: {e}", "error")
             return 0.0
     
     def can_open_position(self, symbol: str, position_type: PositionType) -> bool:
@@ -255,9 +297,10 @@ class PositionManager:
         
         for pos in open_positions:
             if pos.position_type == position_type:
-                self.ui.print_warning(
+                self.log_message(
                     f"Cannot open {position_type.value} position for {symbol}: "
-                    f"Already have open {position_type.value} position"
+                    f"Already have open {position_type.value} position",
+                    "warning"
                 )
                 return False
         
@@ -289,61 +332,38 @@ class PositionManager:
             
             # Debug logging for each position (only if debug mode is enabled)
             if self.settings.BROKER_DEBUG_POSITION_MONITORING:
-                self.ui.print_info(f"🔍 Checking position {position.symbol} ({position.position_type.value}): "
+                self.log_message(f"🔍 Checking position {position.symbol} ({position.position_type.value}): "
                                  f"Entry: ${position.entry_price:.2f}, Current: ${current_price:.2f}, "
                                  f"Target: ${position.target:.2f}, Stop Loss: ${position.stop_loss:.2f}, "
-                                 f"P&L: ${position.pnl:.2f}")
+                                 f"P&L: ${position.pnl:.2f}", "info")
             
-            # PRIORITY 1: Check 48-hour holding time limit first (highest priority)
-            if self.check_holding_time_exceeded(position):
+            # Check stop loss
+            if position.stop_loss and (
+                (position.position_type == PositionType.LONG and current_price <= position.stop_loss) or
+                (position.position_type == PositionType.SHORT and current_price >= position.stop_loss)
+            ):
                 should_close = True
-                holding_hours = self.get_holding_time_hours(position)
-                reason = f"⏰ 48 Hours Completed: Holding time {holding_hours:.1f}h >= {self.settings.BROKER_MAX_HOLDING_HOURS}h | Price: ${current_price:.2f}"
+                reason = "🛑 Stop Loss Hit"
             
-            # PRIORITY 2: Check margin liquidation (higher priority than stop loss)
-            elif position.should_liquidate(current_price, self.settings.BROKER_LIQUIDATION_THRESHOLD):
+            # Check target
+            elif position.target and (
+                (position.position_type == PositionType.LONG and current_price >= position.target) or
+                (position.position_type == PositionType.SHORT and current_price <= position.target)
+            ):
                 should_close = True
+                reason = "🎯 Target Hit"
+            
+            # Check margin liquidation
+            elif position.leverage > 1:
                 margin_usage = position.calculate_margin_usage(current_price)
-                reason = f"💀 MARGIN LIQUIDATION: Loss {margin_usage*100:.1f}% of margin used | Price: ${current_price:.2f}"
-            
-            # PRIORITY 3: Check target first (before stop loss for profit-taking)
-            elif position.target and position.status == PositionStatus.OPEN:
-                target_hit = False
-                if position.position_type == PositionType.LONG and current_price >= position.target:
-                    target_hit = True
-                    reason = f"🎯 Target Hit: ${current_price:.2f} >= ${position.target:.2f}"
-                elif position.position_type == PositionType.SHORT and current_price <= position.target:
-                    target_hit = True
-                    reason = f"🎯 Target Hit: ${current_price:.2f} <= ${position.target:.2f}"
-                
-                if target_hit:
+                if margin_usage >= self.settings.BROKER_LIQUIDATION_THRESHOLD:
                     should_close = True
-                    self.ui.print_success(f"✅ TARGET ACHIEVED for {position.symbol}: {reason}")
+                    reason = f"⚠️ Margin Liquidation: Usage {margin_usage:.1%} >= {self.settings.BROKER_LIQUIDATION_THRESHOLD:.1%}"
             
-            # PRIORITY 4: Check stop loss only if target was not hit
-            elif position.stop_loss and position.status == PositionStatus.OPEN:
-                stop_loss_hit = False
-                if position.position_type == PositionType.LONG and current_price <= position.stop_loss:
-                    stop_loss_hit = True
-                    reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} <= ${position.stop_loss:.2f}"
-                elif position.position_type == PositionType.SHORT and current_price >= position.stop_loss:
-                    stop_loss_hit = True
-                    reason = f"🛡️ Stop Loss Hit: ${current_price:.2f} >= ${position.stop_loss:.2f}"
-                
-                if stop_loss_hit:
-                    should_close = True
-                    self.ui.print_warning(f"⚠️ STOP LOSS TRIGGERED for {position.symbol}: {reason}")
-            
-            # If position should be closed, close it
+            # Close position if needed
             if should_close:
-                if self.settings.BROKER_DEBUG_POSITION_MONITORING:
-                    self.ui.print_info(f"🔄 Attempting to close position {position.id} for {position.symbol}: {reason}")
                 if self.close_position(position.id, current_price, reason):
                     positions_to_close.append(position.id)
-                    if self.settings.BROKER_DEBUG_POSITION_MONITORING:
-                        self.ui.print_success(f"✅ Position {position.symbol} closed successfully")
-                else:
-                    self.ui.print_error(f"❌ Failed to close position {position.symbol}")
         
         return positions_to_close
     
@@ -360,7 +380,7 @@ class PositionManager:
                     
                     if self.close_position(position.id, current_price, reason):
                         expired_positions.append(position.id)
-                        self.ui.print_warning(f"🕐 Position {position.symbol} automatically closed after {holding_hours:.1f} hours")
+                        self.log_message(f"🕐 Position {position.symbol} automatically closed after {holding_hours:.1f} hours", "warning")
         
         return expired_positions
     
@@ -499,4 +519,21 @@ class PositionManager:
         """Disconnect from MongoDB"""
         if self.client:
             self.client.close()
-            self.is_connected = False 
+            self.is_connected = False
+            self.log_message("Position manager disconnected", "info")
+
+    def log_info(self, message: str):
+        """Log information message"""
+        self.logger.info(message)
+
+    def log_warning(self, message: str):
+        """Log warning message"""
+        self.logger.warning(message)
+
+    def log_error(self, message: str):
+        """Log error message"""
+        self.logger.error(message)
+
+    def log_success(self, message: str):
+        """Log success message"""
+        self.logger.info(message) 

@@ -3,11 +3,16 @@ import socket
 import ssl
 import subprocess
 import httpx
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
+import logging
+from datetime import datetime
+import threading
+import time
 
 from src.config import get_settings
-from src.ui.console import ConsoleUI
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class HealthCheckResult:
@@ -19,16 +24,20 @@ class HealthCheckResult:
 class SystemHealthChecker:
     """System health checker with comprehensive error handling"""
     
-    def __init__(self, ui: ConsoleUI):
-        """
-        Initialize system health checker
+    def __init__(self, websocket_server=None):
+        """Initialize health checker
         
         Args:
-            ui (ConsoleUI): Console UI instance
+            websocket_server: WebSocket server instance for sending messages
         """
+        self.logger = logging.getLogger(__name__)
+        self.websocket_server = websocket_server
+        self.last_check = {}
         self.settings = get_settings()
-        self.ui = ui
         self.results: List[HealthCheckResult] = []
+        self.is_running = False
+        self.check_thread = None
+        self._stop_event = threading.Event()
     
     def check_python_version(self) -> HealthCheckResult:
         """
@@ -132,10 +141,12 @@ class SystemHealthChecker:
         required_packages = [
             "websocket-client",
             "pandas",
-            "pandas-ta",
+            "numpy",
             "httpx",
             "rich",
-            "colorama"
+            "colorama",
+            "pymongo",
+            "websockets"
         ]
         
         try:
@@ -204,7 +215,7 @@ class SystemHealthChecker:
         Returns:
             bool: True if all checks passed
         """
-        self.ui.print_info("Running system health checks...")
+        self.logger.info("Running system health checks...")
         
         # Run all checks
         checks = [
@@ -221,9 +232,9 @@ class SystemHealthChecker:
         # Print results
         for result in self.results:
             if result.status:
-                self.ui.print_success(f"{result.name}: {result.message}")
+                self.logger.info(f"{result.name}: {result.message}")
             else:
-                self.ui.print_error(f"{result.name}: {result.message}")
+                self.logger.error(f"{result.name}: {result.message}")
         
         # Return overall status
         return all(result.status for result in self.results)
@@ -235,4 +246,118 @@ class SystemHealthChecker:
         Returns:
             List[HealthCheckResult]: List of check results
         """
-        return self.results 
+        return self.results
+    
+    def start(self) -> None:
+        """Start health checker"""
+        if self.is_running:
+            return
+        
+        self.is_running = True
+        self._stop_event.clear()
+        
+        def run_checks():
+            while not self._stop_event.is_set():
+                try:
+                    self.run_all_checks()
+                except Exception as e:
+                    self.logger.error(f"Error running health checks: {e}")
+                
+                # Wait for next check interval
+                time.sleep(self.settings.SYSTEM_CHECK_TIMEOUT)
+        
+        self.check_thread = threading.Thread(target=run_checks)
+        self.check_thread.daemon = True
+        self.check_thread.start()
+    
+    def stop(self) -> None:
+        """Stop health checker"""
+        self.is_running = False
+        self._stop_event.set()
+        
+        if self.check_thread:
+            try:
+                self.check_thread.join(timeout=5.0)
+            except Exception as e:
+                self.logger.error(f"Error stopping health checker thread: {e}")
+            self.check_thread = None
+
+    def check_all_systems(self) -> Dict[str, Any]:
+        """Check health of all system components
+        
+        Returns:
+            Dict containing health status of each component
+        """
+        status = {}
+        
+        # Check broker connection
+        broker_status = self._check_broker()
+        status["Broker"] = broker_status
+        
+        # Check database connection
+        db_status = self._check_database()
+        status["Database"] = db_status
+        
+        # Check position manager
+        pos_status = self._check_position_manager()
+        status["Position Manager"] = pos_status
+        
+        # Log overall status
+        healthy = all(s["status"] == "healthy" for s in status.values())
+        if not healthy:
+            self.logger.warning("System health check failed")
+            for component, stat in status.items():
+                if stat["status"] != "healthy":
+                    self.logger.error(f"{component}: {stat['details']}")
+        
+        return status
+
+    def _check_broker(self) -> Dict[str, Any]:
+        """Check broker connection health"""
+        try:
+            if not self.websocket_server.is_initialized:
+                return {
+                    "status": "unhealthy",
+                    "details": "WebSocket server not initialized"
+                }
+            return {
+                "status": "healthy",
+                "details": "Connected"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "details": f"Error checking broker: {str(e)}"
+            }
+
+    def _check_database(self) -> Dict[str, Any]:
+        """Check database connection health"""
+        try:
+            if not self.websocket_server.is_connected:
+                return {
+                    "status": "unhealthy",
+                    "details": "WebSocket server not connected"
+                }
+            return {
+                "status": "healthy",
+                "details": "Connected"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "details": f"Error checking database: {str(e)}"
+            }
+
+    def _check_position_manager(self) -> Dict[str, Any]:
+        """Check position manager health"""
+        try:
+            positions = self.websocket_server.get_all_positions()
+            return {
+                "status": "healthy",
+                "details": f"Managing {len(positions)} positions"
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "details": f"Error checking positions: {str(e)}"
+            } 

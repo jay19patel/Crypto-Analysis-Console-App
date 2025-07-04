@@ -7,6 +7,7 @@ import pandas as pd
 import os
 from typing import Optional, Literal
 from src.strategies.base_strategy import BaseStrategy, StrategyResult, SignalType, ConfidenceLevel
+from src.config import get_settings
 
 # Try importing LangChain dependencies
 try:
@@ -132,7 +133,6 @@ class AIPoweredStrategy(BaseStrategy):
         
         # Initialize real AI components
         try:
-            from ..config import get_settings
             settings = get_settings()
             
             if not settings.GOOGLE_API_KEY or settings.GOOGLE_API_KEY == "":

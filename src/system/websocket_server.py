@@ -3,202 +3,207 @@ import json
 import logging
 import websockets
 import threading
+import queue
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-from src.config import Settings
+from typing import Dict, Any, Optional
+from src.config import get_settings
+from src.broker.position_manager import PositionManager
+from src.broker.models import Position
+from src.data.technical_analysis import TechnicalAnalysis
+from src.strategies.strategy_manager import StrategyManager
+from .message_formatter import MessageFormatter, MessageType
+import time
 
-# Create global config instance
-Config = Settings()
+logger = logging.getLogger(__name__)
 
 class WebSocketServer:
+    """WebSocket server for broadcasting messages to web clients"""
+    
     def __init__(self):
-        self.clients: Dict[str, List[websockets.WebSocketServerProtocol]] = {
-            'analysis': [],
-            'liveprice': [],
-            'broker': [],
-            'logs': []
-        }
-        self.latest_data: Dict[str, Any] = {
-            'analysis': None,
-            'liveprice': None,
-            'broker': None,
-            'logs': []
-        }
-        self.server = None
-        self.running = False
+        """Initialize WebSocket server"""
         self.logger = logging.getLogger(__name__)
-        
-    async def register_client(self, websocket, channel: str):
-        """Register a client for a specific channel"""
-        if channel in self.clients:
-            self.clients[channel].append(websocket)
-            self.logger.info(f"Client registered for {channel} channel. Total clients: {len(self.clients[channel])}")
-            
-            # Send latest data to new client
-            if self.latest_data[channel] is not None:
-                await self.send_to_client(websocket, {
-                    'type': channel,
-                    'data': self.latest_data[channel],
-                    'timestamp': datetime.now().isoformat()
-                })
+        self.clients = set()
+        self.message_queue = queue.Queue()
+        self.server = None
+        self.server_thread = None
+        self.is_running = False
+        self.settings = get_settings()
     
-    async def unregister_client(self, websocket, channel: str):
-        """Unregister a client from a specific channel"""
-        if channel in self.clients and websocket in self.clients[channel]:
-            self.clients[channel].remove(websocket)
-            self.logger.info(f"Client unregistered from {channel} channel. Total clients: {len(self.clients[channel])}")
-    
-    async def send_to_client(self, websocket, data: Dict):
-        """Send data to a specific client"""
+    async def register(self, websocket):
+        """Register a new client"""
         try:
-            await websocket.send(json.dumps(data))
-        except websockets.exceptions.ConnectionClosed:
-            pass
+            self.clients.add(websocket)
+            self.logger.info(f"Client connected. Total clients: {len(self.clients)}")
         except Exception as e:
-            self.logger.error(f"Error sending data to client: {e}")
+            self.logger.error(f"Error registering client: {e}")
     
-    async def broadcast_to_channel(self, channel: str, data: Any):
-        """Broadcast data to all clients in a channel"""
-        if channel not in self.clients:
-            return
-            
-        # Store latest data
-        if channel == 'logs':
-            # For logs, append to list (keep last 100 entries)
-            if not isinstance(self.latest_data['logs'], list):
-                self.latest_data['logs'] = []
-            self.latest_data['logs'].append(data)
-            if len(self.latest_data['logs']) > 100:
-                self.latest_data['logs'] = self.latest_data['logs'][-100:]
-        else:
-            self.latest_data[channel] = data
-        
-        # Broadcast to all clients
-        message = {
-            'type': channel,
-            'data': data,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        disconnected_clients = []
-        for client in self.clients[channel]:
-            try:
-                await client.send(json.dumps(message))
-            except websockets.exceptions.ConnectionClosed:
-                disconnected_clients.append(client)
-            except Exception as e:
-                self.logger.error(f"Error broadcasting to client: {e}")
-                disconnected_clients.append(client)
-        
-        # Remove disconnected clients
-        for client in disconnected_clients:
-            self.clients[channel].remove(client)
-    
-    async def handle_client(self, websocket, path):
-        """Handle client connections"""
+    async def unregister(self, websocket):
+        """Unregister a client"""
         try:
-            # Extract channel from path
-            channel = path.strip('/')
-            if channel not in self.clients:
-                await websocket.send(json.dumps({
-                    'type': 'error',
-                    'message': f'Invalid channel: {channel}. Available channels: {list(self.clients.keys())}'
-                }))
-                return
-            
-            await self.register_client(websocket, channel)
-            
-            # Keep connection alive
+            self.clients.discard(websocket)  # Using discard instead of remove to avoid KeyError
+            self.logger.info(f"Client disconnected. Total clients: {len(self.clients)}")
+        except Exception as e:
+            self.logger.error(f"Error unregistering client: {e}")
+    
+    def queue_message(self, message: Dict[str, Any]):
+        """Add message to queue for broadcasting"""
+        try:
+            if self.is_running and message:
+                self.message_queue.put(message)
+        except Exception as e:
+            self.logger.error(f"Error queueing message: {e}")
+    
+    async def broadcast_messages(self):
+        """Broadcast messages from queue to all clients"""
+        while self.is_running:
+            try:
+                # Get message from queue with timeout
+                try:
+                    message = self.message_queue.get(timeout=1.0)
+                except queue.Empty:
+                    await asyncio.sleep(0.1)
+                    continue
+                
+                # Remove disconnected clients
+                disconnected = set()
+                for client in self.clients:
+                    try:
+                        # Ping to check if client is still connected
+                        pong_waiter = await client.ping()
+                        await asyncio.wait_for(pong_waiter, timeout=1.0)
+                    except (websockets.exceptions.ConnectionClosed, asyncio.TimeoutError):
+                        disconnected.add(client)
+                    except Exception:
+                        disconnected.add(client)
+                
+                for client in disconnected:
+                    await self.unregister(client)
+                
+                # Broadcast to all remaining clients
+                if self.clients:
+                    message_str = json.dumps(message)
+                    for client in self.clients:
+                        try:
+                            await client.send(message_str)
+                        except websockets.exceptions.ConnectionClosed:
+                            await self.unregister(client)
+                        except Exception as e:
+                            self.logger.error(f"Error sending message to client: {e}")
+                            await self.unregister(client)
+                
+                self.message_queue.task_done()
+                
+            except Exception as e:
+                self.logger.error(f"Error broadcasting message: {e}")
+                await asyncio.sleep(0.1)
+    
+    async def handle_client(self, websocket):
+        """Handle client connection"""
+        await self.register(websocket)
+        try:
             async for message in websocket:
                 try:
                     data = json.loads(message)
-                    # Handle ping/pong for connection health
-                    if data.get('type') == 'ping':
-                        await websocket.send(json.dumps({'type': 'pong'}))
+                    # Handle client messages if needed
+                    self.logger.debug(f"Received message from client: {data}")
                 except json.JSONDecodeError:
-                    pass
-                    
+                    self.logger.warning(f"Invalid JSON received: {message}")
         except websockets.exceptions.ConnectionClosed:
             pass
-        except Exception as e:
-            self.logger.error(f"Error handling client: {e}")
         finally:
-            # Unregister client from all channels
-            for channel in self.clients:
-                await self.unregister_client(websocket, channel)
+            await self.unregister(websocket)
     
     async def start_server(self):
         """Start WebSocket server"""
         try:
             self.server = await websockets.serve(
                 self.handle_client,
-                Config.WEBSOCKET_SERVER_HOST,
-                Config.WEBSOCKET_SERVER_PORT
+                self.settings.WEBSOCKET_HOST,
+                self.settings.WEBSOCKET_PORT,
+                ping_interval=20,  # Send ping every 20 seconds
+                ping_timeout=10    # Wait 10 seconds for pong response
             )
-            self.running = True
-            self.logger.info(f"WebSocket server started on ws://{Config.WEBSOCKET_SERVER_HOST}:{Config.WEBSOCKET_SERVER_PORT}")
+            self.logger.info(f"WebSocket server started on ws://{self.settings.WEBSOCKET_HOST}:{self.settings.WEBSOCKET_PORT}")
+            
+            # Start message broadcaster
+            asyncio.create_task(self.broadcast_messages())
             
             # Keep server running
             await self.server.wait_closed()
+            
         except Exception as e:
             self.logger.error(f"Error starting WebSocket server: {e}")
-            self.running = False
+            self.is_running = False
     
-    def start_in_background(self):
-        """Start WebSocket server in background thread"""
-        def run_server():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.start_server())
+    def start(self):
+        """Start WebSocket server in a separate thread"""
+        if self.is_running:
+            return True
         
-        thread = threading.Thread(target=run_server, daemon=True)
-        thread.start()
-        return thread
+        self.is_running = True
+        
+        def run_server():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(self.start_server())
+            except Exception as e:
+                self.logger.error(f"Error in WebSocket server thread: {e}")
+                self.is_running = False
+            finally:
+                try:
+                    loop.close()
+                except Exception as e:
+                    self.logger.error(f"Error closing event loop: {e}")
+        
+        self.server_thread = threading.Thread(target=run_server)
+        self.server_thread.daemon = True
+        self.server_thread.start()
+        
+        # Wait for server to start
+        timeout = 5.0
+        start_time = time.time()
+        while not self.server and time.time() - start_time < timeout:
+            time.sleep(0.1)
+        
+        if not self.server:
+            self.logger.error("Failed to start WebSocket server")
+            self.is_running = False
+            return False
+        
+        return True
     
-    def stop_server(self):
+    def stop(self):
         """Stop WebSocket server"""
+        self.is_running = False
+        
         if self.server:
-            self.server.close()
-            self.running = False
-    
-    # Methods to send data from different components
-    def send_analysis_data(self, data: Dict):
-        """Send analysis data to WebSocket clients"""
-        if self.running:
-            asyncio.run_coroutine_threadsafe(
-                self.broadcast_to_channel('analysis', data),
-                asyncio.get_event_loop()
-            )
-    
-    def send_live_price_data(self, data: Dict):
-        """Send live price data to WebSocket clients"""
-        if self.running:
-            asyncio.run_coroutine_threadsafe(
-                self.broadcast_to_channel('liveprice', data),
-                asyncio.get_event_loop()
-            )
-    
-    def send_broker_data(self, data: Dict):
-        """Send broker data to WebSocket clients"""
-        if self.running:
-            asyncio.run_coroutine_threadsafe(
-                self.broadcast_to_channel('broker', data),
-                asyncio.get_event_loop()
-            )
-    
-    def send_log_data(self, log_type: str, message: str, level: str = "INFO"):
-        """Send log data to WebSocket clients"""
-        if self.running:
-            log_data = {
-                'type': log_type,
-                'message': message,
-                'level': level,
-                'timestamp': datetime.now().isoformat()
-            }
-            asyncio.run_coroutine_threadsafe(
-                self.broadcast_to_channel('logs', log_data),
-                asyncio.get_event_loop()
-            )
+            try:
+                # Close the server using the existing event loop
+                if self.server_thread and self.server_thread.is_alive():
+                    async def close_server():
+                        await self.server.close()
+                    asyncio.run_coroutine_threadsafe(close_server(), asyncio.get_event_loop())
+                self.server = None
+            except Exception as e:
+                self.logger.error(f"Error closing WebSocket server: {e}")
+        
+        if self.server_thread:
+            try:
+                self.server_thread.join(timeout=5.0)
+            except Exception as e:
+                self.logger.error(f"Error stopping WebSocket server thread: {e}")
+            self.server_thread = None
+        
+        # Clear all clients and message queue
+        self.clients.clear()
+        while not self.message_queue.empty():
+            try:
+                self.message_queue.get_nowait()
+            except queue.Empty:
+                break
+        
+        self.logger.info("WebSocket server stopped")
 
 # Global WebSocket server instance
 websocket_server = WebSocketServer() 

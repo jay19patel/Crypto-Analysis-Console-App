@@ -7,27 +7,29 @@ from datetime import datetime, timezone, timedelta
 from src.broker.account_manager import AccountManager
 from src.broker.position_manager import PositionManager
 from src.broker.trade_executor import TradeExecutor
-from src.ui.console import ConsoleUI
 from src.config import get_settings
 from rich.table import Table
 from rich.panel import Panel
 from rich.console import Console
 import time
+import logging
 
+logger = logging.getLogger(__name__)
 
 class BrokerClient:
     """Main broker client integrating all trading components"""
     
-    def __init__(self, ui: ConsoleUI):
+    def __init__(self, websocket_server=None):
         """Initialize broker client"""
-        self.ui = ui
+        self.logger = logging.getLogger(__name__)
         self.console = Console()
         self.settings = get_settings()
+        self.websocket_server = websocket_server
         
-        # Initialize components
-        self.account_manager = AccountManager(ui)
-        self.position_manager = PositionManager(ui)
-        self.trade_executor = TradeExecutor(ui, self.account_manager, self.position_manager)
+        # Initialize components in correct order
+        self.account_manager = AccountManager(websocket_server)
+        self.position_manager = PositionManager(self, websocket_server)
+        self.trade_executor = TradeExecutor(websocket_server, self.account_manager, self.position_manager)
         
         self.is_initialized = False
         self.last_updated = None
@@ -36,28 +38,32 @@ class BrokerClient:
         """Initialize all broker components"""
         try:
             # Initialize account manager
+            if not self.account_manager.connect():
+                self.logger.error("Failed to connect account manager")
+                return False
+            
             if not self.account_manager.initialize_account():
-                self.ui.print_error("Failed to initialize account manager")
+                self.logger.error("Failed to initialize account manager")
                 return False
             
             # Initialize position manager - connect and load positions
             if not self.position_manager.connect():
-                self.ui.print_error("Failed to connect position manager")
+                self.logger.error("Failed to connect position manager")
                 return False
             
             if not self.position_manager.load_positions():
-                self.ui.print_error("Failed to load positions")
+                self.logger.error("Failed to load positions")
                 return False
             
             # Set algorithm status to running
             self.account_manager.start_algo()
             
             self.is_initialized = True
-            self.ui.print_success("Broker system initialized successfully")
+            self.logger.info("Broker system initialized successfully")
             return True
             
         except Exception as e:
-            self.ui.print_error(f"Error initializing broker system: {e}")
+            self.logger.error(f"Error initializing broker system: {e}")
             return False
     
     def process_analysis_signal(
@@ -79,7 +85,7 @@ class BrokerClient:
                 action_strength = ai_analysis.get('action_strength', 0)
                 
                 if action_type in ['BUY', 'SELL'] and action_strength > 0:
-                    self.ui.print_info(f"🤖 AI Analysis Signal: {action_type} | Strength: {action_strength}%")
+                    self.logger.info(f"🤖 AI Analysis Signal: {action_type} | Strength: {action_strength}%")
                     
                     # Use actual MongoDB _id from analysis_results
                     analysis_id = str(analysis_results.get('_id', ''))
@@ -110,7 +116,7 @@ class BrokerClient:
             
             # Process the signal
             if signal in ['BUY', 'SELL']:
-                self.ui.print_info(f"📊 Consensus Signal: {signal} | Confidence: {confidence}%")
+                self.logger.info(f"📊 Consensus Signal: {signal} | Confidence: {confidence}%")
                 
                 # Use actual MongoDB _id from analysis_results
                 analysis_id = str(analysis_results.get('_id', ''))
@@ -125,30 +131,106 @@ class BrokerClient:
                     analysis_id=analysis_id
                 )
             
-            self.ui.print_info(f"⚪ No trading signal: {signal} (Strength: {confidence}%)")
+            self.logger.info(f"⚪ No trading signal: {signal} (Strength: {confidence}%)")
             return False
             
         except Exception as e:
-            self.ui.print_error(f"Error processing analysis signal: {e}")
+            self.logger.error(f"Error processing analysis signal: {e}")
             return False
     
-    def monitor_positions(self, current_prices: Dict[str, float]) -> List[str]:
-        """Monitor open positions for stop loss/target hits"""
+    def monitor_positions(self, prices: Dict[str, Dict[str, float]]) -> None:
+        """Monitor open positions and check for updates
         
-        if not self.is_initialized:
-            return []
-        
+        Args:
+            prices: Dictionary of current prices with additional data
+        """
         try:
-            return self.trade_executor.check_open_positions(current_prices)
+            for position in self.position_manager.positions:
+                if position.status == "OPEN":
+                    # Get current price data
+                    price_data = prices.get(position.symbol)
+                    if not price_data:
+                        continue
+                    
+                    current_price = price_data["price"]
+                    mark_price = price_data.get("mark_price", current_price)
+                    
+                    # Calculate position metrics
+                    pnl = position.calculate_pnl(mark_price)
+                    margin_used = position.calculate_margin_used(mark_price)
+                    liquidation_price = position.calculate_liquidation_price()
+                    
+                    # Check position status
+                    if margin_used >= self.settings.BROKER_MARGIN_CALL_THRESHOLD:
+                        self.log_message(
+                            f"⚠️ MARGIN CALL WARNING - {position.symbol}: Margin used {margin_used*100:.1f}% | " +
+                            f"Current: ${current_price:.2f} | Liquidation: ${liquidation_price:.2f}",
+                            "warning"
+                        )
+                    
+                    if margin_used >= self.settings.BROKER_LIQUIDATION_THRESHOLD:
+                        self.log_message(
+                            f"🚨 LIQUIDATION WARNING - {position.symbol}: Margin used {margin_used*100:.1f}% | " +
+                            f"Current: ${current_price:.2f} | Liquidation: ${liquidation_price:.2f}",
+                            "error"
+                        )
+                        
+                        # Auto close position if too close to liquidation
+                        if margin_used >= 0.98:  # 98% margin used
+                            self.trade_executor.close_position(position, "LIQUIDATION_PROTECTION")
+                    
+                    # Check stop loss and take profit
+                    if position.type == "LONG":
+                        if current_price <= position.stop_loss:
+                            self.trade_executor.close_position(position, "STOP_LOSS")
+                        elif current_price >= position.target_price:
+                            self.trade_executor.close_position(position, "TAKE_PROFIT")
+                    else:  # SHORT
+                        if current_price >= position.stop_loss:
+                            self.trade_executor.close_position(position, "STOP_LOSS")
+                        elif current_price <= position.target_price:
+                            self.trade_executor.close_position(position, "TAKE_PROFIT")
+                    
+                    # Send position update to WebSocket
+                    if self.websocket_server:
+                        self.send_message(
+                            MessageFormatter.format_message(
+                                MessageType.POSITIONS,
+                                {
+                                    "position_id": position.id,
+                                    "symbol": position.symbol,
+                                    "type": position.type,
+                                    "entry_price": position.entry_price,
+                                    "current_price": current_price,
+                                    "pnl": pnl,
+                                    "margin_used": margin_used,
+                                    "liquidation_price": liquidation_price,
+                                    "stop_loss": position.stop_loss,
+                                    "target_price": position.target_price,
+                                    "timestamp": datetime.now().isoformat()
+                                },
+                                "broker_client"
+                            )
+                        )
+                    
+                    # Log position status if debug enabled
+                    if self.settings.BROKER_DEBUG_POSITION_MONITORING:
+                        self.log_message(
+                            f"Position Update - {position.symbol} ({position.type}): " +
+                            f"Entry: ${position.entry_price:.2f} | Current: ${current_price:.2f} | " +
+                            f"P&L: ${pnl:.2f} ({(pnl/position.entry_price)*100:.1f}%) | " +
+                            f"Margin Used: {margin_used*100:.1f}%",
+                            "info"
+                        )
+            
         except Exception as e:
-            self.ui.print_error(f"Error monitoring positions: {e}")
-            return []
+            self.log_message(f"Error monitoring positions: {e}", "error")
     
     def display_broker_dashboard(self, show_last_updated: bool = False) -> None:
         """Display comprehensive broker dashboard"""
         
         if not self.is_initialized:
-            self.ui.print_error("Broker system not initialized")
+            self.logger.error("Broker system not initialized")
             return
         
         try:
@@ -156,8 +238,8 @@ class BrokerClient:
             self.last_updated = datetime.now()
             
             # Clear screen for clean display
-            self.ui.clear_screen()
-            self.ui.print_banner()
+            self.console.clear_screen()
+            self.console.print_banner()
             
             # Display last updated time if requested
             if show_last_updated:
@@ -184,7 +266,7 @@ class BrokerClient:
                 self.console.print("Press Ctrl+C to stop", style="dim")
             
         except Exception as e:
-            self.ui.print_error(f"Error displaying dashboard: {e}")
+            self.logger.error(f"Error displaying dashboard: {e}")
     
     def _display_account_summary(self, account: Dict[str, Any], trading_status: Dict[str, Any]) -> None:
         """Display account summary"""
@@ -396,7 +478,7 @@ class BrokerClient:
                     holding_time
                 )
             except Exception as e:
-                self.ui.print_error(f"Error displaying position: {e}")
+                self.logger.error(f"Error displaying position: {e}")
                 continue
         
         self.console.print(positions_table)
@@ -475,6 +557,18 @@ class BrokerClient:
             
             self.account_manager.disconnect()
             self.position_manager.disconnect()
-            self.ui.print_info("Broker system disconnected")
+            self.logger.info("Broker system disconnected")
         except Exception as e:
-            self.ui.print_error(f"Error disconnecting broker: {e}") 
+            self.logger.error(f"Error disconnecting broker: {e}")
+
+    def log_info(self, message: str):
+        """Log information message"""
+        self.logger.info(message)
+
+    def log_warning(self, message: str):
+        """Log warning message"""
+        self.logger.warning(message)
+
+    def log_error(self, message: str):
+        """Log error message"""
+        self.logger.error(message) 
