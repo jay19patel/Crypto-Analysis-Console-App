@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Technical Analysis Configuration
     DEFAULT_RESOLUTION: str = "5m"
     DEFAULT_HISTORY_DAYS: int = 10
+    DEFAULT_SYMBOL: str = "BTCUSD"
+    DEFAULT_REFRESH_INTERVAL: int = 600  # 600 seconds = 10 minutes
+    DEFAULT_ENABLE_BROKER: bool = True
+    DEFAULT_ENABLE_LIVE_PRICE: bool = True
     SUPPORTED_RESOLUTIONS: List[str] = ["1m", "5m", "15m", "1h", "1d"]
     
     # Indicator Settings
@@ -55,6 +59,11 @@ class Settings(BaseSettings):
     AI_MODEL_NAME: str = "gemini-2.0-flash"
     AI_TEMPERATURE: float = 0.0
     AI_MAX_RETRIES: int = 2
+    
+    # WebSocket Server Configuration (for web viewing)
+    WEBSOCKET_SERVER_HOST: str = "localhost"
+    WEBSOCKET_SERVER_PORT: int = 8765
+    WEB_UPDATE_INTERVAL: int = 5  # seconds
     
     # Broker Configuration
     BROKER_INITIAL_BALANCE: float = 10000.0

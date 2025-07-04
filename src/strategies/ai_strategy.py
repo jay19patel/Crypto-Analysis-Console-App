@@ -270,10 +270,10 @@ class AIPoweredStrategy(BaseStrategy):
             Respond in valid JSON format matching the Pydantic model structure.
 
             **Analyze the following comprehensive crypto market data:**
-            {data}
+{data}
 
-            {format_instructions}
-            """
+{format_instructions}
+"""
         
         return PromptTemplate(
             template=system_prompt,

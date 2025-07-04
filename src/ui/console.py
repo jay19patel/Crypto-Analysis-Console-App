@@ -167,7 +167,7 @@ class ConsoleUI:
             # Entry/Exit levels
             if ai_data.get("entry_price"):
                 levels_table.add_row("Entry Price", f"${ai_data['entry_price']:.2f}", f"Method: {ai_data.get('stop_loss_method', 'Standard')}")
-            
+                
             if ai_data.get("stoploss"):
                 levels_table.add_row("Stop Loss", f"${ai_data['stoploss']:.2f}", f"Risk Level: {ai_data.get('risk_level', 'Medium')}")
             
