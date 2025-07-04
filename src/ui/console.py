@@ -83,6 +83,12 @@ class ConsoleUI:
         info.append(f"Resolution: {data['resolution']} | History: {data['days']} days\n", style="dim")
         info.append(f"Last Update: {datetime.now().strftime('%Y-%m-%d %I:%M:%S %p')}\n", style="dim")
         
+        # Add live price status
+        if data.get('live_price_active'):
+            info.append(f"🔴 Live Price: ${data.get('current_price', 'N/A'):.2f} (Real-time)\n", style="bold green")
+        elif data.get('current_price'):
+            info.append(f"📈 Current Price: ${data.get('current_price', 'N/A'):.2f} (Historical)\n", style="yellow")
+        
         self.console.print(Panel(info, box=box.ROUNDED))
         
         # Create indicators table
@@ -132,56 +138,163 @@ class ConsoleUI:
             
             self.console.print(Panel(consensus_panel, title="Strategy Consensus", box=box.ROUNDED))
         
-        # Display AI Analysis if available - ABOVE Strategy Consensus
+        # Display Enhanced AI Analysis if available
         if 'ai_analysis' in data and data['ai_analysis']:
             ai_data = data['ai_analysis']
             
-            # Create comprehensive AI analysis table with ALL fields
-            ai_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, title="🤖 AI Market Analysis")
-            ai_table.add_column("Field", style="white", width=25)
-            ai_table.add_column("Analysis", style="cyan", width=60)
+            # === MAIN AI SIGNALS TABLE ===
+            main_ai_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, title="🤖 AI Trading Signals")
+            main_ai_table.add_column("Signal", style="white", width=20)
+            main_ai_table.add_column("Value", style="cyan", width=25)
+            main_ai_table.add_column("Details", style="yellow", width=40)
             
-            # Add ALL AI analysis fields
-            ai_table.add_row("Summary", ai_data.get("summary", "N/A"))
-            ai_table.add_row("Current Trend", ai_data.get("current_trend", "N/A"))
-            ai_table.add_row("Candlestick Patterns", ai_data.get("candlestick_patterns", "N/A"))
-            ai_table.add_row("Strength", ai_data.get("strength", "N/A"))
-            ai_table.add_row("Recommendation", ai_data.get("recommendation", "N/A"))
-            ai_table.add_row("Reason", ai_data.get("reason", "N/A"))
-            ai_table.add_row("Price Movement", ai_data.get("price_movement", "N/A"))
-            ai_table.add_row("Momentum Forecast", ai_data.get("momentum_forecast", "N/A"))
-            ai_table.add_row("Action Type", ai_data.get("action_type", "N/A"))
-            ai_table.add_row("Action Strength", f"{ai_data.get('action_strength', 0)}%")
+            # Core trading signals
+            main_ai_table.add_row("Recommendation", ai_data.get("recommendation", "N/A"), ai_data.get("reason", "N/A"))
+            main_ai_table.add_row("Action Type", ai_data.get("action_type", "N/A"), f"Strength: {ai_data.get('action_strength', 0)}%")
+            main_ai_table.add_row("Current Trend", ai_data.get("current_trend", "N/A"), f"Strength: {ai_data.get('trend_strength', 'N/A')}")
+            main_ai_table.add_row("Signal Quality", ai_data.get("signal_quality", "N/A"), f"Confidence: {ai_data.get('confidence_level', 0)}%")
+            main_ai_table.add_row("Market Regime", ai_data.get("market_regime", "N/A"), ai_data.get("market_structure", "N/A"))
+            
+            self.console.print("\n")
+            self.console.print(main_ai_table)
+            
+            # === PRICE LEVELS TABLE ===
+            levels_table = Table(show_header=True, header_style="bold green", box=box.ROUNDED, title="📈 Key Price Levels & Targets")
+            levels_table.add_column("Level Type", style="white", width=20)
+            levels_table.add_column("Price", style="green", width=15)
+            levels_table.add_column("Additional Info", style="cyan", width=50)
             
             # Entry/Exit levels
             if ai_data.get("entry_price"):
-                ai_table.add_row("Entry Price", f"${ai_data['entry_price']:.2f}")
-            else:
-                ai_table.add_row("Entry Price", "N/A")
-                
-            if ai_data.get("stoploss"):
-                ai_table.add_row("Stop Loss", f"${ai_data['stoploss']:.2f}")
-            else:
-                ai_table.add_row("Stop Loss", "N/A")
-                
-            if ai_data.get("target"):
-                ai_table.add_row("Target", f"${ai_data['target']:.2f}")
-            else:
-                ai_table.add_row("Target", "N/A")
+                levels_table.add_row("Entry Price", f"${ai_data['entry_price']:.2f}", f"Method: {ai_data.get('stop_loss_method', 'Standard')}")
             
-            ai_table.add_row("Risk/Reward", ai_data.get("risk_to_reward", "N/A"))
-            ai_table.add_row("Max Holding Period", ai_data.get("max_holding_period", "N/A"))
+            if ai_data.get("stoploss"):
+                levels_table.add_row("Stop Loss", f"${ai_data['stoploss']:.2f}", f"Risk Level: {ai_data.get('risk_level', 'Medium')}")
+            
+            # Multiple take profit targets
+            if ai_data.get("take_profit_1"):
+                levels_table.add_row("Take Profit 1", f"${ai_data['take_profit_1']:.2f}", f"R:R {ai_data.get('risk_to_reward', 'N/A')}")
+            if ai_data.get("take_profit_2"):
+                levels_table.add_row("Take Profit 2", f"${ai_data['take_profit_2']:.2f}", "Extended target")
+            if ai_data.get("take_profit_3"):
+                levels_table.add_row("Take Profit 3", f"${ai_data['take_profit_3']:.2f}", "Maximum extension")
+            
+            # Support/Resistance levels
+            if ai_data.get("support_level"):
+                levels_table.add_row("Support Level", f"${ai_data['support_level']:.2f}", "Key support zone")
+            if ai_data.get("resistance_level"):
+                levels_table.add_row("Resistance Level", f"${ai_data['resistance_level']:.2f}", "Key resistance zone")
+            
+            self.console.print(levels_table)
+            
+            # === FIBONACCI ANALYSIS TABLE ===
+            if any(ai_data.get(f"fibonacci_{level}") for level in ["23_6", "38_2", "50_0", "61_8", "78_6"]):
+                fib_table = Table(show_header=True, header_style="bold yellow", box=box.ROUNDED, title="🌟 Fibonacci Analysis")
+                fib_table.add_column("Fibonacci Level", style="white", width=20)
+                fib_table.add_column("Price", style="yellow", width=15)
+                fib_table.add_column("Extension Targets", style="cyan", width=15)
+                fib_table.add_column("Swing Points", style="magenta", width=15)
+                
+                # Retracement levels
+                if ai_data.get("fibonacci_23_6"):
+                    fib_table.add_row("23.6%", f"${ai_data['fibonacci_23_6']:.2f}", 
+                                    f"${ai_data.get('fibonacci_extension_127', 0):.2f}" if ai_data.get('fibonacci_extension_127') else "N/A",
+                                    f"High: ${ai_data.get('swing_high', 0):.2f}" if ai_data.get('swing_high') else "N/A")
+                if ai_data.get("fibonacci_38_2"):
+                    fib_table.add_row("38.2%", f"${ai_data['fibonacci_38_2']:.2f}", 
+                                    f"${ai_data.get('fibonacci_extension_161', 0):.2f}" if ai_data.get('fibonacci_extension_161') else "N/A",
+                                    f"Low: ${ai_data.get('swing_low', 0):.2f}" if ai_data.get('swing_low') else "N/A")
+                if ai_data.get("fibonacci_50_0"):
+                    fib_table.add_row("50.0%", f"${ai_data['fibonacci_50_0']:.2f}", 
+                                    f"${ai_data.get('fibonacci_extension_261', 0):.2f}" if ai_data.get('fibonacci_extension_261') else "N/A",
+                                    ai_data.get("fibonacci_confluence", "N/A")[:15])
+                if ai_data.get("fibonacci_61_8"):
+                    fib_table.add_row("61.8%", f"${ai_data['fibonacci_61_8']:.2f}", "Golden Ratio", "Key level")
+                if ai_data.get("fibonacci_78_6"):
+                    fib_table.add_row("78.6%", f"${ai_data['fibonacci_78_6']:.2f}", "Deep retracement", "Strong support")
+                
+                self.console.print(fib_table)
+            
+            # === MARKET ANALYSIS TABLE ===
+            market_table = Table(show_header=True, header_style="bold blue", box=box.ROUNDED, title="📊 Market Structure & Patterns")
+            market_table.add_column("Analysis Type", style="white", width=25)
+            market_table.add_column("Current Status", style="blue", width=20)
+            market_table.add_column("Details", style="cyan", width=40)
+            
+            # Pattern analysis
+            market_table.add_row("Candlestick Patterns", ai_data.get("candlestick_patterns", "N/A"), 
+                               f"Reliability: {ai_data.get('pattern_reliability', 'N/A')}")
+            market_table.add_row("Reversal Patterns", ai_data.get("reversal_patterns", "N/A"), 
+                               ai_data.get("pattern_context", "N/A"))
+            market_table.add_row("Continuation Patterns", ai_data.get("continuation_patterns", "N/A"), 
+                               ai_data.get("consolidation_pattern", "N/A"))
+            
+            # Breakout analysis
+            market_table.add_row("Breakout Direction", ai_data.get("breakout_direction", "N/A"), 
+                               f"Probability: {ai_data.get('breakout_probability', 0)}%")
+            market_table.add_row("False Breakout Risk", ai_data.get("false_breakout_risk", "N/A"), 
+                               f"Trend Continuation: {ai_data.get('trend_continuation_probability', 0)}%")
+            
+            # Volume analysis
+            market_table.add_row("Volume Trend", ai_data.get("volume_trend", "N/A"), 
+                               f"Confirmation: {ai_data.get('volume_confirmation', 'N/A')}")
+            market_table.add_row("Smart Money Activity", ai_data.get("smart_money_activity", "N/A"), 
+                               ai_data.get("institutional_behavior", "N/A"))
+            
+            self.console.print(market_table)
+            
+            # === INDICATOR CONFLUENCE TABLE ===
+            confluence_table = Table(show_header=True, header_style="bold cyan", box=box.ROUNDED, title="🎯 Indicator Confluence")
+            confluence_table.add_column("Indicator Group", style="white", width=25)
+            confluence_table.add_column("Signal", style="cyan", width=15)
+            confluence_table.add_column("Analysis", style="yellow", width=45)
+            
+            confluence_table.add_row("Momentum Indicators", ai_data.get("momentum_confluence", "N/A"), 
+                                   ai_data.get("momentum_forecast", "N/A"))
+            confluence_table.add_row("Trend Indicators", ai_data.get("trend_confluence", "N/A"), 
+                                   f"Price Movement: {ai_data.get('price_movement', 'N/A')}")
+            confluence_table.add_row("Mean Reversion", ai_data.get("mean_reversion_signal", "N/A"), 
+                                   ai_data.get("overbought_oversold_alert", "N/A"))
+            confluence_table.add_row("Volatility Analysis", "Normal" if "Normal" in ai_data.get("volatility_analysis", "") else "Active", 
+                                   ai_data.get("volatility_analysis", "N/A"))
+            confluence_table.add_row("Overall Strength", f"{ai_data.get('indicator_strength', 0)}%", 
+                                   ai_data.get("unusual_behavior", "N/A"))
+            
+            self.console.print(confluence_table)
+            
+            # === SENTIMENT & RISK TABLE ===
+            sentiment_table = Table(show_header=True, header_style="bold red", box=box.ROUNDED, title="🧠 Market Sentiment & Risk Management")
+            sentiment_table.add_column("Factor", style="white", width=25)
+            sentiment_table.add_column("Status", style="red", width=20)
+            sentiment_table.add_column("Recommendations", style="cyan", width=40)
+            
+            sentiment_table.add_row("Fear/Greed Index", ai_data.get("fear_greed_indicator", "N/A"), 
+                                  ai_data.get("market_psychology", "N/A"))
+            sentiment_table.add_row("Retail Sentiment", ai_data.get("retail_sentiment", "N/A"), 
+                                  ai_data.get("sentiment_extremes", "N/A"))
+            sentiment_table.add_row("Position Size", ai_data.get("position_size_recommendation", "N/A"), 
+                                  f"Max Drawdown: {ai_data.get('max_drawdown_risk', 'N/A')}")
+            sentiment_table.add_row("Time Horizon", ai_data.get("max_holding_period", "N/A"), 
+                                  ai_data.get("time_horizon_detail", "N/A"))
+            sentiment_table.add_row("Execution Notes", ai_data.get("execution_notes", "N/A"), 
+                                  ai_data.get("key_levels_to_watch", "N/A"))
             
             if ai_data.get("reason_to_hold"):
-                ai_table.add_row("Reason to Hold", ai_data.get("reason_to_hold", "N/A"))
+                sentiment_table.add_row("Hold Reason", "Wait Signal", ai_data.get("reason_to_hold", "N/A"))
             
-            ai_table.add_row("Volatility Risk", ai_data.get("volatility_risk", "N/A"))
-            ai_table.add_row("Unusual Behavior", ai_data.get("unusual_behavior", "N/A"))
-            ai_table.add_row("Overbought/Oversold", ai_data.get("overbought_oversold_alert", "N/A"))
-            ai_table.add_row("Note", ai_data.get("note", "N/A"))
+            self.console.print(sentiment_table)
             
-            self.console.print("\n")
-            self.console.print(ai_table)
+            # === CATALYST EVENTS ===
+            if ai_data.get("catalyst_events") and ai_data.get("catalyst_events") != "No major catalysts identified":
+                catalyst_panel = Text()
+                catalyst_panel.append(f"\n🔔 Market Catalysts: {ai_data.get('catalyst_events', 'N/A')}\n", style="bold orange")
+                self.console.print(Panel(catalyst_panel, title="Important Events", box=box.ROUNDED))
+            
+            # === AI SUMMARY ===
+            summary_panel = Text()
+            summary_panel.append(f"\n📝 AI Summary: {ai_data.get('summary', 'N/A')}\n", style="bold white")
+            summary_panel.append(f"💡 Note: {ai_data.get('note', 'N/A')}\n", style="italic cyan")
+            self.console.print(Panel(summary_panel, title="AI Analysis Summary", box=box.ROUNDED))
             self.console.print("\n")
     
     def print_error(self, message: str):

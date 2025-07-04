@@ -7,6 +7,7 @@ A WebSocket-based cryptocurrency price tracking system with technical analysis
 import argparse
 import sys
 import time
+import threading
 from typing import Optional, List
 
 from src.config import get_settings
@@ -25,6 +26,22 @@ class Application:
         self.settings = get_settings()
         self.ui = ConsoleUI(ui_enabled=ui_enabled)
         self.health_checker = SystemHealthChecker(self.ui)
+        self.websocket_client = None  # Store WebSocket client reference
+    
+    def _start_websocket_client(self, websocket_client):
+        """Start WebSocket client in background thread"""
+        try:
+            self.websocket_client = websocket_client  # Store reference
+            if websocket_client.connect():
+                websocket_client.ws.run_forever()
+        except Exception as e:
+            self.ui.print_error(f"WebSocket client error: {e}")
+    
+    def _get_live_price(self, symbol: str) -> Optional[float]:
+        """Get live price for a symbol from WebSocket client"""
+        if self.websocket_client and symbol in self.websocket_client.latest_prices:
+            return self.websocket_client.latest_prices[symbol]["price"]
+        return None
     
     def run_system_check(self) -> bool:
         """
@@ -89,7 +106,8 @@ class Application:
         resolution: str = '5m',
         days: int = 10,
         save_to_mongodb: bool = False,
-        enable_broker: bool = False
+        enable_broker: bool = False,
+        enable_live_price: bool = True
     ) -> bool:
         """
         Run technical analysis mode
@@ -113,6 +131,7 @@ class Application:
                 # Add tasks
                 system_task = progress.add_task("Running system checks...", total=100)
                 analysis_task = progress.add_task("Initializing analysis engine...", total=100)
+                liveprice_task = progress.add_task("Initializing live price monitoring...", total=100)
                 
                 # Run system checks
                 if not self.health_checker.run_all_checks():
@@ -123,6 +142,28 @@ class Application:
                 # Initialize analysis engine
                 analysis = TechnicalAnalysis(self.ui, symbol, resolution, days)
                 progress.update(analysis_task, completed=100)
+                
+                # Initialize live price monitoring if enabled
+                websocket_client = None
+                if enable_live_price:
+                    websocket_client = WebSocketClient(self.ui)
+                    
+                    # Modify the DEFAULT_SYMBOLS to include current symbol
+                    if symbol not in self.settings.DEFAULT_SYMBOLS:
+                        # Create a temporary symbols list that includes the current symbol
+                        temp_symbols = list(self.settings.DEFAULT_SYMBOLS)
+                        temp_symbols.append(symbol)
+                        websocket_client.settings.DEFAULT_SYMBOLS = temp_symbols
+                    
+                    # Start WebSocket connection in a separate thread
+                    websocket_thread = threading.Thread(target=self._start_websocket_client, args=(websocket_client,))
+                    websocket_thread.daemon = True
+                    websocket_thread.start()
+                    
+                    # Give WebSocket time to connect
+                    time.sleep(2)
+                    
+                progress.update(liveprice_task, completed=100)
             
             # Initialize MongoDB client if saving is enabled
             mongodb_client = None
@@ -144,6 +185,9 @@ class Application:
             
             self.ui.print_success("Analysis initialization complete!")
             
+            if enable_live_price and websocket_client:
+                self.ui.print_success(f"🔴 Live price monitoring ACTIVE for {symbol} - Updates every {self.settings.PRICE_UPDATE_INTERVAL} seconds")
+            
             if refresh_interval and refresh_interval > 0:
                 self.ui.print_info(f"Analysis will refresh every {refresh_interval} seconds")
                 if save_to_mongodb and mongodb_client:
@@ -155,6 +199,15 @@ class Application:
                 while True:
                     if analysis.refresh():
                         analysis_results = analysis.get_analysis_results()
+                        
+                        # Update analysis results with live price if available (even without broker)
+                        if enable_live_price:
+                            live_price = self._get_live_price(symbol)
+                            if live_price:
+                                analysis_results['current_price'] = live_price
+                                analysis_results['live_price_active'] = True
+                            else:
+                                analysis_results['live_price_active'] = False
                         
                         # Save to MongoDB first if enabled to get document ID
                         mongodb_document_id = None
@@ -168,8 +221,16 @@ class Application:
                         broker_actions = {'has_actions': False}
                         
                         if enable_broker and broker_client:
-                            # Get current price from analysis data
-                            current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                            # Get current price - prioritize live price, fallback to analysis data
+                            live_price = self._get_live_price(symbol) if enable_live_price else None
+                            current_price = live_price or analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                            
+                            # Update analysis results with live price if available
+                            if live_price:
+                                analysis_results['current_price'] = live_price
+                                analysis_results['live_price_active'] = True
+                            else:
+                                analysis_results['live_price_active'] = False
                             
                             # Add MongoDB document ID to analysis_results
                             if mongodb_document_id:
@@ -203,6 +264,15 @@ class Application:
                 if analysis.refresh():
                     analysis_results = analysis.get_analysis_results()
                     
+                    # Update analysis results with live price if available (even without broker)
+                    if enable_live_price:
+                        live_price = self._get_live_price(symbol)
+                        if live_price:
+                            analysis_results['current_price'] = live_price
+                            analysis_results['live_price_active'] = True
+                        else:
+                            analysis_results['live_price_active'] = False
+                    
                     # Save to MongoDB first if enabled to get document ID
                     mongodb_document_id = None
                     if save_to_mongodb and mongodb_client:
@@ -215,8 +285,16 @@ class Application:
                     broker_actions = {'has_actions': False}
                     
                     if enable_broker and broker_client:
-                        # Get current price from analysis data
-                        current_price = analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                        # Get current price - prioritize live price, fallback to analysis data
+                        live_price = self._get_live_price(symbol) if enable_live_price else None
+                        current_price = live_price or analysis_results.get('current_price', analysis.df['close'].iloc[-1])
+                        
+                        # Update analysis results with live price if available
+                        if live_price:
+                            analysis_results['current_price'] = live_price
+                            analysis_results['live_price_active'] = True
+                        else:
+                            analysis_results['live_price_active'] = False
                         
                         # Add MongoDB document ID to analysis_results
                         if mongodb_document_id:
@@ -250,6 +328,13 @@ class Application:
             
         except KeyboardInterrupt:
             self.ui.print_warning("Analysis stopped by user")
+            # Disconnect WebSocket client if it was connected
+            if enable_live_price and self.websocket_client:
+                try:
+                    self.websocket_client.stop()
+                    self.ui.print_info("Live price monitoring stopped")
+                except:
+                    pass
             # Disconnect MongoDB if it was connected
             if save_to_mongodb and mongodb_client:
                 mongodb_client.disconnect()
@@ -259,6 +344,13 @@ class Application:
             return True
         except Exception as e:
             self.ui.print_error(f"Analysis error: {e}")
+            # Disconnect WebSocket client if it was connected
+            if enable_live_price and self.websocket_client:
+                try:
+                    self.websocket_client.stop()
+                    self.ui.print_info("Live price monitoring stopped")
+                except:
+                    pass
             # Disconnect MongoDB if it was connected
             if save_to_mongodb and mongodb_client:
                 mongodb_client.disconnect()
@@ -555,11 +647,12 @@ def main():
 Examples:
   python app.py --check                    Run system diagnostics
   python app.py --liveprice                Start live price monitoring
-  python app.py --analysis                 Run technical analysis once
-  python app.py --analysis 5               Run technical analysis with 5-second refresh
-  python app.py --analysis --save          Run analysis and save to MongoDB
-  python app.py --analysis 5 --save        Run analysis with refresh and save to MongoDB
-  python app.py --analysis 5 --broker      Run analysis with automated trading (simple actions)
+  python app.py --analysis                 Run technical analysis once (with live price)
+  python app.py --analysis 5               Run technical analysis with 5-second refresh (with live price)
+  python app.py --analysis --save          Run analysis and save to MongoDB (with live price)
+  python app.py --analysis 5 --save        Run analysis with refresh and save to MongoDB (with live price)
+  python app.py --analysis 5 --broker      Run analysis with automated trading + live price (perfect combo!)
+  python app.py --analysis --noliveprice   Run analysis using only historical data (no live price)
   python app.py --brokerui                 Display detailed broker dashboard (auto-refreshes every 1 minute)
   
   ✨ NEW FEATURES:
@@ -619,7 +712,7 @@ Examples:
         '--resolution',
         type=str,
         choices=['1m', '5m', '15m', '1h', '1d'],
-        default='5m',
+        default='15m',
         help='Timeframe resolution for technical analysis (default: 5m)'
     )
     
@@ -652,6 +745,12 @@ Examples:
         '--delete',
         action='store_true',
         help='Delete all data from MongoDB collections (accounts, analysis_results, positions)'
+    )
+    
+    parser.add_argument(
+        '--noliveprice',
+        action='store_true',
+        help='Disable live price monitoring during analysis (use only historical data)'
     )
     
     args = parser.parse_args()
@@ -694,7 +793,8 @@ Examples:
                     resolution=args.resolution,
                     days=args.days,
                     save_to_mongodb=args.save,
-                    enable_broker=args.broker
+                    enable_broker=args.broker,
+                    enable_live_price=not args.noliveprice  # Enable live price by default, disable with --noliveprice
                 )
             if not success:
                 sys.exit(1)

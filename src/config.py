@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     WEBSOCKET_URL: str = "wss://socket.india.delta.exchange"
     HISTORICAL_URL: str = "https://api.india.delta.exchange/v2/history/candles"
     WEBSOCKET_TIMEOUT: int = 10
-    PRICE_UPDATE_INTERVAL: int = 5  # seconds
+    PRICE_UPDATE_INTERVAL: int = 10  # seconds
     DEFAULT_SYMBOLS: List[str] = ["BTCUSD", "ETHUSD"]
     
     # Technical Analysis Configuration

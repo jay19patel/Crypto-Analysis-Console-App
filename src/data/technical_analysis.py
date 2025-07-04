@@ -471,13 +471,15 @@ class TechnicalAnalysis:
         
         # Get latest OHLC data if available
         latest_data = {}
+        current_price = None
         if self.df is not None and not self.df.empty:
             latest = self.df.iloc[-1]
+            current_price = float(latest['close']) if pd.notna(latest['close']) else None
             latest_data = {
                 'open': float(latest['open']) if pd.notna(latest['open']) else None,
                 'high': float(latest['high']) if pd.notna(latest['high']) else None,
                 'low': float(latest['low']) if pd.notna(latest['low']) else None,
-                'close': float(latest['close']) if pd.notna(latest['close']) else None,
+                'close': current_price,
                 'volume': float(latest['volume']) if pd.notna(latest['volume']) else None,
                 'timestamp': latest['time'] if 'time' in latest and pd.notna(latest['time']) else None,
                 'datetime': latest['datetime'].strftime('%Y-%m-%d %H:%M:%S') if 'datetime' in latest and pd.notna(latest['datetime']) else None
@@ -491,7 +493,9 @@ class TechnicalAnalysis:
             'strategies': strategies_dict,
             'consensus': consensus,
             'ai_analysis': self.ai_analysis_result,
-            'latest_data': latest_data
+            'latest_data': latest_data,
+            'current_price': current_price,  # Add current price for easy access
+            'live_price_active': False  # Will be overridden by app.py if live price is available
         }
     
     def refresh(self) -> bool:
