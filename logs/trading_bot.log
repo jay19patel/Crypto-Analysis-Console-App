@@ -1,0 +1,87 @@
+2025-07-05 16:42:28,980 - websockets.server - INFO - connection open
+2025-07-05 16:42:28,981 - src.system.websocket_server - INFO - Client connected. Total clients: 1
+2025-07-05 16:42:32,336 - src.system.websocket_server - INFO - Client disconnected. Total clients: 0
+2025-07-05 16:42:33,440 - websockets.server - INFO - connection open
+2025-07-05 16:42:33,441 - src.system.websocket_server - INFO - Client connected. Total clients: 1
+2025-07-05 16:43:22,482 - src.system.websocket_server - INFO - Client disconnected. Total clients: 0
+2025-07-05 16:49:24,957 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
+2025-07-05 16:49:25,126 - websockets.server - INFO - server listening on 0.0.0.0:8765
+2025-07-05 16:49:25,127 - src.system.websocket_server - INFO - WebSocket server started on ws://0.0.0.0:8765
+2025-07-05 16:49:25,163 - src.data.websocket_client - INFO - Initializing WebSocket client components...
+2025-07-05 16:49:25,180 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
+2025-07-05 16:49:25,180 - src.data.websocket_client - INFO - MongoDB connection verified
+2025-07-05 16:49:25,181 - src.data.websocket_client - INFO - Technical analysis component ready
+2025-07-05 16:49:25,181 - src.data.websocket_client - INFO - Starting Delta Exchange client...
+2025-07-05 16:49:25,181 - src.broker.delta_client - INFO - Starting Delta Exchange WebSocket client...
+2025-07-05 16:49:25,182 - src.broker.delta_client - INFO - Connecting to Delta Exchange: wss://socket.delta.exchange
+2025-07-05 16:49:25,183 - src.broker.delta_client - INFO - WebSocket connection attempt 1/5
+2025-07-05 16:49:26,278 - websocket - INFO - Websocket connected
+2025-07-05 16:49:26,279 - src.broker.delta_client - INFO - Connected to Delta Exchange WebSocket
+2025-07-05 16:49:26,279 - src.broker.delta_client - INFO - Subscribed to BTC-USD
+2025-07-05 16:49:26,280 - src.broker.delta_client - INFO - Subscribed to ETH-USD
+2025-07-05 16:49:26,345 - src.broker.delta_client - INFO - Successfully connected to Delta Exchange WebSocket
+2025-07-05 16:49:26,346 - src.broker.delta_client - INFO - Delta client connected, waiting for initial data...
+2025-07-05 16:49:26,346 - src.broker.delta_client - INFO - Delta client connected successfully
+2025-07-05 16:49:26,348 - src.broker.delta_client - INFO - Delta client started successfully
+2025-07-05 16:49:26,348 - src.data.websocket_client - INFO - Delta client started successfully
+2025-07-05 16:49:26,348 - src.data.websocket_client - INFO - Connecting Position Manager...
+2025-07-05 16:49:26,361 - src.broker.position_manager - INFO - Position manager connected successfully
+2025-07-05 16:49:26,361 - src.data.websocket_client - INFO - Position Manager connected successfully
+2025-07-05 16:49:26,437 - src.broker.position_manager - INFO - Loaded 0 positions
+2025-07-05 16:49:26,437 - src.data.websocket_client - INFO - Existing positions loaded
+2025-07-05 16:49:26,437 - src.data.websocket_client - INFO - WebSocket client connected successfully
+2025-07-05 16:49:26,442 - src.data.websocket_client - INFO - WebSocket client started successfully
+2025-07-05 16:49:31,443 - src.data.websocket_client - INFO - All components ready - starting periodic tasks
+2025-07-05 16:49:31,453 - src.data.technical_analysis - INFO - Analyzing BTC-USD...
+2025-07-05 16:49:31,457 - src.data.technical_analysis - ERROR - Error fetching data for BTCUSD: 'Settings' object has no attribute 'DELTA_API_URL'
+2025-07-05 16:49:31,459 - src.data.technical_analysis - WARNING - Failed to analyze BTC-USD
+2025-07-05 16:49:31,461 - src.data.technical_analysis - INFO - Analyzing ETH-USD...
+2025-07-05 16:49:31,462 - src.data.technical_analysis - ERROR - Error fetching data for ETHUSD: 'Settings' object has no attribute 'DELTA_API_URL'
+2025-07-05 16:49:31,464 - src.data.technical_analysis - WARNING - Failed to analyze ETH-USD
+2025-07-05 16:50:20,566 - websockets.server - INFO - connection open
+2025-07-05 16:50:20,568 - src.system.websocket_server - INFO - Client connected. Total clients: 1
+2025-07-05 16:50:31,768 - src.system.websocket_server - INFO - Client disconnected. Total clients: 0
+2025-07-05 16:50:31,769 - src.system.websocket_server - ERROR - Error broadcasting message: Set changed size during iteration
+2025-07-05 16:58:14,259 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
+2025-07-05 16:58:14,332 - websockets.server - INFO - server listening on 0.0.0.0:8765
+2025-07-05 16:58:14,333 - src.system.websocket_server - INFO - WebSocket server started on ws://0.0.0.0:8765
+2025-07-05 16:58:14,364 - src.data.websocket_client - INFO - Initializing WebSocket client components...
+2025-07-05 16:58:14,391 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
+2025-07-05 16:58:14,391 - src.data.websocket_client - INFO - MongoDB connection verified
+2025-07-05 16:58:14,392 - src.data.websocket_client - INFO - Technical analysis component ready
+2025-07-05 16:58:14,392 - src.data.websocket_client - INFO - Starting Delta Exchange client...
+2025-07-05 16:58:14,393 - src.broker.delta_client - INFO - Starting Delta Exchange WebSocket client...
+2025-07-05 16:58:14,394 - src.broker.delta_client - INFO - Connecting to Delta Exchange: wss://socket.delta.exchange
+2025-07-05 16:58:14,396 - src.broker.delta_client - INFO - WebSocket connection attempt 1/5
+2025-07-05 16:58:15,279 - websocket - INFO - Websocket connected
+2025-07-05 16:58:15,279 - src.broker.delta_client - INFO - Connected to Delta Exchange WebSocket
+2025-07-05 16:58:15,280 - src.broker.delta_client - INFO - Subscribed to BTC-USD
+2025-07-05 16:58:15,280 - src.broker.delta_client - INFO - Subscribed to ETH-USD
+2025-07-05 16:58:15,351 - src.broker.delta_client - INFO - Successfully connected to Delta Exchange WebSocket
+2025-07-05 16:58:15,351 - src.broker.delta_client - INFO - Delta client connected, waiting for initial data...
+2025-07-05 16:58:15,351 - src.broker.delta_client - INFO - Delta client connected successfully
+2025-07-05 16:58:15,355 - src.broker.delta_client - INFO - Delta client started successfully
+2025-07-05 16:58:15,355 - src.data.websocket_client - INFO - Delta client started successfully
+2025-07-05 16:58:15,355 - src.data.websocket_client - INFO - Connecting Position Manager...
+2025-07-05 16:58:15,378 - src.broker.position_manager - INFO - Position manager connected successfully
+2025-07-05 16:58:15,378 - src.data.websocket_client - INFO - Position Manager connected successfully
+2025-07-05 16:58:15,379 - src.broker.position_manager - INFO - Loaded 0 positions from database (Open: 0, Closed: 0)
+2025-07-05 16:58:15,379 - src.data.websocket_client - INFO - Existing positions loaded
+2025-07-05 16:58:15,380 - src.data.websocket_client - INFO - WebSocket client connected successfully
+2025-07-05 16:58:15,380 - src.data.websocket_client - INFO - WebSocket client started successfully
+2025-07-05 16:58:16,395 - websockets.server - INFO - connection open
+2025-07-05 16:58:16,395 - src.system.websocket_server - INFO - Client connected. Total clients: 1
+2025-07-05 16:58:20,382 - src.data.websocket_client - INFO - All components ready - starting periodic tasks
+2025-07-05 16:58:20,384 - src.data.technical_analysis - INFO - Analyzing BTC-USD...
+2025-07-05 16:58:22,302 - src.data.technical_analysis - INFO - Successfully fetched 2880 candles for BTCUSD
+2025-07-05 16:58:22,349 - src.data.technical_analysis - ERROR - Error calculating indicators: 'BBU_20_2'
+2025-07-05 16:58:22,350 - src.data.technical_analysis - WARNING - No indicators calculated for BTC-USD
+2025-07-05 16:58:22,350 - src.data.technical_analysis - WARNING - Failed to analyze BTC-USD
+2025-07-05 16:58:22,350 - src.data.technical_analysis - INFO - Analyzing ETH-USD...
+2025-07-05 16:58:24,017 - src.data.technical_analysis - INFO - Successfully fetched 2880 candles for ETHUSD
+2025-07-05 16:58:24,034 - src.data.technical_analysis - ERROR - Error calculating indicators: 'BBU_20_2'
+2025-07-05 16:58:24,034 - src.data.technical_analysis - WARNING - No indicators calculated for ETH-USD
+2025-07-05 16:58:24,035 - src.data.technical_analysis - WARNING - Failed to analyze ETH-USD
+2025-07-05 16:58:49,897 - websockets.server - INFO - connection open
+2025-07-05 16:58:49,898 - src.system.websocket_server - INFO - Client connected. Total clients: 2
+2025-07-05 16:59:21,137 - src.system.websocket_server - INFO - Client disconnected. Total clients: 1

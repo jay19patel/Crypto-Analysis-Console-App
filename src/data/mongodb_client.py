@@ -57,8 +57,8 @@ class MongoDBClient:
             self.db = self.client[self.settings.DATABASE_NAME]
             self.collection = self.db[self.settings.MONGODB_COLLECTION]
             
-            # Create indexes
-            self.create_indexes()
+            # # Create indexes
+            # self.create_indexes()
             
             self.is_connected = True
             self.log_message("Connected to MongoDB successfully", "info")

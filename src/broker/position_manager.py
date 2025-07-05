@@ -72,24 +72,45 @@ class PositionManager:
             return False
     
     def load_positions(self) -> bool:
-        """Load all positions from database"""
+        """Load all positions from database with enhanced querying"""
         if not self.is_connected:
             if not self.connect():
                 return False
         
         try:
+            # Load all positions (both open and closed) sorted by created date
             cursor = self.positions_collection.find({}).sort("created_at", -1)
             self.positions = []
             
-            for doc in cursor:
-                position = Position.from_dict(doc)
-                self.positions.append(position)
+            position_count = 0
+            open_positions = 0
+            closed_positions = 0
             
-            self.log_message(f"Loaded {len(self.positions)} positions", "info")
+            for doc in cursor:
+                try:
+                    position = Position.from_dict(doc)
+                    self.positions.append(position)
+                    position_count += 1
+                    
+                    if position.status == PositionStatus.OPEN:
+                        open_positions += 1
+                    else:
+                        closed_positions += 1
+                        
+                except Exception as e:
+                    self.log_message(f"Error parsing position from database: {e}", "warning")
+                    continue
+            
+            self.log_message(f"Loaded {position_count} positions from database (Open: {open_positions}, Closed: {closed_positions})", "info")
+            
+            # Also fetch and display position summary
+            if open_positions > 0:
+                self.log_message(f"Found {open_positions} open positions ready for PnL calculation", "info")
+            
             return True
             
         except Exception as e:
-            self.log_message(f"Error loading positions: {e}", "error")
+            self.log_message(f"Error loading positions from database: {e}", "error")
             return False
     
     def save_position(self, position: Position) -> bool:
@@ -310,13 +331,47 @@ class PositionManager:
         return True
     
     def update_positions_pnl(self, current_prices: Dict[str, float]) -> None:
-        """Update PnL for all open positions"""
-        for position in self.get_open_positions():
+        """Update PnL for all open positions with live prices"""
+        if not current_prices:
+            return
+            
+        open_positions = self.get_open_positions()
+        if not open_positions:
+            return
+            
+        updated_count = 0
+        total_pnl = 0.0
+        
+        for position in open_positions:
             if position.symbol in current_prices:
-                position.calculate_pnl(current_prices[position.symbol])
+                current_price = current_prices[position.symbol]
+                old_pnl = position.pnl
+                
+                # Calculate new PnL with current price
+                position.calculate_pnl(current_price)
                 position.calculate_holding_time()
-                # Save updated position
+                
+                # Update unrealized PnL
+                position.unrealized_pnl = position.pnl
+                total_pnl += position.pnl
+                updated_count += 1
+                
+                # Save updated position to database
                 self.save_position(position)
+                
+                # Log significant PnL changes
+                if abs(position.pnl - old_pnl) > (position.invested_amount * 0.01):  # 1% change
+                    pnl_direction = "📈" if position.pnl > old_pnl else "📉"
+                    self.log_message(
+                        f"{pnl_direction} {position.symbol}: PnL ${position.pnl:.2f} "
+                        f"(Price: ${current_price:.2f})", "info"
+                    )
+        
+        if updated_count > 0:
+            self.log_message(
+                f"Updated PnL for {updated_count} positions | Total Unrealized PnL: ${total_pnl:.2f}", 
+                "info"
+            )
     
     def check_stop_loss_and_targets(self, current_prices: Dict[str, float]) -> List[str]:
         """Check positions for stop loss and take profit targets
@@ -520,4 +575,64 @@ class PositionManager:
 
     def get_all_positions(self) -> List[Position]:
         """Get all current positions"""
-        return list(self.positions.values()) 
+        return list(self.positions.values()) if isinstance(self.positions, dict) else self.positions
+        
+    def get_positions_with_live_pnl(self, current_prices: Dict[str, float]) -> Dict[str, Any]:
+        """Get all positions with live PnL calculation and enhanced data"""
+        positions_data = {
+            "timestamp": datetime.now().isoformat(),
+            "total_positions": len(self.get_all_positions()),
+            "open_positions": [],
+            "closed_positions": [],
+            "summary": {
+                "total_open_value": 0.0,
+                "total_unrealized_pnl": 0.0,
+                "total_realized_pnl": 0.0,
+                "positions_in_profit": 0,
+                "positions_in_loss": 0,
+                "price_data_available": len(current_prices)
+            }
+        }
+        
+        all_positions = self.get_all_positions()
+        
+        for position in all_positions:
+            position_data = position.to_dict()
+            
+            if position.status == PositionStatus.OPEN:
+                # Calculate live PnL for open positions
+                if position.symbol in current_prices:
+                    current_price = current_prices[position.symbol]
+                    old_pnl = position.pnl
+                    
+                    # Calculate live PnL
+                    position.calculate_pnl(current_price)
+                    position_data["current_price"] = current_price
+                    position_data["unrealized_pnl"] = position.pnl
+                    position_data["price_change"] = position.pnl - old_pnl
+                    
+                    # Add percentage calculations
+                    if position.invested_amount > 0:
+                        position_data["pnl_percentage"] = (position.pnl / position.invested_amount) * 100
+                    
+                    # Update summary
+                    positions_data["summary"]["total_open_value"] += position.invested_amount
+                    positions_data["summary"]["total_unrealized_pnl"] += position.pnl
+                    
+                    if position.pnl > 0:
+                        positions_data["summary"]["positions_in_profit"] += 1
+                    elif position.pnl < 0:
+                        positions_data["summary"]["positions_in_loss"] += 1
+                else:
+                    position_data["current_price"] = None
+                    position_data["unrealized_pnl"] = 0
+                    position_data["price_change"] = 0
+                    position_data["pnl_percentage"] = 0
+                
+                positions_data["open_positions"].append(position_data)
+            else:
+                # Add realized PnL for closed positions
+                positions_data["summary"]["total_realized_pnl"] += position.pnl
+                positions_data["closed_positions"].append(position_data)
+        
+        return positions_data 

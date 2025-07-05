@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # WebSocket Configuration
     WEBSOCKET_URL: str = "ws://localhost:8765"  # Local WebSocket server URL
     DELTA_WEBSOCKET_URL: str = "wss://socket.delta.exchange"  # Delta Exchange WebSocket URL
+    DELTA_API_URL: str = "https://api.delta.exchange/v2"  # Delta Exchange API URL
     HISTORICAL_URL: str = "https://api.india.delta.exchange/v2/history/candles"
     WEBSOCKET_TIMEOUT: int = 10  # Seconds to wait for WebSocket connection
     PRICE_UPDATE_INTERVAL: int = 10  # Seconds between price updates

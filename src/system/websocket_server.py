@@ -66,7 +66,8 @@ class WebSocketServer:
                 
                 # Remove disconnected clients
                 disconnected = set()
-                for client in self.clients:
+                clients_copy = self.clients.copy()  # Create a copy to avoid "Set changed size during iteration"
+                for client in clients_copy:
                     try:
                         # Ping to check if client is still connected
                         pong_waiter = await client.ping()
@@ -179,14 +180,17 @@ class WebSocketServer:
         
         if self.server:
             try:
-                # Close the server using the existing event loop
+                # Close the server properly
                 if self.server_thread and self.server_thread.is_alive():
-                    async def close_server():
-                        await self.server.close()
-                    asyncio.run_coroutine_threadsafe(close_server(), asyncio.get_event_loop())
+                    # Get the event loop from the server thread
+                    try:
+                        # Signal server to close
+                        self.server.close()
+                    except Exception as e:
+                        self.logger.error(f"Error closing WebSocket server: {e}")
                 self.server = None
             except Exception as e:
-                self.logger.error(f"Error closing WebSocket server: {e}")
+                self.logger.error(f"Error stopping WebSocket server: {e}")
         
         if self.server_thread:
             try:
