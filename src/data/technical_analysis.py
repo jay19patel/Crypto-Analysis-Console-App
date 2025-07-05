@@ -11,6 +11,7 @@ from src.config import get_settings
 from src.strategies.strategy_manager import StrategyManager
 from src.strategies.base_strategy import SignalType, ConfidenceLevel
 from src.system.message_formatter import MessageFormatter, MessageType
+from src.data.mongodb_client import MongoDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class IndicatorResult:
 class TechnicalAnalysis:
     """Technical analysis engine with strategies integration"""
     
-    def __init__(self, websocket_server=None, mongodb_client=None):
+    def __init__(self, websocket_server=None, mongodb_client: Optional[MongoDBClient] = None):
         """Initialize technical analysis engine
         
         Args:
@@ -34,7 +35,7 @@ class TechnicalAnalysis:
         """
         self.logger = logging.getLogger(__name__)
         self.websocket_server = websocket_server
-        self.mongodb_client = mongodb_client
+        self.mongodb_client = mongodb_client or MongoDBClient()  # Create new instance if None
         self.settings = get_settings()
         self.df = None
         self.indicators = []
@@ -450,4 +451,94 @@ class TechnicalAnalysis:
             except Exception as e:
                 self.log_message(f"Error analyzing {symbol}: {e}", "error")
         
-        return results 
+        return results
+
+    def analyze_symbol(self, symbol: str) -> Optional[Dict]:
+        """Analyze symbol and return technical indicators
+        
+        Args:
+            symbol: Trading symbol to analyze
+            
+        Returns:
+            Dict containing analysis results or None if not enough data
+        """
+        try:
+            # Get historical data from MongoDB
+            data = self.mongodb_client.get_historical_data(
+                symbol,
+                start_time=(datetime.now() - timedelta(days=30)).isoformat(),
+                end_time=datetime.now().isoformat()
+            )
+            
+            if not data or len(data) < 30:  # Need at least 30 data points
+                return None
+                
+            # Convert to pandas DataFrame
+            df = pd.DataFrame(data)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.set_index('timestamp', inplace=True)
+            df.sort_index(inplace=True)
+            
+            # Calculate indicators
+            # SMA
+            df['sma_20'] = df['close'].rolling(window=20).mean()
+            df['sma_50'] = df['close'].rolling(window=50).mean()
+            
+            # EMA
+            df['ema_12'] = df['close'].ewm(span=12, adjust=False).mean()
+            df['ema_26'] = df['close'].ewm(span=26, adjust=False).mean()
+            
+            # MACD
+            df['macd'] = df['ema_12'] - df['ema_26']
+            df['signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+            
+            # RSI
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['rsi'] = 100 - (100 / (1 + rs))
+            
+            # Bollinger Bands
+            df['bb_middle'] = df['close'].rolling(window=20).mean()
+            df['bb_upper'] = df['bb_middle'] + 2 * df['close'].rolling(window=20).std()
+            df['bb_lower'] = df['bb_middle'] - 2 * df['close'].rolling(window=20).std()
+            
+            # Get latest values
+            latest = df.iloc[-1]
+            
+            return {
+                "symbol": symbol,
+                "timestamp": latest.name.isoformat(),
+                "price": float(latest['close']),
+                "indicators": {
+                    "sma_20": float(latest['sma_20']),
+                    "sma_50": float(latest['sma_50']),
+                    "ema_12": float(latest['ema_12']),
+                    "ema_26": float(latest['ema_26']),
+                    "macd": {
+                        "value": float(latest['macd']),
+                        "signal": float(latest['signal']),
+                        "histogram": float(latest['macd'] - latest['signal'])
+                    },
+                    "rsi": float(latest['rsi']),
+                    "bollinger_bands": {
+                        "upper": float(latest['bb_upper']),
+                        "middle": float(latest['bb_middle']),
+                        "lower": float(latest['bb_lower'])
+                    }
+                },
+                "signals": {
+                    "trend": "bullish" if latest['sma_20'] > latest['sma_50'] else "bearish",
+                    "rsi_overbought": latest['rsi'] > 70,
+                    "rsi_oversold": latest['rsi'] < 30,
+                    "macd_crossover": (df['macd'].iloc[-2] < df['signal'].iloc[-2] and 
+                                     latest['macd'] > latest['signal']),
+                    "price_above_bb": latest['close'] > latest['bb_upper'],
+                    "price_below_bb": latest['close'] < latest['bb_lower']
+                }
+            }
+            
+        except Exception as e:
+            print(f"Error analyzing {symbol}: {e}")
+            return None 

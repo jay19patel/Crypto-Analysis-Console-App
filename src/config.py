@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017/"
     DATABASE_NAME: str = "trading_bot"
     MONGODB_TIMEOUT: int = 5
+    MONGODB_COLLECTION: str = "analysis_results"  # Collection for storing analysis results
     
     # AI Strategy Configuration
     GOOGLE_API_KEY: str = "AIzaSyCK2n2AoIwXNTvdpEQMiGiwnYZ00-MRLqE"  # Add your Google AI API key here

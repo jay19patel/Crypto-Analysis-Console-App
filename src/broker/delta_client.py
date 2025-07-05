@@ -95,6 +95,9 @@ class DeltaBrokerClient:
     def on_message(self, ws: websocket.WebSocketApp, message: str) -> None:
         """Handle incoming Delta Exchange WebSocket messages"""
         try:
+            # Add delay between messages
+            time.sleep(10)  # 10-second delay
+            
             message_json = json.loads(message)
             
             # Handle different message types from Delta Exchange
@@ -126,7 +129,8 @@ class DeltaBrokerClient:
         except json.JSONDecodeError as e:
             self.log_message(f"Failed to parse message: {e}", "error")
         except Exception as e:
-            self.log_message(f"Error processing message: {e}", "error")
+            if not self._stop_event.is_set():  # Only log if not stopping
+                self.log_message(f"Error processing message: {e}", "error")
 
     def on_error(self, ws: websocket.WebSocketApp, error: Exception) -> None:
         """Handle WebSocket errors"""
@@ -330,5 +334,4 @@ class DeltaBrokerClient:
         
         time.sleep(self.settings.WEBSOCKET_TIMEOUT)
         test_ws.close()
-        
         return True 

@@ -30,6 +30,12 @@ from src.broker.delta_client import DeltaBrokerClient
 def setup_logging():
     """Setup logging configuration"""
     settings = get_settings()
+    
+    # Create logs directory if it doesn't exist
+    log_dir = os.path.dirname(settings.LOG_FILE)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
     logging.basicConfig(
         level=settings.LOG_LEVEL,
         format=settings.LOG_FORMAT,
@@ -38,13 +44,17 @@ def setup_logging():
             logging.StreamHandler(sys.stdout)
         ]
     )
+    return logging.getLogger(__name__)
+
+# Initialize logger at module level
+logger = setup_logging()
+
+# Create a stop event for graceful shutdown
+stop_event = threading.Event()
 
 def main():
     """Main application entry point"""
     try:
-        # Setup logging
-        setup_logging()
-        logger = logging.getLogger(__name__)
         logger.info("Starting trading bot...")
         
         # Initialize components
@@ -59,10 +69,29 @@ def main():
         
         # Setup signal handlers
         def signal_handler(signum, frame):
-            logger.info("Received shutdown signal. Cleaning up...")
-            websocket_client.stop()  # This will also stop DeltaClient
-            websocket_server.stop()
-            sys.exit(0)
+            logger.info("Received shutdown signal. Starting graceful shutdown...")
+            
+            # Set stop event first to prevent new operations
+            stop_event.set()
+            
+            try:
+                # Stop WebSocket client first (includes DeltaClient)
+                logger.info("Stopping WebSocket client...")
+                websocket_client.stop()
+                
+                # Stop WebSocket server
+                logger.info("Stopping WebSocket server...")
+                websocket_server.stop()
+                
+                # Close MongoDB connection
+                logger.info("Closing MongoDB connection...")
+                mongodb_client.disconnect()
+                
+                logger.info("Graceful shutdown completed.")
+                sys.exit(0)
+            except Exception as e:
+                logger.error(f"Error during shutdown: {e}")
+                sys.exit(1)
             
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
@@ -80,8 +109,9 @@ def main():
             
         logger.info("Trading bot started successfully")
         
-        # Keep main thread alive
-        signal.pause()
+        # Keep main thread alive using threading.Event instead of signal.pause()
+        while not stop_event.is_set():
+            time.sleep(1)
         
     except Exception as e:
         logger.error(f"Fatal error: {e}")

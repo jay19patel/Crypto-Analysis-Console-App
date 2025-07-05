@@ -37,7 +37,7 @@ class AccountManager:
         """Connect to MongoDB"""
         try:
             self.client = MongoClient(
-                self.settings.MONGODB_URL,
+                self.settings.MONGODB_URI,
                 serverSelectionTimeoutMS=self.settings.MONGODB_TIMEOUT * 1000
             )
             
@@ -45,7 +45,7 @@ class AccountManager:
             self.client.admin.command('ping')
             
             # Get database and collection
-            self.db = self.client[self.settings.MONGODB_DATABASE]
+            self.db = self.client[self.settings.DATABASE_NAME]
             self.accounts_collection = self.db['accounts']
             
             self.is_connected = True

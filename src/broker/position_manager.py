@@ -14,13 +14,14 @@ from pymongo import MongoClient
 from src.broker.models import Position, PositionType, PositionStatus
 from src.config import get_settings
 from src.system.message_formatter import MessageFormatter, MessageType
+from src.data.technical_analysis import TechnicalAnalysis
 
 logger = logging.getLogger(__name__)
 
 class PositionManager:
     """Manages trading positions"""
     
-    def __init__(self, broker_client, websocket_server=None):
+    def __init__(self, broker_client, websocket_server=None, technical_analysis: TechnicalAnalysis = None):
         """Initialize position manager"""
         self.logger = logging.getLogger(__name__)
         self.broker_client = broker_client
@@ -31,6 +32,8 @@ class PositionManager:
         self.positions_collection = None
         self.positions: List[Position] = []
         self.is_connected = False
+        self.technical_analysis = technical_analysis
+        self.positions: Dict[str, Position] = {}  # symbol -> Position
     
     def send_message(self, message: Dict):
         """Send message through WebSocket if available"""
@@ -49,7 +52,7 @@ class PositionManager:
         """Connect to MongoDB"""
         try:
             self.client = MongoClient(
-                self.settings.MONGODB_URL,
+                self.settings.MONGODB_URI,
                 serverSelectionTimeoutMS=self.settings.MONGODB_TIMEOUT * 1000
             )
             
@@ -57,7 +60,7 @@ class PositionManager:
             self.client.admin.command('ping')
             
             # Get database and collection
-            self.db = self.client[self.settings.MONGODB_DATABASE]
+            self.db = self.client[self.settings.DATABASE_NAME]
             self.positions_collection = self.db['positions']
             
             self.is_connected = True
@@ -316,55 +319,32 @@ class PositionManager:
                 self.save_position(position)
     
     def check_stop_loss_and_targets(self, current_prices: Dict[str, float]) -> List[str]:
-        """Check holding time, margin liquidation, stop loss and targets for open positions"""
+        """Check positions for stop loss and take profit targets
+        
+        Returns:
+            List[str]: List of symbols that should be closed
+        """
         positions_to_close = []
         
-        for position in self.get_open_positions():
-            if position.symbol not in current_prices:
+        for symbol, position in self.positions.items():
+            current_price = current_prices.get(symbol)
+            if not current_price:
                 continue
                 
-            current_price = current_prices[position.symbol]
-            should_close = False
-            reason = ""
-            
-            # Update position PnL first
-            position.calculate_pnl(current_price)
-            
-            # Debug logging for each position (only if debug mode is enabled)
-            if self.settings.BROKER_DEBUG_POSITION_MONITORING:
-                self.log_message(f"🔍 Checking position {position.symbol} ({position.position_type.value}): "
-                                 f"Entry: ${position.entry_price:.2f}, Current: ${current_price:.2f}, "
-                                 f"Target: ${position.target:.2f}, Stop Loss: ${position.stop_loss:.2f}, "
-                                 f"P&L: ${position.pnl:.2f}", "info")
-            
             # Check stop loss
-            if position.stop_loss and (
-                (position.position_type == PositionType.LONG and current_price <= position.stop_loss) or
-                (position.position_type == PositionType.SHORT and current_price >= position.stop_loss)
-            ):
-                should_close = True
-                reason = "🛑 Stop Loss Hit"
+            if position.stop_loss:
+                if (position.side == "long" and current_price <= position.stop_loss) or \
+                   (position.side == "short" and current_price >= position.stop_loss):
+                    positions_to_close.append(symbol)
+                    continue
             
-            # Check target
-            elif position.target and (
-                (position.position_type == PositionType.LONG and current_price >= position.target) or
-                (position.position_type == PositionType.SHORT and current_price <= position.target)
-            ):
-                should_close = True
-                reason = "🎯 Target Hit"
-            
-            # Check margin liquidation
-            elif position.leverage > 1:
-                margin_usage = position.calculate_margin_usage(current_price)
-                if margin_usage >= self.settings.BROKER_LIQUIDATION_THRESHOLD:
-                    should_close = True
-                    reason = f"⚠️ Margin Liquidation: Usage {margin_usage:.1%} >= {self.settings.BROKER_LIQUIDATION_THRESHOLD:.1%}"
-            
-            # Close position if needed
-            if should_close:
-                if self.close_position(position.id, current_price, reason):
-                    positions_to_close.append(position.id)
-        
+            # Check take profit
+            if position.take_profit:
+                if (position.side == "long" and current_price >= position.take_profit) or \
+                   (position.side == "short" and current_price <= position.take_profit):
+                    positions_to_close.append(symbol)
+                    continue
+                    
         return positions_to_close
     
     def check_and_close_expired_positions(self, current_prices: Dict[str, float]) -> List[str]:
@@ -536,4 +516,8 @@ class PositionManager:
 
     def log_success(self, message: str):
         """Log success message"""
-        self.logger.info(message) 
+        self.logger.info(message)
+
+    def get_all_positions(self) -> List[Position]:
+        """Get all current positions"""
+        return list(self.positions.values()) 

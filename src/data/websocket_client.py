@@ -4,314 +4,14 @@ import websocket
 import threading
 import time
 from datetime import datetime
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional, List
 from src.system.message_formatter import MessageFormatter, MessageType
 from src.config import get_settings
+from src.broker.position_manager import PositionManager
+from src.data.technical_analysis import TechnicalAnalysis
+from src.data.mongodb_client import MongoDBClient
 
 logger = logging.getLogger(__name__)
-
-class DeltaClient:
-    """Delta Exchange WebSocket client for real-time cryptocurrency data"""
-    
-    def __init__(self, websocket_client=None):
-        """
-        Initialize Delta Exchange WebSocket client
-        
-        Args:
-            websocket_client: WebSocket client instance for sending messages
-        """
-        self.logger = logging.getLogger(__name__)
-        self.websocket_client = websocket_client
-        self.settings = get_settings()
-        self.ws = None
-        self.is_connected = False
-        self.latest_prices: Dict[str, Dict] = {}
-        self._stop_event = threading.Event()
-        self._connection_thread = None
-        self._price_check_timer = None
-        self._analysis_timer = None
-        
-    def send_message(self, message: Dict):
-        """Send message through WebSocket if available"""
-        if self.websocket_client:
-            self.websocket_client.send_message(message)
-
-    def log_message(self, message: str, level: str = "info"):
-        """Send log message"""
-        self.logger.log(getattr(logging, level.upper()), message)
-        if self.websocket_client:
-            self.send_message(
-                MessageFormatter.format_log(message, level, "delta_client")
-            )
-
-    def connect(self) -> bool:
-        """Connect to Delta Exchange WebSocket server"""
-        try:
-            websocket.enableTrace(True)  # Enable debug logging
-            self.ws = websocket.WebSocketApp(
-                self.settings.DELTA_WEBSOCKET_URL,
-                on_message=self.on_message,
-                on_error=self.on_error,
-                on_close=self.on_close,
-                on_open=self.on_open
-            )
-            
-            # Start WebSocket connection in a separate thread
-            self._connection_thread = threading.Thread(target=self.ws.run_forever)
-            self._connection_thread.daemon = True
-            self._connection_thread.start()
-            
-            # Wait for connection
-            timeout = self.settings.WEBSOCKET_TIMEOUT
-            start_time = time.time()
-            while not self.is_connected and time.time() - start_time < timeout:
-                time.sleep(0.1)
-            
-            return self.is_connected
-            
-        except Exception as e:
-            self.log_message(f"Delta Exchange WebSocket connection error: {e}", "error")
-            return False
-
-    def disconnect(self):
-        """Disconnect from Delta Exchange WebSocket server"""
-        self._stop_event.set()
-        if self.ws:
-            self.ws.close()
-        if self._connection_thread:
-            self._connection_thread.join(timeout=5.0)
-        if self._price_check_timer:
-            self._price_check_timer.cancel()
-        if self._analysis_timer:
-            self._analysis_timer.cancel()
-        self.is_connected = False
-        self.log_message("Disconnected from Delta Exchange WebSocket server", "info")
-
-    def on_message(self, ws: websocket.WebSocketApp, message: str) -> None:
-        """Handle incoming Delta Exchange WebSocket messages"""
-        try:
-            message_json = json.loads(message)
-            
-            # Handle different message types from Delta Exchange
-            if isinstance(message_json, dict):
-                if message_json.get("type") == "v2/ticker":
-                    data = message_json.get("data", {})
-                    symbol = data.get("symbol")
-                    mark_price = data.get("mark_price")
-                    spot_price = data.get("spot_price")
-                    last_price = data.get("last_price")
-                    
-                    # Get the best available price
-                    price = mark_price or spot_price or last_price
-                    
-                    if price and symbol in self.settings.DEFAULT_SYMBOLS:
-                        # Update latest prices
-                        self.latest_prices[symbol] = {
-                            "price": float(price),
-                            "timestamp": datetime.now(),
-                            "mark_price": float(mark_price) if mark_price else None,
-                            "spot_price": float(spot_price) if spot_price else None,
-                            "last_price": float(last_price) if last_price else None
-                        }
-                        
-                        # Forward price update
-                        if self.websocket_client:
-                            self.send_message(
-                                MessageFormatter.format_message(
-                                    MessageType.LIVE_PRICE,
-                                    {
-                                        "symbol": symbol,
-                                        "price": float(price),
-                                        "mark_price": float(mark_price) if mark_price else None,
-                                        "spot_price": float(spot_price) if spot_price else None,
-                                        "last_price": float(last_price) if last_price else None,
-                                        "timestamp": datetime.now().isoformat()
-                                    },
-                                    "delta_client"
-                                )
-                            )
-                            
-                            # Log price update
-                            self.log_message(
-                                f"Price Update - {symbol}: ${price:.2f} (Mark: ${mark_price if mark_price else 'N/A'}, " +
-                                f"Spot: ${spot_price if spot_price else 'N/A'}, Last: ${last_price if last_price else 'N/A'})",
-                                "info"
-                            )
-                
-                elif message_json.get("type") == "error":
-                    error_msg = message_json.get("message", "Unknown error")
-                    self.log_message(f"Delta Exchange error: {error_msg}", "error")
-                    
-        except json.JSONDecodeError as e:
-            self.log_message(f"Failed to parse message: {e}", "error")
-        except Exception as e:
-            self.log_message(f"Error processing message: {e}", "error")
-
-    def on_error(self, ws: websocket.WebSocketApp, error: Exception) -> None:
-        """Handle WebSocket errors"""
-        self.log_message(f"Delta Exchange WebSocket error: {error}", "error")
-        self.is_connected = False
-        if not self._stop_event.is_set():
-            self._attempt_reconnect()
-
-    def on_close(self, ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
-        """Handle WebSocket connection closure"""
-        self.log_message(f"Delta Exchange WebSocket closed (Status: {close_status_code} - {close_msg})", "warning")
-        self.is_connected = False
-        if not self._stop_event.is_set():
-            self._attempt_reconnect()
-
-    def on_open(self, ws: websocket.WebSocketApp) -> None:
-        """Handle WebSocket connection open"""
-        self.is_connected = True
-        self.log_message("Connected to Delta Exchange WebSocket server", "info")
-        
-        # Subscribe to required channels
-        self._subscribe_to_channels()
-
-    def _subscribe_to_channels(self) -> None:
-        """Subscribe to required Delta Exchange WebSocket channels"""
-        try:
-            # Subscribe to v2/ticker channel for all symbols at once
-            subscribe_message = {
-                "type": "subscribe",
-                "payload": {
-                    "channels": [
-                        {
-                            "name": "v2/ticker",
-                            "symbols": self.settings.DEFAULT_SYMBOLS
-                        }
-                    ]
-                }
-            }
-            self.ws.send(json.dumps(subscribe_message))
-            self.log_message(f"Subscribed to Delta Exchange tickers: {', '.join(self.settings.DEFAULT_SYMBOLS)}", "info")
-                
-        except Exception as e:
-            self.log_message(f"Error subscribing to Delta Exchange channels: {e}", "error")
-
-    def _attempt_reconnect(self, max_attempts: int = 3, delay: int = 5) -> None:
-        """
-        Attempt to reconnect to Delta Exchange WebSocket server
-        
-        Args:
-            max_attempts (int): Maximum number of reconnection attempts
-            delay (int): Delay between attempts in seconds
-        """
-        attempts = 0
-        while attempts < max_attempts and not self._stop_event.is_set():
-            attempts += 1
-            self.log_message(f"Attempting to reconnect ({attempts}/{max_attempts})...", "warning")
-            
-            try:
-                if self.connect():
-                    break
-            except Exception as e:
-                self.log_message(f"Reconnection attempt failed: {e}", "error")
-            
-            if attempts < max_attempts:
-                time.sleep(delay)
-
-    def check_positions_and_prices(self) -> None:
-        """Check positions and send price updates"""
-        try:
-            if self.latest_prices:
-                # Send price updates
-                self.send_message(
-                    MessageFormatter.format_message(
-                        MessageType.LIVE_PRICE,
-                        {
-                            "prices": self.get_latest_prices(),
-                            "timestamp": datetime.now().isoformat()
-                        },
-                        "delta_client"
-                    )
-                )
-                
-                # Log price updates
-                for symbol, price_data in self.latest_prices.items():
-                    self.log_message(
-                        f"Current Price - {symbol}: ${price_data['price']:.2f}",
-                        "info"
-                    )
-            
-        except Exception as e:
-            self.log_message(f"Error in position and price check: {e}", "error")
-            
-        finally:
-            # Schedule next check if not stopped
-            if not self._stop_event.is_set():
-                self._price_check_timer = threading.Timer(10.0, self.check_positions_and_prices)
-                self._price_check_timer.daemon = True
-                self._price_check_timer.start()
-
-    def get_latest_prices(self) -> Dict[str, Dict]:
-        """Get latest prices for all symbols with additional data"""
-        return {
-            symbol: {
-                "price": data["price"],
-                "mark_price": data.get("mark_price"),
-                "spot_price": data.get("spot_price"),
-                "last_price": data.get("last_price"),
-                "timestamp": data["timestamp"].isoformat()
-            }
-            for symbol, data in self.latest_prices.items()
-        }
-
-    def start(self) -> bool:
-        """Start the Delta Exchange WebSocket client
-        
-        Returns:
-            bool: True if started successfully, False otherwise
-        """
-        self._stop_event.clear()
-        if self.connect():
-            # Wait for initial prices with increased timeout
-            timeout = 30  # Increased timeout for initial connection
-            start_time = time.time()
-            while not self.latest_prices and time.time() - start_time < timeout:
-                time.sleep(0.1)
-                
-            if not self.latest_prices:
-                self.log_message("Timeout waiting for initial prices", "error")
-                return False
-                
-            # Start price checks
-            self.check_positions_and_prices()
-            return True
-        else:
-            self.log_message("Failed to start Delta Exchange WebSocket client", "error")
-            return False
-
-    def stop(self) -> None:
-        """Stop the Delta Exchange WebSocket client"""
-        self._stop_event.set()
-        self.disconnect()
-
-    def test_connection(self) -> bool:
-        """
-        Test Delta Exchange WebSocket connection
-        
-        Returns:
-            bool: True if connection test was successful
-        """
-        self.log_message("Testing Delta Exchange WebSocket connection...", "info")
-        
-        test_ws = websocket.WebSocketApp(
-            self.settings.DELTA_WEBSOCKET_URL,
-            on_open=lambda ws: self.log_message("Connection test successful", "info"),
-            on_error=lambda ws, error: self.log_message(f"Connection test failed: {error}", "error"),
-            on_close=lambda ws, code, msg: None
-        )
-        
-        connection_thread = threading.Thread(target=test_ws.run_forever)
-        connection_thread.daemon = True
-        connection_thread.start()
-        
-        time.sleep(self.settings.WEBSOCKET_TIMEOUT)
-        test_ws.close()
-        
-        return True
 
 class WebSocketClient:
     """WebSocket client for sending data to local WebSocket server"""
@@ -330,20 +30,102 @@ class WebSocketClient:
         self.is_connected = False
         self._stop_event = threading.Event()
         self._connection_thread = None
-        self.delta_client = DeltaClient(self)
+        
+        # Initialize components
+        self.mongodb_client = MongoDBClient()
+        self.technical_analysis = TechnicalAnalysis(self.mongodb_client)
+        self.position_manager = PositionManager(self.technical_analysis)
+        
+        # Track last analysis time
+        self._last_analysis_time = 0
     
     def send_message(self, message: Dict):
         """Send message through WebSocket if available"""
         if self.websocket_server:
             self.websocket_server.queue_message(message)
 
-    def log_message(self, message: str, level: str = "info"):
-        """Send log message"""
-        self.logger.log(getattr(logging, level.upper()), message)
-        if self.websocket_server:
+    def check_positions(self, current_prices: Dict[str, float]) -> None:
+        """Check positions and send updates"""
+        try:
+            # Check positions
+            positions_to_close = self.position_manager.check_stop_loss_and_targets(current_prices)
+            
+            # Get all positions with updated PNL
+            positions = self.position_manager.get_all_positions()
+            
+            # Create position update message
+            position_data = {
+                "positions": [
+                    {
+                        "symbol": pos.symbol,
+                        "entry_price": pos.entry_price,
+                        "current_price": current_prices.get(pos.symbol),
+                        "quantity": pos.quantity,
+                        "side": pos.side,
+                        "pnl": pos.calculate_pnl(current_prices.get(pos.symbol, 0)),
+                        "stop_loss": pos.stop_loss,
+                        "take_profit": pos.take_profit,
+                        "liquidation_price": pos.liquidation_price,
+                        "margin_ratio": pos.calculate_margin_ratio(current_prices.get(pos.symbol, 0)),
+                        "status": "CLOSING" if pos.symbol in positions_to_close else "OPEN",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    for pos in positions
+                ],
+                "prices": {
+                    symbol: {"price": price, "timestamp": datetime.now().isoformat()}
+                    for symbol, price in current_prices.items()
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Send position update
             self.send_message(
-                MessageFormatter.format_log(message, level, "websocket_client")
+                MessageFormatter.format_message(
+                    MessageType.POSITIONS,
+                    position_data,
+                    "trading"
+                )
             )
+            
+        except Exception as e:
+            self.logger.error(f"Error checking positions: {e}")
+
+    def run_analysis(self, current_prices: Dict[str, float]) -> None:
+        """Run technical analysis and send results"""
+        try:
+            # Check if it's time to run analysis (every 10 minutes)
+            current_time = time.time()
+            if current_time - self._last_analysis_time >= self.settings.ANALYSIS_INTERVAL:
+                self._last_analysis_time = current_time
+                
+                # Run analysis for each symbol
+                analysis_results = {}
+                for symbol in current_prices:
+                    try:
+                        # Get analysis results
+                        result = self.technical_analysis.analyze_symbol(symbol)
+                        if result:
+                            analysis_results[symbol] = result
+                            
+                    except Exception as e:
+                        self.logger.error(f"Error analyzing {symbol}: {e}")
+                
+                if analysis_results:
+                    # Send analysis results
+                    self.send_message(
+                        MessageFormatter.format_message(
+                            MessageType.ANALYSIS,
+                            {
+                                "analysis": analysis_results,
+                                "timestamp": datetime.now().isoformat()
+                            },
+                            "trading"
+                        )
+                    )
+                    
+        except Exception as e:
+            self.logger.error(f"Error in technical analysis: {e}")
 
     def connect(self) -> bool:
         """Connect to WebSocket server"""
@@ -370,7 +152,7 @@ class WebSocketClient:
             return self.is_connected
             
         except Exception as e:
-            self.log_message(f"WebSocket connection error: {e}", "error")
+            self.logger.error(f"WebSocket connection error: {e}")
             return False
 
     def disconnect(self):
@@ -381,7 +163,6 @@ class WebSocketClient:
         if self._connection_thread:
             self._connection_thread.join(timeout=5.0)
         self.is_connected = False
-        self.log_message("Disconnected from WebSocket server", "info")
 
     def on_message(self, ws: websocket.WebSocketApp, message: str) -> None:
         """Handle incoming WebSocket messages"""
@@ -393,20 +174,19 @@ class WebSocketClient:
                 self.send_message(message_json)
                 
         except json.JSONDecodeError as e:
-            self.log_message(f"Failed to parse message: {e}", "error")
+            self.logger.error(f"Failed to parse message: {e}")
         except Exception as e:
-            self.log_message(f"Error processing message: {e}", "error")
+            self.logger.error(f"Error processing message: {e}")
 
     def on_error(self, ws: websocket.WebSocketApp, error: Exception) -> None:
         """Handle WebSocket errors"""
-        self.log_message(f"WebSocket error: {error}", "error")
+        self.logger.error(f"WebSocket error: {error}")
         self.is_connected = False
         if not self._stop_event.is_set():
             self._attempt_reconnect()
 
     def on_close(self, ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
         """Handle WebSocket connection closure"""
-        self.log_message(f"WebSocket closed (Status: {close_status_code} - {close_msg})", "warning")
         self.is_connected = False
         if not self._stop_event.is_set():
             self._attempt_reconnect()
@@ -414,7 +194,6 @@ class WebSocketClient:
     def on_open(self, ws: websocket.WebSocketApp) -> None:
         """Handle WebSocket connection open"""
         self.is_connected = True
-        self.log_message("Connected to WebSocket server", "info")
 
     def _attempt_reconnect(self, max_attempts: int = 3, delay: int = 5) -> None:
         """
@@ -427,16 +206,37 @@ class WebSocketClient:
         attempts = 0
         while attempts < max_attempts and not self._stop_event.is_set():
             attempts += 1
-            self.log_message(f"Attempting to reconnect ({attempts}/{max_attempts})...", "warning")
-            
             try:
                 if self.connect():
                     break
             except Exception as e:
-                self.log_message(f"Reconnection attempt failed: {e}", "error")
+                self.logger.error(f"Reconnection attempt failed: {e}")
             
             if attempts < max_attempts:
                 time.sleep(delay)
+
+    def process_market_data(self) -> None:
+        """Process market data in a loop"""
+        while not self._stop_event.is_set():
+            try:
+                # Get current prices (you need to implement this based on your data source)
+                current_prices = {
+                    symbol: 0.0  # Replace with actual price data
+                    for symbol in self.settings.DEFAULT_SYMBOLS
+                }
+                
+                # Check positions and send updates
+                self.check_positions(current_prices)
+                
+                # Run technical analysis if needed
+                self.run_analysis(current_prices)
+                
+                # Sleep for 1 second
+                time.sleep(1)
+                
+            except Exception as e:
+                self.logger.error(f"Error processing market data: {e}")
+                time.sleep(1)  # Sleep on error to prevent tight loop
 
     def start(self) -> bool:
         """Start the WebSocket client
@@ -446,17 +246,16 @@ class WebSocketClient:
         """
         self._stop_event.clear()
         if self.connect():
-            # Start Delta client
-            if not self.delta_client.start():
-                self.log_message("Failed to start Delta client", "error")
-                return False
+            # Start market data processing in a separate thread
+            processing_thread = threading.Thread(target=self.process_market_data)
+            processing_thread.daemon = True
+            processing_thread.start()
             return True
         return False
 
     def stop(self) -> None:
         """Stop the WebSocket client"""
         self._stop_event.set()
-        self.delta_client.stop()
         self.disconnect()
 
     def test_connection(self) -> bool:
@@ -466,20 +265,22 @@ class WebSocketClient:
         Returns:
             bool: True if connection test was successful
         """
-        self.log_message("Testing WebSocket connection...", "info")
-        
-        test_ws = websocket.WebSocketApp(
-            self.settings.WEBSOCKET_URL,
-            on_open=lambda ws: self.log_message("Connection test successful", "info"),
-            on_error=lambda ws, error: self.log_message(f"Connection test failed: {error}", "error"),
-            on_close=lambda ws, code, msg: None
-        )
-        
-        connection_thread = threading.Thread(target=test_ws.run_forever)
-        connection_thread.daemon = True
-        connection_thread.start()
-        
-        time.sleep(self.settings.WEBSOCKET_TIMEOUT)
-        test_ws.close()
-        
-        return True 
+        try:
+            test_ws = websocket.WebSocketApp(
+                self.settings.WEBSOCKET_URL,
+                on_open=lambda ws: None,
+                on_error=lambda ws, error: None,
+                on_close=lambda ws, code, msg: None
+            )
+            
+            connection_thread = threading.Thread(target=test_ws.run_forever)
+            connection_thread.daemon = True
+            connection_thread.start()
+            
+            time.sleep(self.settings.WEBSOCKET_TIMEOUT)
+            test_ws.close()
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"Connection test failed: {e}")
+            return False 

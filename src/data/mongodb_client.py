@@ -46,7 +46,7 @@ class MongoDBClient:
         try:
             # Connect to MongoDB
             self.client = MongoClient(
-                self.settings.MONGODB_URL,
+                self.settings.MONGODB_URI,
                 serverSelectionTimeoutMS=self.settings.MONGODB_TIMEOUT * 1000
             )
             
@@ -54,7 +54,7 @@ class MongoDBClient:
             self.client.admin.command('ping')
             
             # Get database and collection
-            self.db = self.client[self.settings.MONGODB_DATABASE]
+            self.db = self.client[self.settings.DATABASE_NAME]
             self.collection = self.db[self.settings.MONGODB_COLLECTION]
             
             # Create indexes
@@ -198,6 +198,57 @@ class MongoDBClient:
             
         except Exception as e:
             self.log_message(f"Error retrieving from MongoDB: {e}", "error")
+            return []
+
+    def get_historical_data(self, symbol: str, start_time: str, end_time: str) -> List[Dict[str, Any]]:
+        """
+        Get historical price data for a symbol within the specified time range
+        
+        Args:
+            symbol: Trading symbol (e.g., 'BTCUSD')
+            start_time: Start time in ISO format
+            end_time: End time in ISO format
+            
+        Returns:
+            List of historical price data points
+        """
+        if not self.is_connected:
+            if not self.connect():
+                return []
+        
+        try:
+            # Get historical data collection
+            historical_collection = self.db['historical_data']
+            
+            # Query for data within time range
+            query = {
+                'symbol': symbol,
+                'timestamp': {
+                    '$gte': start_time,
+                    '$lte': end_time
+                }
+            }
+            
+            # Sort by timestamp ascending
+            cursor = historical_collection.find(query).sort('timestamp', 1)
+            
+            # Convert cursor to list
+            data = list(cursor)
+            
+            # Convert ObjectId to string for JSON serialization
+            for item in data:
+                if '_id' in item:
+                    item['_id'] = str(item['_id'])
+            
+            if not data:
+                self.log_message(f"No historical data found for {symbol} between {start_time} and {end_time}", "warning")
+            else:
+                self.log_message(f"Retrieved {len(data)} historical data points for {symbol}", "info")
+            
+            return data
+            
+        except Exception as e:
+            self.log_message(f"Error retrieving historical data from MongoDB: {e}", "error")
             return []
     
     def test_connection(self) -> bool:
