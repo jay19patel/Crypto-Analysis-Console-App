@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Optimized Real-time Market Data Client
-Provides live price updates every 1 second with optimal performance
+Real-time Market Data Client with Delta Exchange WebSocket Integration
+Provides live market data with execution time tracking and proper logging
 """
 
 import asyncio
@@ -17,89 +17,96 @@ import random
 from src.config import get_settings
 
 class RealTimeMarketData:
-    """Optimized Real-time Market Data Client"""
+    """Real-time Market Data Client with Delta Exchange WebSocket Integration"""
     
     def __init__(self, price_callback: Optional[Callable] = None):
-        """Initialize optimized market data client"""
+        """Initialize market data client"""
+        # Initialize logger
         self.logger = logging.getLogger("market_data")
         self.price_callback = price_callback
         self.settings = get_settings()
         
-        # Real-time price storage (temp cache for optimization)
+        # Real-time price storage with thread safety
         self.live_prices: Dict[str, Dict] = {}
-        self.price_lock = threading.Lock()  # Thread safety for price updates
+        self.price_lock = threading.Lock()
         
-        # WebSocket connection
+        # WebSocket connection management
         self.ws = None
         self.is_connected = False
         self.connection_attempts = 0
-        self.max_connection_attempts = 5
+        self.max_connection_attempts = self.settings.WEBSOCKET_MAX_RETRIES
+        self.reconnect_delay = self.settings.WEBSOCKET_RECONNECT_DELAY
+        self.connection_timeout = self.settings.WEBSOCKET_TIMEOUT
         
-        # Threading for real-time updates
+        # Threading control
         self._price_thread = None
-        self._simulation_thread = None
         self._websocket_thread = None
         self._stop_event = threading.Event()
         
         # Performance tracking
         self._update_count = 0
         self._start_time = time.time()
-        
-        # Base prices for simulation (in case live data fails)
-        self.base_prices = {
-            "BTC-USD": 45000.0,
-            "ETH-USD": 2800.0,
-            "SOL-USD": 110.0
-        }
+        self._last_heartbeat = time.time()
+        self._heartbeat_interval = 30  # seconds
 
     def start(self) -> bool:
         """Start real-time market data system"""
         try:
-            self.logger.info("🚀 Starting Real-time Market Data System...")
+            start_time = time.time()
+            self.logger.info("INFO - [MarketData] System | Starting Real-time Market Data System")
             
+            # Reset state
             self._stop_event.clear()
             self._start_time = time.time()
+            self._last_heartbeat = time.time()
+            self.connection_attempts = 0
             
-            # Initialize prices with base values
-            self._initialize_prices()
-            
-            # Start simulation for reliable data
-            self._start_price_simulation()
-            
-            # Start real-time price update thread
-            self._start_real_time_updates()
-            
-            # Try to connect to live WebSocket
+            # Start WebSocket connection
             self._start_websocket_connection()
             
-            self.logger.info("✅ Real-time Market Data System started successfully")
-            return True
+            # Wait for initial connection with timeout
+            timeout = self.connection_timeout
+            while not self.is_connected and timeout > 0:
+                if self.connection_attempts >= self.max_connection_attempts:
+                    self.logger.error("ERROR - [MarketData] Connection | Max connection attempts reached")
+                    return False
+                time.sleep(0.5)
+                timeout -= 0.5
+            
+            execution_time = time.time() - start_time
+            if self.is_connected:
+                self.logger.info(f"INFO - [MarketData] Connection | WebSocket connected successfully (Time: {execution_time:.3f}s)")
+                return True
+            else:
+                self.logger.error(f"ERROR - [MarketData] Connection | Failed to establish WebSocket connection (Time: {execution_time:.3f}s)")
+                return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Error starting Market Data System: {e}")
+            self.logger.error(f"ERROR - [MarketData] System | Startup failed: {str(e)}")
             return False
     
     def stop(self) -> None:
         """Stop market data system"""
         try:
-            self.logger.info("🛑 Stopping Market Data System...")
+            start_time = time.time()
+            self.logger.info("INFO - [MarketData] System | Stopping Market Data System")
             
             self._stop_event.set()
             
-            # Close WebSocket
             if self.ws:
                 self.ws.close()
             
             # Wait for threads
-            for thread in [self._price_thread, self._simulation_thread, self._websocket_thread]:
+            for thread in [self._price_thread, self._websocket_thread]:
                 if thread and thread.is_alive():
                     thread.join(timeout=2.0)
             
             self.is_connected = False
-            self.logger.info("✅ Market Data System stopped")
+            execution_time = time.time() - start_time
+            self.logger.info(f"INFO - [MarketData] System | System stopped successfully (Time: {execution_time:.3f}s)")
             
         except Exception as e:
-            self.logger.error(f"❌ Error stopping Market Data System: {e}")
+            self.logger.error(f"ERROR - [MarketData] System | Shutdown failed: {str(e)}")
 
     def get_live_prices(self) -> Dict[str, Dict]:
         """Get current live prices (thread-safe)"""
@@ -114,9 +121,8 @@ class RealTimeMarketData:
     def get_performance_stats(self) -> Dict[str, any]:
         """Get real-time performance statistics"""
         uptime = time.time() - self._start_time
-        
         return {
-            "status": "connected" if self.is_connected else "simulation",
+            "status": "connected" if self.is_connected else "disconnected",
             "uptime_seconds": round(uptime, 2),
             "update_count": self._update_count,
             "updates_per_second": round(self._update_count / uptime, 2) if uptime > 0 else 0,
@@ -124,181 +130,155 @@ class RealTimeMarketData:
             "last_update": datetime.now(timezone.utc).isoformat()
         }
 
-    def _initialize_prices(self) -> None:
-        """Initialize base prices for all symbols"""
-        with self.price_lock:
-            for symbol, base_price in self.base_prices.items():
-                self.live_prices[symbol] = {
-                    "symbol": symbol,
-                    "price": base_price,
-                    "change_24h": 0.0,
-                    "volume": random.randint(1000000, 5000000),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "source": "simulation"
-                }
-
-    def _start_real_time_updates(self) -> None:
-        """Start the main real-time price update thread"""
-        self._price_thread = threading.Thread(target=self._real_time_update_loop, daemon=True)
-        self._price_thread.start()
-
-    def _start_price_simulation(self) -> None:
-        """Start price simulation thread"""
-        self._simulation_thread = threading.Thread(target=self._price_simulation_loop, daemon=True)
-        self._simulation_thread.start()
-
     def _start_websocket_connection(self) -> None:
         """Start WebSocket connection in separate thread"""
         self._websocket_thread = threading.Thread(target=self._websocket_connection_loop, daemon=True)
         self._websocket_thread.start()
 
-    def _real_time_update_loop(self) -> None:
-        """Main real-time update loop - runs every 1 second"""
-        self.logger.info("📊 Real-time price update loop started (1 second interval)")
-        
+    def _websocket_connection_loop(self) -> None:
+        """WebSocket connection management loop"""
         while not self._stop_event.is_set():
             try:
                 start_time = time.time()
+                self.logger.info("INFO - [MarketData] WebSocket | Establishing connection")
                 
-                # Get current prices and send to callback
-                current_prices = self.get_live_prices()
-                
-                if current_prices and self.price_callback:
-                    self.price_callback(current_prices)
-                    self._update_count += 1
-                
-                # Log every 10 updates
-                if self._update_count % 10 == 0:
-                    stats = self.get_performance_stats()
-                    self.logger.info(f"📈 Live Price Update #{self._update_count} | "
-                                   f"UPS: {stats['updates_per_second']:.1f} | "
-                                   f"Symbols: {stats['active_symbols']} | "
-                                   f"Status: {stats['status']}")
-                
-                # Precise 1-second interval
-                elapsed = time.time() - start_time
-                sleep_time = max(0, self.settings.LIVE_PRICE_UPDATE_INTERVAL - elapsed)
-                time.sleep(sleep_time)
-                
-            except Exception as e:
-                self.logger.error(f"❌ Error in real-time update loop: {e}")
-                time.sleep(1)
-
-    def _price_simulation_loop(self) -> None:
-        """Price simulation loop for realistic price movements"""
-        while not self._stop_event.is_set():
-            try:
-                with self.price_lock:
-                    for symbol in self.live_prices:
-                        current_price = self.live_prices[symbol]["price"]
-                        
-                        # Generate realistic price movement (±0.1% to ±0.5%)
-                        change_percent = random.uniform(-0.005, 0.005)  # ±0.5%
-                        new_price = current_price * (1 + change_percent)
-                        
-                        # Update price data
-                        self.live_prices[symbol].update({
-                            "price": round(new_price, 2),
-                            "change_24h": change_percent * 100,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "source": "live" if self.is_connected else "simulation"
-                        })
-                
-                # Update every 0.5 seconds for smooth price movement
-                time.sleep(0.5)
-                
-            except Exception as e:
-                self.logger.error(f"❌ Error in price simulation: {e}")
-                time.sleep(1)
-
-    def _websocket_connection_loop(self) -> None:
-        """WebSocket connection with retry logic"""
-        while not self._stop_event.is_set() and self.connection_attempts < self.max_connection_attempts:
-            try:
-                self.connection_attempts += 1
-                self.logger.info(f"🔗 WebSocket connection attempt {self.connection_attempts}/{self.max_connection_attempts}")
-                
+                # Initialize WebSocket connection with proper error handling
+                websocket.enableTrace(False)  # Disable debug tracing
                 self.ws = websocket.WebSocketApp(
-                    self.settings.DELTA_WEBSOCKET_URL,
+                    "wss://socket.india.delta.exchange",  # Delta Exchange WebSocket URL
+                    on_open=self._on_websocket_open,
                     on_message=self._on_websocket_message,
                     on_error=self._on_websocket_error,
                     on_close=self._on_websocket_close,
-                    on_open=self._on_websocket_open
+                    on_ping=self._on_websocket_ping,
+                    on_pong=self._on_websocket_pong
                 )
                 
-                self.ws.run_forever()
+                # Connect with timeout and heartbeat
+                self.ws.run_forever(
+                    ping_interval=self._heartbeat_interval,
+                    ping_timeout=10,
+                    reconnect=3  # Auto-reconnect up to 3 times
+                )
                 
-                if not self._stop_event.is_set():
-                    self.logger.warning("⚠️ WebSocket connection lost, retrying in 5 seconds...")
-                    time.sleep(5)
+                if self._stop_event.is_set():
+                    break
+                
+                # Connection lost - attempt reconnect
+                self.is_connected = False
+                self.connection_attempts += 1
+                
+                execution_time = time.time() - start_time
+                self.logger.warning(
+                    f"WARN - [MarketData] WebSocket | Connection lost, attempt {self.connection_attempts} "
+                    f"of {self.max_connection_attempts} (Time: {execution_time:.3f}s)"
+                )
+                
+                if self.connection_attempts >= self.max_connection_attempts:
+                    self.logger.error("ERROR - [MarketData] WebSocket | Max reconnection attempts reached")
+                    break
+                    
+                time.sleep(self.reconnect_delay)
                 
             except Exception as e:
-                self.logger.error(f"❌ WebSocket connection error: {e}")
-                if not self._stop_event.is_set():
-                    time.sleep(5)
-        
-        if self.connection_attempts >= self.max_connection_attempts:
-            self.logger.warning("⚠️ Maximum WebSocket connection attempts reached - using simulation only")
-
+                self.logger.error(f"ERROR - [MarketData] WebSocket | Connection error: {str(e)}")
+                time.sleep(self.reconnect_delay)
+    
     def _on_websocket_open(self, ws: websocket.WebSocketApp) -> None:
         """Handle WebSocket connection open"""
         try:
-            self.is_connected = True
-            self.connection_attempts = 0
-            self.logger.info("✅ WebSocket connected to live market data")
+            start_time = time.time()
+            self.logger.info("INFO - [MarketData] WebSocket | Connection established")
             
-            # Subscribe to symbols
-            for symbol in self.settings.DEFAULT_SYMBOLS:
-                subscribe_msg = {
-                    "type": "subscribe",
-                    "symbol": symbol.replace("-", "")
+            # Reset connection attempts on successful connection
+            self.connection_attempts = 0
+            self._last_heartbeat = time.time()
+            
+            # Subscribe to market data using Delta Exchange format
+            subscribe_msg = {
+                "type": "subscribe",
+                "payload": {
+                    "channels": [
+                        {
+                            "name": "v2/ticker",
+                            "symbols": [
+                                "BTCUSD",
+                                "ETHUSD"
+                            ]
+                        }
+                    ]
                 }
-                ws.send(json.dumps(subscribe_msg))
+            }
+            
+            ws.send(json.dumps(subscribe_msg))
+            self.is_connected = True
+            
+            execution_time = time.time() - start_time
+            self.logger.info(
+                f"INFO - [MarketData] WebSocket | Subscribed to market data "
+                f"(Time: {execution_time:.3f}s)"
+            )
                 
         except Exception as e:
-            self.logger.error(f"❌ Error in WebSocket open: {e}")
-
+            self.logger.error(f"ERROR - [MarketData] WebSocket | Subscription failed: {str(e)}")
+            ws.close()
+    
     def _on_websocket_message(self, ws: websocket.WebSocketApp, message: str) -> None:
         """Handle incoming WebSocket messages"""
         try:
             data = json.loads(message)
             
-            # Process ticker data
-            if data.get("type") == "ticker" and "symbol" in data:
-                symbol = self._format_symbol(data["symbol"])
-                price = float(data.get("price", 0))
+            # Update heartbeat time for any valid message
+            self._last_heartbeat = time.time()
+            
+            # Process market data (Delta Exchange format)
+            if "type" in data and data["type"] == "v2/ticker":
+                symbol = data["symbol"].replace("USD", "-USD")  # Convert to our format
+                with self.price_lock:
+                    price_update = {
+                        "price": float(data["mark_price"]),  # Current mark price
+                        "volume": float(data["volume"]),  # 24h volume
+                        "high": float(data["high"]),   # 24h high
+                        "low": float(data["low"]),    # 24h low
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "mark_price": float(data["mark_price"]),
+                        "spot_price": float(data["spot_price"]) if "spot_price" in data else None,
+                        "funding_rate": float(data["funding_rate"]) if "funding_rate" in data else None,
+                        "open_interest": float(data["oi"]) if "oi" in data else None
+                    }
+                    self.live_prices[symbol] = price_update
+                    self._update_count += 1
+                    
+                    # Notify callback if registered
+                    if self.price_callback:
+                        self.price_callback(symbol, price_update)
                 
-                if price > 0:
-                    with self.price_lock:
-                        if symbol in self.live_prices:
-                            self.live_prices[symbol].update({
-                                "price": round(price, 2),
-                                "change_24h": float(data.get("change_24h", 0)),
-                                "volume": float(data.get("volume", 0)),
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                                "source": "live"
-                            })
-                
+        except json.JSONDecodeError as e:
+            self.logger.warning(f"WARN - [MarketData] WebSocket | Invalid message format: {str(e)}")
         except Exception as e:
-            self.logger.error(f"❌ Error processing WebSocket message: {e}")
-
+            self.logger.error(f"ERROR - [MarketData] WebSocket | Message processing error: {str(e)}")
+    
     def _on_websocket_error(self, ws: websocket.WebSocketApp, error: Exception) -> None:
         """Handle WebSocket errors"""
-        self.logger.error(f"❌ WebSocket error: {error}")
-
+        self.logger.error(f"ERROR - [MarketData] WebSocket | Error occurred: {str(error)}")
+        
     def _on_websocket_close(self, ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
-        """Handle WebSocket close"""
+        """Handle WebSocket connection close"""
+        self.logger.warning(f"WARN - [MarketData] WebSocket | Connection closed: {close_status_code} - {close_msg}")
         self.is_connected = False
-        self.logger.warning(f"⚠️ WebSocket connection closed: {close_status_code} - {close_msg}")
+        
+    def _on_websocket_ping(self, ws: websocket.WebSocketApp, message: bytes) -> None:
+        """Handle WebSocket ping"""
+        self._last_heartbeat = time.time()
+        
+    def _on_websocket_pong(self, ws: websocket.WebSocketApp, message: bytes) -> None:
+        """Handle WebSocket pong"""
+        self._last_heartbeat = time.time()
 
     def _format_symbol(self, symbol: str) -> str:
-        """Format symbol to match our convention"""
-        symbol_map = {
-            "BTCUSD": "BTC-USD",
-            "ETHUSD": "ETH-USD", 
-            "SOLUSD": "SOL-USD"
-        }
-        return symbol_map.get(symbol.upper(), symbol)
+        """Format symbol for Delta Exchange WebSocket subscription"""
+        # Convert BTC-USD to BTCUSD
+        return symbol.replace("-", "").replace("USD", "")
 
 
 # Alias for backward compatibility

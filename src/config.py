@@ -11,15 +11,21 @@ class Settings(BaseSettings):
     DEFAULT_SYMBOL: str = "BTCUSD"
     
     # Real-time Update Intervals (in seconds)
-    LIVE_PRICE_UPDATE_INTERVAL: int = 1    # Live price every 1 second
-    POSITION_UPDATE_INTERVAL: int = 1      # Position updates every 1 second
-    ACCOUNT_UPDATE_INTERVAL: int = 1       # Account updates every 1 second
-    STRATEGY_CHECK_INTERVAL: int = 1       # Strategy checks every 1 second
-    RISK_CHECK_INTERVAL: int = 1           # Risk management every 1 second
+    LIVE_PRICE_UPDATE_INTERVAL: int = 5    # Live price every 5 seconds
+    POSITION_UPDATE_INTERVAL: int = 5      # Position updates every 5 seconds
+    ACCOUNT_UPDATE_INTERVAL: int = 5       # Account updates every 5 seconds
+    STRATEGY_CHECK_INTERVAL: int = 5       # Strategy checks every 5 seconds
+    RISK_CHECK_INTERVAL: int = 5           # Risk management every 5 seconds
+    MONITORING_INTERVAL: int = 5           # System monitoring every 5 seconds
+    COMPREHENSIVE_STATUS_LOG_INTERVAL: int = 5  # Comprehensive status log every 5 seconds
     
     # WebSocket Configuration
-    DELTA_WEBSOCKET_URL: str = "wss://socket.delta.exchange"
-    WEBSOCKET_TIMEOUT: int = 10
+    WEBSOCKET_URL: str = "wss://socket.india.delta.exchange"
+    WEBSOCKET_TIMEOUT: int = 30  # seconds
+    WEBSOCKET_RECONNECT_DELAY: int = 5  # seconds
+    WEBSOCKET_MAX_RETRIES: int = 3
+    WEBSOCKET_PING_INTERVAL: int = 30  # seconds
+    WEBSOCKET_PING_TIMEOUT: int = 10  # seconds
     
     # MongoDB Configuration
     MONGODB_URI: str = "mongodb://localhost:27017/"
@@ -52,9 +58,9 @@ class Settings(BaseSettings):
     RISK_MAX_POSITION_RISK: float = 0.05    # 5% max position risk
     RISK_CORRELATION_THRESHOLD: float = 0.7  # Max correlation between positions
     
-    # Logging
+    # Logging Configuration
     LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    LOG_FORMAT: str = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
     LOG_FILE: str = "logs/trading_bot.log"
     
     class Config:

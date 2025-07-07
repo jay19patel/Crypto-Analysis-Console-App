@@ -14,81 +14,92 @@ from src.config import get_settings
 # Removed message formatter dependency for simplified system
 import uuid
 import json
+from collections import defaultdict
 
 class BrokerLogger:
-    """Enhanced logging system for broker operations"""
+    """Enhanced logging for broker operations"""
     
-    def __init__(self, module_name: str = "Broker", websocket_server=None):
-        self.module_name = module_name
-        self.websocket_server = websocket_server
-        self.logger = logging.getLogger(f"broker.{module_name.lower()}")
-    
-    def log(self, level: str, message: str, data: Any = None, execution_time: float = None):
+    def __init__(self):
+        self.logger = logging.getLogger("broker.broker")
+        
+    def log(self, level: str, category: str, message: str, data: Any = None, execution_time: float = None):
         """Enhanced logging with execution time and data"""
-        timestamp = datetime.now(timezone.utc)
-        
-        # Format log entry
-        log_entry = {
-            "module": self.module_name,
-            "timestamp": timestamp.isoformat(),
-            "execution_time_ms": round(execution_time * 1000, 2) if execution_time else None,
-            "level": level.upper(),
-            "message": message,
-            "data": data
-        }
-        
-        # Log to file
-        log_msg = f"[{self.module_name}] {message}"
-        if execution_time:
-            log_msg += f" (executed in {execution_time*1000:.2f}ms)"
-        
-        getattr(self.logger, level.lower())(log_msg)
-        
-        # Send to WebSocket
-        if self.websocket_server:
-            self.websocket_server.queue_message({
-                "type": "broker_log",
-                "data": log_entry
-            })
+        try:
+            # Format log message
+            log_msg = f"{level.upper()} - [Broker] {category} | {message}"
+            if execution_time is not None:
+                log_msg += f" (Time: {execution_time:.3f}s)"
+                
+            # Add data if provided
+            if data:
+                try:
+                    data_str = json.dumps(data, default=str)
+                    log_msg += f" | Data: {data_str}"
+                except:
+                    pass
+            
+            # Log using appropriate level
+            log_func = getattr(self.logger, level.lower(), self.logger.info)
+            log_func(log_msg)
+            
+        except Exception as e:
+            # Fallback logging in case of errors
+            self.logger.error(f"Logging error: {str(e)} | Original message: {message}")
+
+    def disconnect(self):
+        """Log broker disconnection"""
+        self.log("info", "System", "Broker system disconnected")
 
 class UnifiedBroker:
-    """
-    Unified Broker System - All-in-one trading platform
-    Handles account management, positions, trades, and real-time monitoring
-    """
+    """Unified broker implementation with enhanced monitoring and risk management"""
     
-    def __init__(self, websocket_server=None):
-        """Initialize unified broker system"""
-        self.settings = get_settings()
-        self.websocket_server = websocket_server
-        self.logger = BrokerLogger("Broker", websocket_server)
+    def __init__(self):
+        """Initialize broker components"""
+        # Initialize logger
+        self.logger = BrokerLogger()
         
-        # Database connection
-        self.client = None
+        # Initialize threading components
+        self._stop_event = threading.Event()
+        self._monitoring_thread = None
+        
+        # Initialize connection state
+        self.is_connected = False
+        self.market_data_client = None
+        
+        # Initialize MongoDB components
+        self.db_client = None
         self.db = None
         self.accounts_collection = None
         self.positions_collection = None
-        self.is_connected = False
         
-        # Core data
-        self.account: Optional[Account] = None
-        self.positions: Dict[str, Position] = {}  # position_id -> Position
-        self.open_positions: Dict[str, Position] = {}  # symbol -> Position
-        self.current_prices: Dict[str, Dict] = {}  # symbol -> price_data
+        # Initialize trading components
+        self.account = None
+        self.positions = {}
+        self.current_prices = {}
         
-        # Trading settings
+        # Load settings
+        self.settings = get_settings()
+        
+        # Risk parameters
         self.stop_loss_percentage = self.settings.BROKER_STOP_LOSS_PCT
         self.target_percentage = self.settings.BROKER_TARGET_PCT
-        self.min_confidence_threshold = self.settings.BROKER_MIN_CONFIDENCE
-        
-        # Monitoring
-        self._monitoring_thread = None
-        self._stop_monitoring = threading.Event()
-        self._last_update = time.time()
         
         # Performance tracking
-        self._operation_times = {}
+        self._operation_times = defaultdict(float)
         
+        self.logger.log(
+            "info",
+            "Initialization",
+            "Broker system initialized",
+            execution_time=0.0
+        )
+        
+    @property
+    def open_positions(self) -> Dict[str, Position]:
+        """Returns a dictionary of open positions"""
+        with self._time_operation("get_open_positions"):
+            return {p_id: p for p_id, p in self.positions.items() if p.status == PositionStatus.OPEN}
+    
     def _time_operation(self, operation_name: str):
         """Context manager for timing operations"""
         class OperationTimer:
@@ -104,42 +115,53 @@ class UnifiedBroker:
             def __exit__(self, exc_type, exc_val, exc_tb):
                 execution_time = time.time() - self.start_time
                 self.broker._operation_times[self.name] = execution_time
+                return execution_time
         
         return OperationTimer(self, operation_name)
     
     def connect(self) -> bool:
-        """Connect to MongoDB database"""
-        with self._time_operation("database_connect"):
+        """Connect to trading system and initialize components"""
+        with self._time_operation("database_connect") as timer:
             try:
-                self.client = MongoClient(
+                # Connect to MongoDB
+                self.db_client = MongoClient(
                     self.settings.MONGODB_URI,
                     serverSelectionTimeoutMS=self.settings.MONGODB_TIMEOUT * 1000
                 )
                 
                 # Test connection
-                self.client.admin.command('ping')
+                self.db_client.admin.command('ping')
                 
-                # Get database and collections with text prefix
-                self.db = self.client[self.settings.DATABASE_NAME]
-                self.accounts_collection = self.db['text_trading_accounts']
-                self.positions_collection = self.db['text_trading_positions']
+                # Get database and collections
+                self.db = self.db_client[self.settings.DATABASE_NAME]
+                self.accounts_collection = self.db['trading_accounts']
+                self.positions_collection = self.db['trading_positions']
                 
                 self.is_connected = True
                 
-                exec_time = self._operation_times.get("database_connect", 0)
-                self.logger.log("info", "Database connected successfully", 
-                              {"mongodb_uri": self.settings.MONGODB_URI}, exec_time)
+                self.logger.log(
+                    "info",
+                    "Database",
+                    "Connection established successfully",
+                    {"database": self.settings.DATABASE_NAME},
+                    timer.__exit__(None, None, None)
+                )
+                
                 return True
                 
             except Exception as e:
-                exec_time = self._operation_times.get("database_connect", 0)
-                self.logger.log("error", f"Database connection failed: {e}", 
-                              {"error": str(e)}, exec_time)
+                self.logger.log(
+                    "error",
+                    "Database",
+                    "Connection failed",
+                    {"error": str(e)},
+                    timer.__exit__(None, None, None)
+                )
                 return False
     
     def initialize_account(self, account_id: str = "main", initial_balance: float = 10000.0) -> bool:
         """Initialize or load trading account"""
-        with self._time_operation("account_initialize"):
+        with self._time_operation("account_initialize") as timer:
             try:
                 if not self.is_connected:
                     if not self.connect():
@@ -150,8 +172,11 @@ class UnifiedBroker:
                 
                 if account_doc:
                     self.account = Account.from_dict(account_doc)
-                    self.logger.log("info", f"Loaded existing account: {account_id}", 
-                                  {"balance": self.account.current_balance})
+                    self.logger.log(
+                        "info", "Account", f"Loaded existing account: {account_id}",
+                        {"balance": self.account.current_balance},
+                        timer.__exit__(None, None, None)
+                    )
                 else:
                     # Create new account
                     self.account = Account()
@@ -167,59 +192,62 @@ class UnifiedBroker:
                     # Save new account
                     self._save_account()
                     
-                    exec_time = self._operation_times.get("account_initialize", 0)
-                    self.logger.log("info", f"Created new account: {account_id}", 
-                                  {"initial_balance": initial_balance}, exec_time)
+                    self.logger.log(
+                        "info", "Account", f"Created new account: {account_id}",
+                        {"initial_balance": initial_balance},
+                        timer.__exit__(None, None, None)
+                    )
                 
                 return True
                 
             except Exception as e:
-                exec_time = self._operation_times.get("account_initialize", 0)
-                self.logger.log("error", f"Account initialization failed: {e}", 
-                              {"error": str(e)}, exec_time)
+                self.logger.log(
+                    "error", "Account", "Initialization failed",
+                    {"error": str(e)},
+                    timer.__exit__(None, None, None)
+                )
                 return False
     
     def load_positions(self) -> bool:
         """Load all positions from database"""
-        with self._time_operation("positions_load"):
+        with self._time_operation("positions_load") as timer:
             try:
                 if not self.is_connected:
                     return False
                 
                 # Clear existing positions
                 self.positions.clear()
-                self.open_positions.clear()
                 
                 # Load from database
                 cursor = self.positions_collection.find({}).sort("created_at", -1)
                 
                 loaded_count = 0
-                open_count = 0
                 
                 for doc in cursor:
                     try:
                         position = Position.from_dict(doc)
                         self.positions[position.id] = position
-                        
-                        if position.status == PositionStatus.OPEN:
-                            self.open_positions[position.symbol] = position
-                            open_count += 1
-                        
                         loaded_count += 1
                         
                     except Exception as e:
-                        self.logger.log("warning", f"Failed to load position: {e}")
+                        self.logger.log(
+                            "error", "Positions", "Failed to load position",
+                            {"position_id": doc.get("id"), "error": str(e)}
+                        )
                 
-                exec_time = self._operation_times.get("positions_load", 0)
-                self.logger.log("info", f"Loaded {loaded_count} positions ({open_count} open)", 
-                              {"total": loaded_count, "open": open_count}, exec_time)
-                
+                self.logger.log(
+                    "info", "Positions", "Positions loaded from database",
+                    {"total_loaded": loaded_count},
+                    timer.__exit__(None, None, None)
+                )
                 return True
                 
             except Exception as e:
-                exec_time = self._operation_times.get("positions_load", 0)
-                self.logger.log("error", f"Failed to load positions: {e}", 
-                              {"error": str(e)}, exec_time)
+                self.logger.log(
+                    "error", "Positions", "Failed to load positions",
+                    {"error": str(e)},
+                    timer.__exit__(None, None, None)
+                )
                 return False
     
     def execute_trade(self, signal: str, symbol: str, current_price: float, 
@@ -237,9 +265,9 @@ class UnifiedBroker:
                     return False
                 
                 # Check confidence threshold
-                if confidence < self.min_confidence_threshold:
+                if confidence < self.settings.BROKER_MIN_CONFIDENCE:
                     self.logger.log("warning", f"Low confidence signal ignored", 
-                                  {"confidence": confidence, "threshold": self.min_confidence_threshold})
+                                  {"confidence": confidence, "threshold": self.settings.BROKER_MIN_CONFIDENCE})
                     return False
                 
                 # Check daily trades limit
@@ -248,7 +276,7 @@ class UnifiedBroker:
                 
                 # Check if we can open this position
                 position_type = PositionType.LONG if signal == 'BUY' else PositionType.SHORT
-                if symbol in self.open_positions:
+                if symbol in self.positions:
                     self.logger.log("warning", f"Position already open for {symbol}")
                     return False
                 
@@ -292,7 +320,6 @@ class UnifiedBroker:
                 # Save position
                 if self._save_position(position):
                     self.positions[position.id] = position
-                    self.open_positions[symbol] = position
                     
                     # Update account stats
                     self.account.total_trades += 1
@@ -361,10 +388,6 @@ class UnifiedBroker:
                 self._save_position(position)
                 self._save_account()
                 
-                # Remove from open positions
-                if position.symbol in self.open_positions:
-                    del self.open_positions[position.symbol]
-                
                 exec_time = self._operation_times.get("position_close", 0)
                 self.logger.log("info", f"Position closed: {position.symbol}", {
                     "position_id": position_id,
@@ -387,11 +410,10 @@ class UnifiedBroker:
         with self._time_operation("prices_update"):
             try:
                 self.current_prices.update(prices)
-                self._last_update = time.time()
                 
                 # Update PnL for open positions
                 updated_positions = []
-                for symbol, position in self.open_positions.items():
+                for symbol, position in self.positions.items():
                     if symbol in prices:
                         current_price = prices[symbol]["price"]
                         old_pnl = position.pnl
@@ -423,7 +445,7 @@ class UnifiedBroker:
             try:
                 positions_to_close = []
                 
-                for symbol, position in self.open_positions.items():
+                for symbol, position in self.positions.items():
                     if symbol not in self.current_prices:
                         continue
                     
@@ -542,15 +564,15 @@ class UnifiedBroker:
             "total_margin_used": self.account.total_margin_used,
             "brokerage_charges": self.account.brokerage_charges,
             "algo_status": self.account.algo_status,
-            "open_positions_count": len(self.open_positions),
-            "total_unrealized_pnl": sum(pos.pnl for pos in self.open_positions.values()),
+            "open_positions_count": len(self.positions),
+            "total_unrealized_pnl": sum(pos.pnl for pos in self.positions.values()),
             "last_updated": datetime.now(timezone.utc).isoformat()
         }
     
     def get_positions_summary(self) -> Dict[str, Any]:
         """Get positions summary"""
         open_positions_list = []
-        for position in self.open_positions.values():
+        for position in self.positions.values():
             pos_data = position.to_dict()
             if position.symbol in self.current_prices:
                 pos_data["current_price"] = self.current_prices[position.symbol]["price"]
@@ -569,64 +591,97 @@ class UnifiedBroker:
         return {
             "open_positions": open_positions_list,
             "closed_positions": closed_positions_list[:10],  # Last 10
-            "total_open": len(self.open_positions),
+            "total_open": len(self.positions),
             "total_closed": len(closed_positions_list),
-            "total_unrealized_pnl": sum(pos.pnl for pos in self.open_positions.values())
+            "total_unrealized_pnl": sum(pos.pnl for pos in self.positions.values())
         }
     
     def start_monitoring(self) -> None:
         """Start real-time monitoring thread"""
-        if self._monitoring_thread and self._monitoring_thread.is_alive():
-            return
-        
-        self._stop_monitoring.clear()
-        self._monitoring_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
-        self._monitoring_thread.start()
-        
-        self.logger.log("info", "Real-time monitoring started")
+        try:
+            if self._monitoring_thread and self._monitoring_thread.is_alive():
+                self.logger.log("warning", "Monitoring", "Monitoring already running")
+                return
+            
+            self._stop_event.clear()
+            self._monitoring_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
+            self._monitoring_thread.start()
+            
+            self.logger.log("info", "Monitoring", "Real-time monitoring started")
+            
+        except Exception as e:
+            self.logger.log(
+                "error",
+                "Monitoring",
+                "Failed to start monitoring system",
+                {"error": str(e)},
+                execution_time=0.0
+            )
     
     def stop_monitoring(self) -> None:
-        """Stop real-time monitoring"""
-        self._stop_monitoring.set()
-        if self._monitoring_thread:
-            self._monitoring_thread.join(timeout=5.0)
-        
-        self.logger.log("info", "Real-time monitoring stopped")
+        """Stop monitoring thread"""
+        try:
+            self._stop_event.set()
+            
+            if self._monitoring_thread and self._monitoring_thread.is_alive():
+                self._monitoring_thread.join(timeout=2.0)
+            
+            self.logger.log("info", "Monitoring", "Monitoring system stopped")
+            
+        except Exception as e:
+            self.logger.log(
+                "error",
+                "Monitoring",
+                "Error stopping monitoring system",
+                {"error": str(e)},
+                execution_time=0.0
+            )
     
-    def _monitoring_loop(self) -> None:
-        """Main monitoring loop (runs every 1-2 seconds)"""
-        while not self._stop_monitoring.is_set():
-            try:
-                start_time = time.time()
-                
-                # Check risk levels for all open positions
-                if self.open_positions:
-                    closed_positions = self.check_risk_levels()
+    def _monitoring_loop(self):
+        """Monitor broker operations and connections"""
+        try:
+            while not self._stop_event.is_set():
+                try:
+                    with self._time_operation("monitoring") as timer:
+                        # Check database connection
+                        if not self.is_connected:
+                            self.logger.log(
+                                "warning",
+                                "Connection",
+                                "Database connection lost",
+                                execution_time=timer.execution_time
+                            )
+                            
+                        # Check account status
+                        if not self._check_account_status():
+                            self.logger.log(
+                                "warning",
+                                "Account",
+                                "Account status check failed",
+                                execution_time=timer.execution_time
+                            )
+                            
+                        # Sleep for monitoring interval
+                        time.sleep(self.settings.MONITORING_INTERVAL)
+                        
+                except Exception as e:
+                    self.logger.log(
+                        "error",
+                        "Monitoring",
+                        "Monitoring loop error",
+                        {"error": str(e)},
+                        execution_time=0.0
+                    )
+                    time.sleep(1)
                     
-                    if closed_positions:
-                        self.logger.log("info", f"Monitoring closed {len(closed_positions)} positions")
-                
-                # Send status update via WebSocket
-                if self.websocket_server:
-                    status_update = {
-                        "type": "broker_status",
-                        "data": {
-                            "account": self.get_account_summary(),
-                            "positions": self.get_positions_summary(),
-                            "current_prices": self.current_prices,
-                            "timestamp": datetime.now(timezone.utc).isoformat()
-                        }
-                    }
-                    self.websocket_server.queue_message(status_update)
-                
-                # Sleep for 1-2 seconds
-                elapsed = time.time() - start_time
-                sleep_time = max(0, 1.5 - elapsed)  # Target 1.5 second intervals
-                time.sleep(sleep_time)
-                
-            except Exception as e:
-                self.logger.log("error", f"Monitoring loop error: {e}")
-                time.sleep(2)  # Wait before retrying
+        except Exception as e:
+            self.logger.log(
+                "error",
+                "Monitoring",
+                "Fatal error in monitoring loop",
+                {"error": str(e)},
+                execution_time=0.0
+            )
     
     # Private helper methods
     def _can_trade_today(self) -> bool:
@@ -762,15 +817,84 @@ class UnifiedBroker:
             return False
     
     def disconnect(self) -> None:
-        """Disconnect from database and stop monitoring"""
-        self.stop_monitoring()
-        
-        if self.account:
-            self.account.algo_status = False
-            self._save_account()
-        
-        if self.client:
-            self.client.close()
-        
-        self.is_connected = False
-        self.logger.log("info", "Broker system disconnected") 
+        """Disconnect from trading system"""
+        try:
+            # Stop monitoring
+            self.stop_monitoring()
+            
+            # Close database connection
+            if self.db_client:
+                self.db_client.close()
+            
+            self.is_connected = False
+            self.logger.log("info", "System", "Broker system disconnected")
+            
+        except Exception as e:
+            self.logger.log(
+                "error",
+                "System",
+                "Error during disconnect",
+                {"error": str(e)},
+                execution_time=0.0
+            )
+    
+    def _check_account_status(self) -> bool:
+        """Check account status and connection"""
+        try:
+            if not self.is_connected:
+                return False
+                
+            if not self.account:
+                return False
+                
+            # Verify we can still access the database
+            try:
+                self.db_client.admin.command('ping')
+            except Exception as e:
+                self.logger.log(
+                    "error",
+                    "Database",
+                    "Database connection lost",
+                    {"error": str(e)},
+                    execution_time=0.0
+                )
+                self.is_connected = False
+                return False
+                
+            # Check account balance is valid
+            if self.account.current_balance <= 0:
+                self.logger.log(
+                    "warning",
+                    "Account",
+                    "Invalid account balance",
+                    {"balance": self.account.current_balance},
+                    execution_time=0.0
+                )
+                return False
+                
+            # Check margin usage is within limits
+            margin_usage = self.account.total_margin_used / self.account.current_balance
+            if margin_usage >= self.settings.BROKER_MARGIN_CALL_THRESHOLD:
+                self.logger.log(
+                    "warning",
+                    "Account",
+                    "High margin usage",
+                    {
+                        "margin_usage": f"{margin_usage:.2%}",
+                        "threshold": f"{self.settings.BROKER_MARGIN_CALL_THRESHOLD:.2%}"
+                    },
+                    execution_time=0.0
+                )
+                return False
+                
+            return True
+            
+        except Exception as e:
+            self.logger.log(
+                "error",
+                "Account",
+                "Account status check failed",
+                {"error": str(e)},
+                execution_time=0.0
+            )
+            return False 
