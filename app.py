@@ -1,574 +1,680 @@
 #!/usr/bin/env python3
 """
-Cryptocurrency Trading System with AI Analysis
-Simple interface: python app.py (starts everything), python app.py --save (saves to MongoDB)
+Optimized Real-time Trading System
+Complete trading platform with 1-second real-time updates for:
+- Live Prices
+- Position Details (with P&L)
+- Account Details 
+- Strategy Signals
+- Risk Management
 """
 
-import argparse
+import signal
 import sys
 import time
 import threading
-import signal
-import os
-from typing import Optional
 import logging
-from datetime import datetime
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-from rich.live import Live
-from rich.table import Table
-from rich.style import Style
-from rich.layout import Layout
-from rich.text import Text
-import asyncio
+import os
+import json
+from datetime import datetime, timezone
+from typing import Dict, Any
 
-# Add src to path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-
+# Import optimized system components
+from src.broker.broker import UnifiedBroker
+from src.broker.risk_management import RiskManager
+from src.data.market_data_client import RealTimeMarketData
+from src.strategies.simple_random_strategy import StrategyManager
 from src.config import get_settings
-from src.broker.broker_client import BrokerClient
-from src.data.technical_analysis import TechnicalAnalysis
-from src.data.websocket_client import WebSocketClient
-from src.system.health_checker import SystemHealthChecker
-from src.data.mongodb_client import MongoDBClient
-from src.system.websocket_server import WebSocketServer
-from src.broker.position_manager import PositionManager
-from src.broker.delta_client import DeltaBrokerClient
 
-# Initialize rich console
-console = Console()
+# Configure proper logging
+if os.name == 'nt':  # Windows
+    os.system('chcp 65001 >nul 2>&1')
 
-def setup_logging():
-    """Setup logging configuration"""
-    settings = get_settings()
+# Create logs directory
+os.makedirs('logs', exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/trading_bot.log', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+class OptimizedTradingSystem:
+    """
+    High-Performance Real-time Trading System
+    - 1-second updates for all components
+    - Optimized position caching
+    - Real-time P&L calculations
+    - Advanced account metrics
+    """
     
-    # Create logs directory if it doesn't exist
-    log_dir = os.path.dirname(settings.LOG_FILE)
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
-    # Configure logging to file only
-    logging.basicConfig(
-        level=settings.LOG_LEVEL,
-        format=settings.LOG_FORMAT,
-        handlers=[
-            logging.FileHandler(settings.LOG_FILE)
-        ]
-    )
-    return logging.getLogger(__name__)
-
-class SystemStatus:
     def __init__(self):
-        self.components = {
-            "WebSocket Server": "Pending",
-            "MongoDB Connection": "Pending", 
-            "Delta WebSocket": "Pending",
-            "Delta API": "Pending",
-            "Technical Analysis": "Pending",
-            "Position Manager": "Pending"
-        }
-        self.is_ready = False
-        self.is_online = False
-        self.processing_status = "Initializing"
-        self.progress = 0  # 0-100
-        self.last_activity = {
-            "Live Price Update": "Never",
-            "Position Check": "Never", 
-            "Technical Analysis": "Never",
-            "Trade Execution": "Never"
-        }
-        self.logs = []  # Store recent logs for display
+        """Initialize optimized trading system"""
+        self.logger = logging.getLogger("trading_system")
+        self.settings = get_settings()
         
-    def update(self, component: str, status: str):
-        """Update component status: 'Pending', 'Done', 'Failed'"""
-        self.components[component] = status
-        self.is_ready = all(s == "Done" for s in self.components.values())
-        self.is_online = self.is_ready
-        if self.is_ready:
-            self.processing_status = "Online Processing"
-            self.progress = 100
-        else:
-            done_count = sum(1 for s in self.components.values() if s == "Done")
-            self.progress = int((done_count / len(self.components)) * 100)
+        # Core system components
+        self.broker: UnifiedBroker = None
+        self.risk_manager: RiskManager = None
+        self.market_data: RealTimeMarketData = None
+        self.strategy_manager: StrategyManager = None
         
-    def update_activity(self, activity: str):
-        self.last_activity[activity] = datetime.now().strftime("%H:%M:%S")
+        # System state
+        self.is_running = False
+        self.start_time = None
         
-    def add_log(self, message: str, level: str = "info"):
-        """Add log message to display"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.logs.append({
-            "timestamp": timestamp,
-            "level": level,
-            "message": message
-        })
-        # Keep only last 10 logs
-        if len(self.logs) > 10:
-            self.logs = self.logs[-10:]
-        
-    def get_config_table(self) -> Table:
-        """Get configuration table"""
-        settings = get_settings()
-        table = Table(title="System Configuration", show_header=True, header_style="bold magenta")
-        table.add_column("Setting", style="cyan")
-        table.add_column("Value", style="green")
-        
-        configs = [
-            ("WebSocket Server URL", f"ws://{settings.WEBSOCKET_SERVER_HOST}:{settings.WEBSOCKET_SERVER_PORT}"),
-            ("Delta WebSocket URL", settings.DELTA_WEBSOCKET_URL),
-            ("MongoDB URI", settings.MONGODB_URI),
-            ("Database Name", settings.DATABASE_NAME),
-            ("Default Symbols", ", ".join(settings.DEFAULT_SYMBOLS)),
-            ("Price Update Interval", f"{settings.POSITION_CHECK_INTERVAL}s"),
-            ("Analysis Interval", f"{settings.ANALYSIS_INTERVAL}s"),
-            ("System Check Timeout", f"{settings.SYSTEM_CHECK_TIMEOUT}s"),
-            ("WebSocket Update Interval", f"{settings.WEBSOCKET_UPDATE_INTERVAL}s"),
-            ("Default Refresh Interval", f"{settings.DEFAULT_REFRESH_INTERVAL}s"),
-            ("Min Trade Confidence", f"{settings.BROKER_MIN_CONFIDENCE}%"),
-            ("Risk Per Trade", f"{settings.BROKER_RISK_PER_TRADE * 100}%"),
-            ("Default Leverage", f"{settings.BROKER_DEFAULT_LEVERAGE}x"),
-            ("Stop Loss %", f"{settings.BROKER_STOP_LOSS_PCT * 100}%"),
-            ("Target %", f"{settings.BROKER_TARGET_PCT * 100}%")
-        ]
-        
-        for setting, value in configs:
-            table.add_row(setting, str(value))
-        
-        return table
-        
-    def get_status_table(self) -> Table:
-        """Get system status table with progress"""
-        status_title = f"{'🟢 ONLINE' if self.is_online else '🔴 OFFLINE'} - {self.processing_status} ({self.progress}%)"
-        table = Table(title=status_title, show_header=True, header_style="bold blue")
-        table.add_column("Component", style="cyan")
-        table.add_column("Status", style="green")
-        
-        for component, status in self.components.items():
-            if status == "Done":
-                status_text = "[green]✓ Done"
-            elif status == "Failed":
-                status_text = "[red]✗ Failed"
-            else:
-                status_text = "[yellow]⏳ Pending"
-            table.add_row(component, status_text)
-        
-        # Add progress bar
-        if self.progress < 100:
-            progress_bar = "█" * (self.progress // 10) + "░" * (10 - (self.progress // 10))
-            table.add_row("[bold]Progress", f"[cyan]{progress_bar}[/cyan] {self.progress}%")
-        
-        return table
-        
-    def get_activity_table(self) -> Table:
-        """Get live activity table with logs"""
-        table = Table(title="Live Activity & Logs", show_header=True, header_style="bold yellow")
-        table.add_column("Type", style="cyan", width=15)
-        table.add_column("Time", style="green", width=10)
-        table.add_column("Details", style="white")
-        
-        current_time = datetime.now()
-        
-        # Add activity status
-        for activity, last_time in self.last_activity.items():
-            if last_time == "Never":
-                status = "[red]Waiting"
-            else:
-                try:
-                    last_dt = datetime.strptime(last_time, "%H:%M:%S").replace(
-                        year=current_time.year,
-                        month=current_time.month, 
-                        day=current_time.day
-                    )
-                    diff = (current_time - last_dt).total_seconds()
-                    if diff < 15:
-                        status = "[green]Active"
-                    elif diff < 60:
-                        status = "[yellow]Recent"
-                    else:
-                        status = "[red]Idle"
-                except:
-                    status = "[red]Error"
-            
-            table.add_row(f"[bold]{activity}", last_time, status)
-        
-        # Add separator
-        if self.last_activity and self.logs:
-            table.add_row("─────────", "──────", "─────────────────────────")
-        
-        # Add recent logs
-        for log in self.logs[-5:]:  # Show last 5 logs
-            level_color = {
-                "info": "blue",
-                "warning": "yellow", 
-                "error": "red",
-                "success": "green"
-            }.get(log["level"], "white")
-            
-            table.add_row(
-                f"[{level_color}]LOG",
-                log["timestamp"],
-                f"[{level_color}]{log['message']}"
-            )
-        
-        return table
-
-# Initialize logger at module level
-logger = setup_logging()
-
-# Create a stop event for graceful shutdown
-stop_event = threading.Event()
-
-class ActivityMonitor:
-    def __init__(self, system_status):
-        self.system_status = system_status
+        # Real-time update threads
+        self._position_update_thread = None
+        self._account_update_thread = None
+        self._strategy_thread = None
+        self._risk_thread = None
+        self._main_thread = None
         self._stop_event = threading.Event()
         
-    def start_monitoring(self, websocket_client):
-        """Start monitoring system activities"""
-        def monitor():
-            last_price_check = 0
-            last_analysis_check = 0
-            
-            while not self._stop_event.is_set():
-                try:
-                    current_time = time.time()
-                    
-                    # Check if WebSocket client system is ready and update status accordingly
-                    if websocket_client and hasattr(websocket_client, '_system_ready'):
-                        if websocket_client._system_ready:
-                            # Mark all components as Done if system is ready
-                            if self.system_status.components.get("Delta WebSocket") != "Done":
-                                self.system_status.update("Delta WebSocket", "Done")
-                                self.system_status.add_log("Delta client confirmed online", "success")
-                            if self.system_status.components.get("Delta API") != "Done":
-                                self.system_status.update("Delta API", "Done")
-                    
-                    if websocket_client.delta_client and websocket_client.delta_client.is_connected:
-                        # Check for price updates
-                        if websocket_client.delta_client.latest_prices:
-                            self.system_status.update_activity("Live Price Update")
-                        
-                        # Check for position processing
-                        if current_time - last_price_check >= websocket_client.settings.POSITION_CHECK_INTERVAL:
-                            last_price_check = current_time
-                            self.system_status.update_activity("Position Check")
-                        
-                        # Check for analysis
-                        if current_time - last_analysis_check >= websocket_client.settings.ANALYSIS_INTERVAL:
-                            last_analysis_check = current_time
-                            self.system_status.update_activity("Technical Analysis")
-                    
-                    # Check for activity updates from websocket server
-                    if hasattr(websocket_client.websocket_server, 'last_activity_update'):
-                        for activity, timestamp in websocket_client.websocket_server.last_activity_update.items():
-                            self.system_status.last_activity[activity] = timestamp
-                    
-                    time.sleep(2)  # Check every 2 seconds for more responsive updates
-                    
-                except Exception as e:
-                    logger.error(f"Error in activity monitor: {e}")
-                    time.sleep(5)
+        # Optimized caching for performance
+        self.cached_positions: Dict[str, Any] = {}
+        self.cached_account: Dict[str, Any] = {}
+        self.position_cache_lock = threading.Lock()
+        self.account_cache_lock = threading.Lock()
         
-        monitor_thread = threading.Thread(target=monitor)
-        monitor_thread.daemon = True
-        monitor_thread.start()
+        # Performance tracking
+        self._update_cycles = 0
+        self._last_performance_log = time.time()
         
-    def stop(self):
-        self._stop_event.set()
-
-def run_system():
-    """Run the trading system"""
-    try:
-        # Initialize system components
-        system_status = SystemStatus()
-        websocket_server = WebSocketServer()
-        websocket_client = WebSocketClient(websocket_server)
-        activity_monitor = ActivityMonitor(system_status)
+        # Real-time data storage
+        self.current_prices: Dict[str, Dict] = {}
+        self.latest_signals: Dict[str, Any] = {}
+        self.risk_alerts: list = []
         
-        # Start components
-        if not websocket_server.start():
-            logger.error("Failed to start WebSocket server")
-            return
-        
-        system_status.update("WebSocket Server", True)
-        
-        if not websocket_client.start():
-            logger.error("Failed to start WebSocket client")
-            websocket_server.stop()
-            return
-            
-        # Wait for Delta client to be ready
-        max_wait = 30  # Maximum wait time in seconds
-        wait_start = time.time()
-        while time.time() - wait_start < max_wait:
-            if websocket_client.delta_client and websocket_client.delta_client.is_connected:
-                system_status.update("Delta WebSocket", True)
-                system_status.update("Delta API", True)
-                system_status.update("Technical Analysis", True)
-                system_status.update("Position Manager", True)
-                system_status.is_ready = True
-                logger.info("Trading system is ready - Delta client initialized")
-                break
-            time.sleep(1)
-            
-        if not system_status.is_ready:
-            logger.error("Timeout waiting for Delta client to initialize")
-            websocket_client.stop()
-            websocket_server.stop()
-            return
-        
-        # Start activity monitoring
-        activity_monitor.start_monitoring(websocket_client)
-        
-        # Keep the main thread running
+        # Shutdown handling
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+    
+    def initialize(self) -> bool:
+        """Initialize all system components"""
         try:
-            while True:
-                if not websocket_client.delta_client.is_connected:
-                    logger.warning("Delta client disconnected, attempting to reconnect...")
-                    if not websocket_client.delta_client.start():
-                        logger.error("Failed to reconnect Delta client")
-                        break
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Shutting down trading system...")
-            activity_monitor.stop()
-            websocket_client.stop()
-            websocket_server.stop()
-            logger.info("Trading system shutdown complete")
+            self.logger.info("🚀 Initializing Optimized Real-time Trading System...")
             
-    except Exception as e:
-        logger.error(f"Error running trading system: {e}")
-        if 'websocket_client' in locals():
-            websocket_client.stop()
-        if 'websocket_server' in locals():
-            websocket_server.stop()
+            # 1. Initialize Unified Broker
+            self.logger.info("💰 Initializing Unified Broker...")
+            self.broker = UnifiedBroker()
+            
+            if not self.broker.connect():
+                self.logger.error("Failed to connect broker to database")
+                return False
+            
+            if not self.broker.initialize_account("main", self.settings.BROKER_INITIAL_BALANCE):
+                self.logger.error("Failed to initialize trading account")
+                return False
+            
+            if not self.broker.load_positions():
+                self.logger.error("Failed to load positions")
+                return False
+            
+            # 2. Initialize Risk Manager
+            self.logger.info("⚠️ Initializing Risk Manager...")
+            self.risk_manager = RiskManager(self.broker)
+            
+            # 3. Initialize Market Data Client
+            self.logger.info("📊 Initializing Real-time Market Data...")
+            self.market_data = RealTimeMarketData(price_callback=self._on_price_update)
+            
+            if not self.market_data.start():
+                self.logger.error("Failed to start market data client")
+                return False
+            
+            # 4. Initialize Strategy Manager
+            self.logger.info("🎯 Initializing Strategy Manager...")
+            self.strategy_manager = StrategyManager()
+            
+            if not self.strategy_manager.start():
+                self.logger.error("Failed to start strategy manager")
+                return False
+            
+            # 5. Initialize caches
+            self._initialize_caches()
+            
+            self.logger.info("✅ All systems initialized successfully!")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ System initialization failed: {e}")
+            return False
+    
+    def start_real_time_trading(self) -> bool:
+        """Start the real-time trading system"""
+        try:
+            if self.is_running:
+                self.logger.warning("Trading system already running")
+                return True
+            
+            self.logger.info("🎯 Starting Real-time Trading Operations...")
+            
+            # Set running state
+            self.is_running = True
+            self.start_time = datetime.now(timezone.utc)
+            self._stop_event.clear()
+            
+            # Start all real-time update threads
+            self._start_real_time_threads()
+            
+            # Start monitoring systems
+            self.broker.start_monitoring()
+            self.risk_manager.start_risk_monitoring()
+            
+            self.logger.info("🚀 Real-time Trading System is now LIVE!")
+            self.logger.info("📊 Updates every 1 second: Prices | Positions | Account | Strategy | Risk")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start real-time trading: {e}")
+            return False
+    
+    def stop_trading(self) -> None:
+        """Stop trading operations"""
+        try:
+            self.logger.info("🛑 Stopping Real-time Trading System...")
+            
+            # Set stop flag
+            self._stop_event.set()
+            self.is_running = False
+            
+            # Stop all threads
+            self._stop_all_threads()
+            
+            # Stop monitoring systems
+            if self.risk_manager:
+                self.risk_manager.stop_risk_monitoring()
+            
+            if self.broker:
+                self.broker.stop_monitoring()
+            
+            # Stop market data
+            if self.market_data:
+                self.market_data.stop()
+            
+            # Stop strategy manager
+            if self.strategy_manager:
+                self.strategy_manager.stop()
+            
+            # Disconnect broker
+            if self.broker:
+                self.broker.disconnect()
+            
+            self.logger.info("✅ Real-time Trading System stopped successfully")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error stopping trading system: {e}")
+    
+    def _start_real_time_threads(self) -> None:
+        """Start all real-time update threads"""
+        # Position updates every 1 second
+        self._position_update_thread = threading.Thread(
+            target=self._position_update_loop, daemon=True
+        )
+        self._position_update_thread.start()
+        
+        # Account updates every 1 second
+        self._account_update_thread = threading.Thread(
+            target=self._account_update_loop, daemon=True
+        )
+        self._account_update_thread.start()
+        
+        # Strategy checks every 1 second
+        self._strategy_thread = threading.Thread(
+            target=self._strategy_loop, daemon=True
+        )
+        self._strategy_thread.start()
+        
+        # Risk management every 1 second
+        self._risk_thread = threading.Thread(
+            target=self._risk_management_loop, daemon=True
+        )
+        self._risk_thread.start()
+        
+        # Main system monitoring
+        self._main_thread = threading.Thread(
+            target=self._main_system_loop, daemon=True
+        )
+        self._main_thread.start()
+    
+    def _stop_all_threads(self) -> None:
+        """Stop all running threads"""
+        threads = [
+            self._position_update_thread,
+            self._account_update_thread,
+            self._strategy_thread,
+            self._risk_thread,
+            self._main_thread
+        ]
+        
+        for thread in threads:
+            if thread and thread.is_alive():
+                thread.join(timeout=2.0)
+    
+    def _on_price_update(self, prices: Dict[str, Dict]) -> None:
+        """Handle real-time price updates from market data"""
+        self.current_prices = prices
+        # Update broker with latest prices
+        self.broker.update_prices(prices)
+    
+    def _position_update_loop(self) -> None:
+        """Real-time position updates every 1 second"""
+        self.logger.info("📍 Position update loop started (1-second interval)")
+        
+        while not self._stop_event.is_set():
+            try:
+                start_time = time.time()
+                
+                # Get current positions and update with live prices
+                self._update_position_cache()
+                
+                # Log position details
+                self._log_position_updates()
+                
+                # Precise 1-second interval
+                elapsed = time.time() - start_time
+                sleep_time = max(0, self.settings.POSITION_UPDATE_INTERVAL - elapsed)
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error in position update loop: {e}")
+                time.sleep(1)
+    
+    def _account_update_loop(self) -> None:
+        """Real-time account updates every 1 second"""
+        self.logger.info("💰 Account update loop started (1-second interval)")
+        
+        while not self._stop_event.is_set():
+            try:
+                start_time = time.time()
+                
+                # Update account cache with real-time data
+                self._update_account_cache()
+                
+                # Log account details
+                self._log_account_updates()
+                
+                # Precise 1-second interval
+                elapsed = time.time() - start_time
+                sleep_time = max(0, self.settings.ACCOUNT_UPDATE_INTERVAL - elapsed)
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error in account update loop: {e}")
+                time.sleep(1)
+    
+    def _strategy_loop(self) -> None:
+        """Real-time strategy checks every 1 second"""
+        self.logger.info("🎯 Strategy loop started (1-second interval)")
+        
+        while not self._stop_event.is_set():
+            try:
+                start_time = time.time()
+                
+                # Check for signals if we have current prices
+                if self.current_prices:
+                    self._check_strategy_signals()
+                
+                # Precise 1-second interval
+                elapsed = time.time() - start_time
+                sleep_time = max(0, self.settings.STRATEGY_CHECK_INTERVAL - elapsed)
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error in strategy loop: {e}")
+                time.sleep(1)
+    
+    def _risk_management_loop(self) -> None:
+        """Real-time risk management every 1 second"""
+        self.logger.info("⚠️ Risk management loop started (1-second interval)")
+        
+        while not self._stop_event.is_set():
+            try:
+                start_time = time.time()
+                
+                # Check risk levels for all positions
+                self._check_risk_management()
+                
+                # Precise 1-second interval
+                elapsed = time.time() - start_time
+                sleep_time = max(0, self.settings.RISK_CHECK_INTERVAL - elapsed)
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error in risk management loop: {e}")
+                time.sleep(1)
+    
+    def _main_system_loop(self) -> None:
+        """Main system monitoring and performance tracking"""
+        while not self._stop_event.is_set():
+            try:
+                self._update_cycles += 1
+                
+                # Log comprehensive system status every 30 seconds
+                if self._update_cycles % 30 == 0:
+                    self._log_comprehensive_status()
+                
+                time.sleep(1)
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error in main system loop: {e}")
+                time.sleep(1)
+    
+    def _initialize_caches(self) -> None:
+        """Initialize position and account caches"""
+        self._update_position_cache()
+        self._update_account_cache()
+    
+    def _update_position_cache(self) -> None:
+        """Update position cache with real-time P&L calculations"""
+        with self.position_cache_lock:
+            try:
+                positions_data = {}
+                
+                for pos_id, position in self.broker.positions.items():
+                    if position.status.value == "OPEN":
+                        # Get current price for P&L calculation
+                        current_price = self.current_prices.get(position.symbol, {}).get("price", 0)
+                        
+                        if current_price > 0:
+                            # Calculate real-time P&L
+                            pnl = position.calculate_pnl(current_price)
+                            position.calculate_holding_time()
+                            
+                            positions_data[pos_id] = {
+                                "id": position.id,
+                                "symbol": position.symbol,
+                                "type": position.position_type.value,
+                                "entry_price": position.entry_price,
+                                "current_price": current_price,
+                                "quantity": position.quantity,
+                                "invested_amount": position.invested_amount,
+                                "leverage": position.leverage,
+                                "pnl": pnl,
+                                "pnl_percentage": (pnl / position.invested_amount) * 100 if position.invested_amount > 0 else 0,
+                                "profit_after_amount": position.profit_after_amount,
+                                "holding_time": position.holding_time,
+                                "stop_loss": position.stop_loss,
+                                "target": position.target,
+                                "margin_used": position.margin_used,
+                                "margin_usage": position.calculate_margin_usage(current_price),
+                                "status": position.status.value
+                            }
+                
+                self.cached_positions = positions_data
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error updating position cache: {e}")
+    
+    def _update_account_cache(self) -> None:
+        """Update account cache with comprehensive metrics"""
+        with self.account_cache_lock:
+            try:
+                if not self.broker.account:
+                    return
+                
+                account = self.broker.account
+                
+                # Calculate unrealized P&L from open positions
+                unrealized_pnl = sum(
+                    pos_data.get("pnl", 0) for pos_data in self.cached_positions.values()
+                )
+                
+                # Calculate account growth
+                account_growth = ((account.current_balance - account.initial_balance) / account.initial_balance) * 100
+                
+                # Calculate today's stats
+                open_trades = len([p for p in self.cached_positions.values() if p.get("status") == "OPEN"])
+                
+                self.cached_account = {
+                    "current_balance": account.current_balance,
+                    "initial_balance": account.initial_balance,
+                    "account_growth": round(account_growth, 2),
+                    "margin_used": account.total_margin_used,
+                    "max_leverage": account.max_leverage,
+                    "realized_pnl": account.total_profit - account.total_loss,
+                    "unrealized_pnl": round(unrealized_pnl, 2),
+                    "open_trades": open_trades,
+                    "closed_trades": account.total_trades,
+                    "win_rate": round(account.win_rate, 2),
+                    "daily_trades": account.daily_trades_count,
+                    "daily_limit": account.daily_trades_limit,
+                    "max_profit": max([p.get("pnl", 0) for p in self.cached_positions.values()], default=0),
+                    "max_loss": min([p.get("pnl", 0) for p in self.cached_positions.values()], default=0),
+                    "total_profit": account.total_profit,
+                    "total_loss": account.total_loss,
+                    "brokerage_charges": account.brokerage_charges,
+                    "algo_status": "RUNNING" if self.is_running else "STOPPED"
+                }
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error updating account cache: {e}")
+    
+    def _check_strategy_signals(self) -> None:
+        """Check for trading signals and execute trades"""
+        try:
+            # Generate signals for current prices
+            analysis_result = self.strategy_manager.analyze_and_generate_signals(self.current_prices)
+            
+            if analysis_result.get("status") == "completed":
+                actionable_signals = analysis_result.get("actionable_signals", {})
+                
+                for symbol, signal_data in actionable_signals.items():
+                    signal = signal_data.get("signal")
+                    confidence = signal_data.get("confidence", 0)
+                    current_price = signal_data.get("current_price", 0)
+                    
+                    if signal in ["BUY", "SELL"] and confidence >= self.settings.BROKER_MIN_CONFIDENCE:
+                        # Execute trade
+                        if self._can_execute_trade(signal_data):
+                            success = self.broker.execute_trade(
+                                signal=signal,
+                                symbol=symbol,
+                                current_price=current_price,
+                                confidence=confidence,
+                                strategy_name="Simple Random Strategy",
+                                leverage=self.settings.BROKER_DEFAULT_LEVERAGE
+                            )
+                            
+                            if success:
+                                self.logger.info(f"🎯 Executed {signal} for {symbol} at ${current_price:.2f}")
+                            else:
+                                self.logger.warning(f"⚠️ Failed to execute {signal} for {symbol}")
+                
+                # Store latest signals
+                self.latest_signals = actionable_signals
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error checking strategy signals: {e}")
+    
+    def _check_risk_management(self) -> None:
+        """Check risk management for all positions"""
+        try:
+            risk_alerts = []
+            
+            for pos_id, position in self.broker.positions.items():
+                if position.status.value == "OPEN":
+                    current_price = self.current_prices.get(position.symbol, {}).get("price", 0)
+                    
+                    if current_price > 0:
+                        # Analyze position risk
+                        risk_metrics = self.risk_manager.analyze_position_risk(position, current_price)
+                        
+                        # Execute risk actions if needed
+                        action_taken = self.risk_manager.execute_risk_action(position, risk_metrics, current_price)
+                        
+                        if action_taken:
+                            risk_alerts.append(f"Risk action taken for {position.symbol}")
+                        
+                        # Check for stop loss or target hits
+                        if position.stop_loss and current_price <= position.stop_loss:
+                            self.broker.close_position(pos_id, current_price, "Stop Loss Hit")
+                            risk_alerts.append(f"Stop Loss hit for {position.symbol}")
+                        
+                        elif position.target and current_price >= position.target:
+                            self.broker.close_position(pos_id, current_price, "Target Hit")
+                            risk_alerts.append(f"Target hit for {position.symbol}")
+            
+            self.risk_alerts = risk_alerts
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error in risk management: {e}")
+    
+    def _can_execute_trade(self, signal_data: dict) -> bool:
+        """Check if we can execute a trade"""
+        try:
+            # Check daily trade limits
+            if not self.broker.account.can_trade_today():
+                return False
+            
+            # Check if we already have a position in this symbol
+            symbol = signal_data.get("symbol")
+            if symbol in self.broker.open_positions:
+                return False
+            
+            # Check account balance
+            if self.broker.account.current_balance < self.settings.BROKER_MAX_POSITION_SIZE:
+                return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error checking trade execution: {e}")
+            return False
+    
+    def _log_position_updates(self) -> None:
+        """Log real-time position updates"""
+        try:
+            if self.cached_positions:
+                position_summary = []
+                for pos_data in self.cached_positions.values():
+                    summary = (f"{pos_data['symbol']} | "
+                             f"{pos_data['type']} | "
+                             f"Entry: ${pos_data['entry_price']:.2f} | "
+                             f"Current: ${pos_data['current_price']:.2f} | "
+                             f"P&L: ${pos_data['pnl']:.2f} ({pos_data['pnl_percentage']:+.2f}%) | "
+                             f"Time: {pos_data['holding_time']}")
+                    position_summary.append(summary)
+                
+                # Log position details
+                for summary in position_summary:
+                    self.logger.info(f"📍 [Position] {summary}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error logging position updates: {e}")
+    
+    def _log_account_updates(self) -> None:
+        """Log real-time account updates"""
+        try:
+            if self.cached_account:
+                account_str = json.dumps(self.cached_account, indent=2)
+                self.logger.info(f"💰 [Account] {account_str}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error logging account updates: {e}")
+    
+    def _log_comprehensive_status(self) -> None:
+        """Log comprehensive system status"""
+        try:
+            uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds() if self.start_time else 0
+            
+            # Market data stats
+            market_stats = self.market_data.get_performance_stats() if self.market_data else {}
+            
+            # Position summary
+            open_positions = len(self.cached_positions)
+            total_pnl = sum(pos.get("pnl", 0) for pos in self.cached_positions.values())
+            
+            status_summary = {
+                "uptime_seconds": round(uptime, 2),
+                "update_cycles": self._update_cycles,
+                "market_data_status": market_stats.get("status", "unknown"),
+                "open_positions": open_positions,
+                "total_unrealized_pnl": round(total_pnl, 2),
+                "latest_signals": len(self.latest_signals),
+                "risk_alerts": len(self.risk_alerts),
+                "account_balance": self.cached_account.get("current_balance", 0)
+            }
+            
+            self.logger.info(f"🚀 [System Status] {json.dumps(status_summary, indent=2)}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error logging comprehensive status: {e}")
+    
+    def _signal_handler(self, signum, frame) -> None:
+        """Handle shutdown signals"""
+        self.logger.info(f"🛑 Received signal {signum}, shutting down...")
+        self.stop_trading()
+        sys.exit(0)
+    
+    def get_system_status(self) -> dict:
+        """Get current system status"""
+        try:
+            uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds() if self.start_time else 0
+            
+            return {
+                "is_running": self.is_running,
+                "uptime_seconds": uptime,
+                "update_cycles": self._update_cycles,
+                "current_prices": len(self.current_prices),
+                "open_positions": len(self.cached_positions),
+                "account_balance": self.cached_account.get("current_balance", 0),
+                "market_data_status": self.market_data.get_performance_stats() if self.market_data else {},
+                "last_update": datetime.now(timezone.utc).isoformat()
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error getting system status: {e}")
+            return {"error": str(e)}
+
 
 def main():
-    """Main application entry point"""
+    """Main function to start the optimized trading system"""
+    system = OptimizedTradingSystem()
+    
     try:
-        # Initialize system status
-        system_status = SystemStatus()
-        settings = get_settings()
+        # Initialize system
+        if not system.initialize():
+            print("❌ Failed to initialize trading system")
+            return 1
         
-        with console.screen() as screen:
-            # Create layout
-            layout = Layout()
-            layout.split_column(
-                Layout(name="header", size=3),
-                Layout(name="body"),
-                Layout(name="footer", size=3)
-            )
-            
-            layout["body"].split_row(
-                Layout(name="config", ratio=1),
-                Layout(name="status", ratio=1),
-                Layout(name="activity", ratio=1)
-            )
-            
-            # Header - Dynamic Online/Offline status
-            def get_header():
-                if system_status.is_online:
-                    return Panel(
-                        Text("🟢 ONLINE - Cryptocurrency Trading System", style="bold green", justify="center"),
-                        style="bold green"
-                    )
-                else:
-                    return Panel(
-                        Text("🔴 OFFLINE - Cryptocurrency Trading System", style="bold red", justify="center"),
-                        style="bold red"
-                    )
-            
-            layout["header"].update(get_header())
-            
-            # Footer
-            layout["footer"].update(
-                Panel(
-                    Text("Press Ctrl+C to stop the system", style="bold yellow", justify="center"),
-                    style="bold red"
-                )
-            )
-            
-            def get_renderable():
-                layout["header"].update(get_header())  # Update header dynamically
-                layout["config"].update(Panel(system_status.get_config_table(), title="Configuration"))
-                layout["status"].update(Panel(system_status.get_status_table(), title="System Status"))
-                layout["activity"].update(Panel(system_status.get_activity_table(), title="Live Activity"))
-                return layout
-            
-            with Live(get_renderable(), console=console, refresh_per_second=2) as live:
-                # Initialize components in background
-                def init_system():
-                    try:
-                        system_status.add_log("Starting system initialization...", "info")
-                        
-                        # Initialize MongoDB
-                        system_status.add_log("Connecting to MongoDB...", "info")
-                        mongodb_client = MongoDBClient()
-                        if mongodb_client.test_connection():
-                            system_status.update("MongoDB Connection", "Done")
-                            system_status.add_log("MongoDB connected successfully", "success")
-                        else:
-                            system_status.update("MongoDB Connection", "Failed")
-                            system_status.add_log("MongoDB connection failed - continuing anyway", "warning")
-                        
-                        # Initialize WebSocket server
-                        system_status.add_log("Starting WebSocket server...", "info")
-                        websocket_server = WebSocketServer()
-                        if websocket_server.start():
-                            system_status.update("WebSocket Server", "Done")
-                            system_status.add_log(f"WebSocket server started on ws://{settings.WEBSOCKET_SERVER_HOST}:{settings.WEBSOCKET_SERVER_PORT}", "success")
-                        else:
-                            system_status.update("WebSocket Server", "Failed")
-                            system_status.add_log("WebSocket server failed to start", "error")
-                            return
-                        
-                        # Initialize WebSocket client
-                        system_status.add_log("Starting WebSocket client...", "info")
-                        websocket_client = WebSocketClient(websocket_server)
-                        
-                        # Initialize activity monitor
-                        activity_monitor = ActivityMonitor(system_status)
-                        
-                        # Start WebSocket client (this will attempt to start Delta client)
-                        if websocket_client.start():
-                            system_status.add_log("WebSocket client started", "success")
-                            
-                            # Wait a bit for components to initialize
-                            system_status.add_log("Waiting for components to initialize...", "info")
-                            time.sleep(5)  # Increased wait time
-                            
-                            # Check Delta client status and mark all components as Done
-                            if websocket_client.delta_client and websocket_client.delta_client.is_connected:
-                                system_status.update("Delta WebSocket", "Done")
-                                system_status.update("Delta API", "Done")
-                                system_status.add_log("Delta client connected", "success")
-                                # Set system ready flag
-                                websocket_client.set_system_ready(True)
-                                system_status.add_log("🎉 System is now ONLINE!", "success")
-                            else:
-                                system_status.add_log("Delta client not connected - will retry in background", "warning")
-                                # Don't fail the entire system, just mark as not ready for now
-                            
-                            # Check technical analysis
-                            if websocket_client.technical_analysis:
-                                system_status.update("Technical Analysis", "Done")
-                                system_status.add_log("Technical analysis ready", "success")
-                            else:
-                                system_status.update("Technical Analysis", "Failed")
-                                system_status.add_log("Technical analysis not available", "warning")
-                            
-                            # Check position manager
-                            if websocket_client.position_manager:
-                                if websocket_client.position_manager.is_connected:
-                                    system_status.update("Position Manager", "Done")
-                                    system_status.add_log("Position manager ready", "success")
-                                else:
-                                    system_status.update("Position Manager", "Done")  # Mark as ready anyway
-                                    system_status.add_log("Position manager connected with warnings", "warning")
-                            else:
-                                system_status.update("Position Manager", "Failed")
-                                system_status.add_log("Position manager not available", "warning")
-                            
-                            # Start activity monitoring
-                            activity_monitor.start_monitoring(websocket_client)
-                            system_status.add_log("Activity monitoring started", "success")
-                            
-                            system_status.add_log("🎉 System initialization complete!", "success")
-                            system_status.add_log("System is running - components will continue to connect in background", "info")
-                            
-                            # Keep running and monitor connection
-                            last_delta_check = 0
-                            last_status_update = 0
-                            
-                            while True:
-                                current_time = time.time()
-                                
-                                # Update system status every 10 seconds
-                                if current_time - last_status_update >= 10:
-                                    last_status_update = current_time
-                                    
-                                    # Update all component statuses
-                                    if websocket_server and hasattr(websocket_server, 'is_running') and websocket_server.is_running:
-                                        if system_status.components["WebSocket Server"] != "Done":
-                                            system_status.update("WebSocket Server", "Done")
-                                    
-                                    if mongodb_client and mongodb_client.test_connection():
-                                        if system_status.components["MongoDB Connection"] != "Done":
-                                            system_status.update("MongoDB Connection", "Done")
-                                    
-                                    if websocket_client.technical_analysis:
-                                        if system_status.components["Technical Analysis"] != "Done":
-                                            system_status.update("Technical Analysis", "Done")
-                                    
-                                    if websocket_client.position_manager:
-                                        if system_status.components["Position Manager"] != "Done":
-                                            system_status.update("Position Manager", "Done")
-                                
-                                # Check Delta client every 30 seconds
-                                if current_time - last_delta_check >= 30:
-                                    last_delta_check = current_time
-                                    
-                                    if websocket_client.delta_client:
-                                        if websocket_client.delta_client.is_connected:
-                                            if system_status.components.get("Delta WebSocket") != "Done":
-                                                system_status.update("Delta WebSocket", "Done")
-                                                system_status.update("Delta API", "Done")
-                                                system_status.add_log("Delta client reconnected", "success")
-                                                websocket_client.set_system_ready(True)
-                                        else:
-                                            if system_status.components.get("Delta WebSocket") == "Done":
-                                                system_status.update("Delta WebSocket", "Failed")
-                                                system_status.update("Delta API", "Failed")
-                                                system_status.add_log("Delta client disconnected", "warning")
-                                                websocket_client.set_system_ready(False)
-                                
-                                time.sleep(2)  # Check every 2 seconds for more responsive UI
-                                
-                        else:
-                            system_status.add_log("WebSocket client failed to start", "error")
-                            websocket_server.stop()
-                            return
-                                
-                    except KeyboardInterrupt:
-                        system_status.add_log("Shutting down system...", "warning")
-                        if 'activity_monitor' in locals():
-                            activity_monitor.stop()
-                        if 'websocket_client' in locals():
-                            websocket_client.stop()
-                        if 'websocket_server' in locals():
-                            websocket_server.stop()
-                        system_status.add_log("System shutdown complete", "success")
-                    except Exception as e:
-                        system_status.add_log(f"Error in system initialization: {e}", "error")
-                        logger.error(f"Error in system initialization: {e}")
-                        import traceback
-                        logger.error(traceback.format_exc())
-                
-                # Start system in background thread
-                system_thread = threading.Thread(target=init_system)
-                system_thread.daemon = True
-                system_thread.start()
-                
-                # Handle graceful shutdown
-                def signal_handler(signum, frame):
-                    system_status.add_log("Shutting down system...", "warning")
-                    stop_event.set()
-                    raise KeyboardInterrupt
-                
-                signal.signal(signal.SIGINT, signal_handler)
-                signal.signal(signal.SIGTERM, signal_handler)
-                
-                # Keep the main thread alive
-                try:
-                    while not stop_event.is_set():
-                        time.sleep(0.1)
-                except KeyboardInterrupt:
-                    system_status.add_log("System shutdown complete!", "success")
-                    
+        # Start real-time trading
+        if not system.start_real_time_trading():
+            print("❌ Failed to start real-time trading")
+            return 1
+        
+        print("\n" + "="*80)
+        print("🚀 OPTIMIZED REAL-TIME TRADING SYSTEM - LIVE")
+        print("="*80)
+        print("📊 Live Price Updates: Every 1 second")
+        print("📍 Position Updates: Every 1 second (with real-time P&L)")
+        print("💰 Account Updates: Every 1 second")
+        print("🎯 Strategy Checks: Every 1 second")
+        print("⚠️ Risk Management: Every 1 second")
+        print("="*80)
+        print("Press Ctrl+C to stop the system\n")
+        
+        # Keep main thread alive
+        try:
+            while system.is_running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        
+        return 0
+        
     except Exception as e:
-        console.print(f"[bold red]Error in main: {e}[/bold red]")
-        logger.error(f"Error in main: {e}")
+        print(f"❌ System error: {e}")
+        return 1
+    
+    finally:
+        system.stop_trading()
+
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    sys.exit(exit_code)

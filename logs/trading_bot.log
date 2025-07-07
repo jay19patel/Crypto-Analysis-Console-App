@@ -1,87 +1,1509 @@
-2025-07-05 16:42:28,980 - websockets.server - INFO - connection open
-2025-07-05 16:42:28,981 - src.system.websocket_server - INFO - Client connected. Total clients: 1
-2025-07-05 16:42:32,336 - src.system.websocket_server - INFO - Client disconnected. Total clients: 0
-2025-07-05 16:42:33,440 - websockets.server - INFO - connection open
-2025-07-05 16:42:33,441 - src.system.websocket_server - INFO - Client connected. Total clients: 1
-2025-07-05 16:43:22,482 - src.system.websocket_server - INFO - Client disconnected. Total clients: 0
-2025-07-05 16:49:24,957 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
-2025-07-05 16:49:25,126 - websockets.server - INFO - server listening on 0.0.0.0:8765
-2025-07-05 16:49:25,127 - src.system.websocket_server - INFO - WebSocket server started on ws://0.0.0.0:8765
-2025-07-05 16:49:25,163 - src.data.websocket_client - INFO - Initializing WebSocket client components...
-2025-07-05 16:49:25,180 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
-2025-07-05 16:49:25,180 - src.data.websocket_client - INFO - MongoDB connection verified
-2025-07-05 16:49:25,181 - src.data.websocket_client - INFO - Technical analysis component ready
-2025-07-05 16:49:25,181 - src.data.websocket_client - INFO - Starting Delta Exchange client...
-2025-07-05 16:49:25,181 - src.broker.delta_client - INFO - Starting Delta Exchange WebSocket client...
-2025-07-05 16:49:25,182 - src.broker.delta_client - INFO - Connecting to Delta Exchange: wss://socket.delta.exchange
-2025-07-05 16:49:25,183 - src.broker.delta_client - INFO - WebSocket connection attempt 1/5
-2025-07-05 16:49:26,278 - websocket - INFO - Websocket connected
-2025-07-05 16:49:26,279 - src.broker.delta_client - INFO - Connected to Delta Exchange WebSocket
-2025-07-05 16:49:26,279 - src.broker.delta_client - INFO - Subscribed to BTC-USD
-2025-07-05 16:49:26,280 - src.broker.delta_client - INFO - Subscribed to ETH-USD
-2025-07-05 16:49:26,345 - src.broker.delta_client - INFO - Successfully connected to Delta Exchange WebSocket
-2025-07-05 16:49:26,346 - src.broker.delta_client - INFO - Delta client connected, waiting for initial data...
-2025-07-05 16:49:26,346 - src.broker.delta_client - INFO - Delta client connected successfully
-2025-07-05 16:49:26,348 - src.broker.delta_client - INFO - Delta client started successfully
-2025-07-05 16:49:26,348 - src.data.websocket_client - INFO - Delta client started successfully
-2025-07-05 16:49:26,348 - src.data.websocket_client - INFO - Connecting Position Manager...
-2025-07-05 16:49:26,361 - src.broker.position_manager - INFO - Position manager connected successfully
-2025-07-05 16:49:26,361 - src.data.websocket_client - INFO - Position Manager connected successfully
-2025-07-05 16:49:26,437 - src.broker.position_manager - INFO - Loaded 0 positions
-2025-07-05 16:49:26,437 - src.data.websocket_client - INFO - Existing positions loaded
-2025-07-05 16:49:26,437 - src.data.websocket_client - INFO - WebSocket client connected successfully
-2025-07-05 16:49:26,442 - src.data.websocket_client - INFO - WebSocket client started successfully
-2025-07-05 16:49:31,443 - src.data.websocket_client - INFO - All components ready - starting periodic tasks
-2025-07-05 16:49:31,453 - src.data.technical_analysis - INFO - Analyzing BTC-USD...
-2025-07-05 16:49:31,457 - src.data.technical_analysis - ERROR - Error fetching data for BTCUSD: 'Settings' object has no attribute 'DELTA_API_URL'
-2025-07-05 16:49:31,459 - src.data.technical_analysis - WARNING - Failed to analyze BTC-USD
-2025-07-05 16:49:31,461 - src.data.technical_analysis - INFO - Analyzing ETH-USD...
-2025-07-05 16:49:31,462 - src.data.technical_analysis - ERROR - Error fetching data for ETHUSD: 'Settings' object has no attribute 'DELTA_API_URL'
-2025-07-05 16:49:31,464 - src.data.technical_analysis - WARNING - Failed to analyze ETH-USD
-2025-07-05 16:50:20,566 - websockets.server - INFO - connection open
-2025-07-05 16:50:20,568 - src.system.websocket_server - INFO - Client connected. Total clients: 1
-2025-07-05 16:50:31,768 - src.system.websocket_server - INFO - Client disconnected. Total clients: 0
-2025-07-05 16:50:31,769 - src.system.websocket_server - ERROR - Error broadcasting message: Set changed size during iteration
-2025-07-05 16:58:14,259 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
-2025-07-05 16:58:14,332 - websockets.server - INFO - server listening on 0.0.0.0:8765
-2025-07-05 16:58:14,333 - src.system.websocket_server - INFO - WebSocket server started on ws://0.0.0.0:8765
-2025-07-05 16:58:14,364 - src.data.websocket_client - INFO - Initializing WebSocket client components...
-2025-07-05 16:58:14,391 - src.data.mongodb_client - INFO - Connected to MongoDB successfully
-2025-07-05 16:58:14,391 - src.data.websocket_client - INFO - MongoDB connection verified
-2025-07-05 16:58:14,392 - src.data.websocket_client - INFO - Technical analysis component ready
-2025-07-05 16:58:14,392 - src.data.websocket_client - INFO - Starting Delta Exchange client...
-2025-07-05 16:58:14,393 - src.broker.delta_client - INFO - Starting Delta Exchange WebSocket client...
-2025-07-05 16:58:14,394 - src.broker.delta_client - INFO - Connecting to Delta Exchange: wss://socket.delta.exchange
-2025-07-05 16:58:14,396 - src.broker.delta_client - INFO - WebSocket connection attempt 1/5
-2025-07-05 16:58:15,279 - websocket - INFO - Websocket connected
-2025-07-05 16:58:15,279 - src.broker.delta_client - INFO - Connected to Delta Exchange WebSocket
-2025-07-05 16:58:15,280 - src.broker.delta_client - INFO - Subscribed to BTC-USD
-2025-07-05 16:58:15,280 - src.broker.delta_client - INFO - Subscribed to ETH-USD
-2025-07-05 16:58:15,351 - src.broker.delta_client - INFO - Successfully connected to Delta Exchange WebSocket
-2025-07-05 16:58:15,351 - src.broker.delta_client - INFO - Delta client connected, waiting for initial data...
-2025-07-05 16:58:15,351 - src.broker.delta_client - INFO - Delta client connected successfully
-2025-07-05 16:58:15,355 - src.broker.delta_client - INFO - Delta client started successfully
-2025-07-05 16:58:15,355 - src.data.websocket_client - INFO - Delta client started successfully
-2025-07-05 16:58:15,355 - src.data.websocket_client - INFO - Connecting Position Manager...
-2025-07-05 16:58:15,378 - src.broker.position_manager - INFO - Position manager connected successfully
-2025-07-05 16:58:15,378 - src.data.websocket_client - INFO - Position Manager connected successfully
-2025-07-05 16:58:15,379 - src.broker.position_manager - INFO - Loaded 0 positions from database (Open: 0, Closed: 0)
-2025-07-05 16:58:15,379 - src.data.websocket_client - INFO - Existing positions loaded
-2025-07-05 16:58:15,380 - src.data.websocket_client - INFO - WebSocket client connected successfully
-2025-07-05 16:58:15,380 - src.data.websocket_client - INFO - WebSocket client started successfully
-2025-07-05 16:58:16,395 - websockets.server - INFO - connection open
-2025-07-05 16:58:16,395 - src.system.websocket_server - INFO - Client connected. Total clients: 1
-2025-07-05 16:58:20,382 - src.data.websocket_client - INFO - All components ready - starting periodic tasks
-2025-07-05 16:58:20,384 - src.data.technical_analysis - INFO - Analyzing BTC-USD...
-2025-07-05 16:58:22,302 - src.data.technical_analysis - INFO - Successfully fetched 2880 candles for BTCUSD
-2025-07-05 16:58:22,349 - src.data.technical_analysis - ERROR - Error calculating indicators: 'BBU_20_2'
-2025-07-05 16:58:22,350 - src.data.technical_analysis - WARNING - No indicators calculated for BTC-USD
-2025-07-05 16:58:22,350 - src.data.technical_analysis - WARNING - Failed to analyze BTC-USD
-2025-07-05 16:58:22,350 - src.data.technical_analysis - INFO - Analyzing ETH-USD...
-2025-07-05 16:58:24,017 - src.data.technical_analysis - INFO - Successfully fetched 2880 candles for ETHUSD
-2025-07-05 16:58:24,034 - src.data.technical_analysis - ERROR - Error calculating indicators: 'BBU_20_2'
-2025-07-05 16:58:24,034 - src.data.technical_analysis - WARNING - No indicators calculated for ETH-USD
-2025-07-05 16:58:24,035 - src.data.technical_analysis - WARNING - Failed to analyze ETH-USD
-2025-07-05 16:58:49,897 - websockets.server - INFO - connection open
-2025-07-05 16:58:49,898 - src.system.websocket_server - INFO - Client connected. Total clients: 2
-2025-07-05 16:59:21,137 - src.system.websocket_server - INFO - Client disconnected. Total clients: 1
+2025-07-07 14:39:35,428 - trading_system - INFO - 🚀 Initializing Optimized Real-time Trading System...
+2025-07-07 14:39:35,429 - trading_system - INFO - 💰 Initializing Unified Broker...
+2025-07-07 14:39:35,449 - broker.broker - INFO - [Broker] Database connected successfully
+2025-07-07 14:39:35,466 - broker.broker - INFO - [Broker] Created new account: main
+2025-07-07 14:39:35,467 - broker.broker - INFO - [Broker] Loaded 0 positions (0 open)
+2025-07-07 14:39:35,467 - trading_system - INFO - ⚠️ Initializing Risk Manager...
+2025-07-07 14:39:35,467 - trading_system - INFO - 📊 Initializing Real-time Market Data...
+2025-07-07 14:39:35,468 - market_data - INFO - 🚀 Starting Real-time Market Data System...
+2025-07-07 14:39:35,472 - market_data - INFO - 📊 Real-time price update loop started (1 second interval)
+2025-07-07 14:39:35,472 - market_data - INFO - 🔗 WebSocket connection attempt 1/5
+2025-07-07 14:39:35,472 - market_data - INFO - ✅ Real-time Market Data System started successfully
+2025-07-07 14:39:35,472 - trading_system - INFO - 🎯 Initializing Strategy Manager...
+2025-07-07 14:39:35,473 - strategy.manager - INFO - 🎯 Optimized Strategy Manager started for real-time operations
+2025-07-07 14:39:35,473 - trading_system - INFO - ✅ All systems initialized successfully!
+2025-07-07 14:39:35,473 - trading_system - INFO - 🎯 Starting Real-time Trading Operations...
+2025-07-07 14:39:35,474 - trading_system - INFO - 📍 Position update loop started (1-second interval)
+2025-07-07 14:39:35,474 - trading_system - INFO - 💰 Account update loop started (1-second interval)
+2025-07-07 14:39:35,474 - trading_system - INFO - 🎯 Strategy loop started (1-second interval)
+2025-07-07 14:39:35,475 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 10000.0,
+  "initial_balance": 10000.0,
+  "account_growth": 0.0,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": 0.0,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 0,
+  "win_rate": 0.0,
+  "daily_trades": 0,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 0.0,
+  "brokerage_charges": 0.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:35,475 - trading_system - INFO - ⚠️ Risk management loop started (1-second interval)
+2025-07-07 14:39:35,475 - strategy.random - INFO - 🎯 Generated BUY signal for BTC-USD at $44873.05 (confidence: 69%)
+2025-07-07 14:39:35,477 - broker.broker - INFO - [Broker] Real-time monitoring started
+2025-07-07 14:39:35,478 - strategy.random - INFO - 🎯 Generated SELL signal for SOL-USD at $109.73 (confidence: 80%)
+2025-07-07 14:39:35,479 - strategy.manager - INFO - 🎯 [Strategy] Analysis #1: 2 actionable signals from 3 symbols (executed in 3.47ms)
+2025-07-07 14:39:35,479 - risk_manager - INFO - [RiskManager] Risk monitoring started
+2025-07-07 14:39:35,481 - trading_system - INFO - 🚀 Real-time Trading System is now LIVE!
+2025-07-07 14:39:35,481 - trading_system - INFO - 📊 Updates every 1 second: Prices | Positions | Account | Strategy | Risk
+2025-07-07 14:39:35,495 - broker.broker - INFO - [Broker] Trade executed: BUY BTC-USD
+2025-07-07 14:39:35,495 - trading_system - INFO - 🎯 Executed BUY for BTC-USD at $44873.05
+2025-07-07 14:39:35,499 - broker.broker - INFO - [Broker] Trade executed: SELL SOL-USD (executed in 15.33ms)
+2025-07-07 14:39:35,499 - trading_system - INFO - 🎯 Executed SELL for SOL-USD at $109.73
+2025-07-07 14:39:36,397 - websocket - INFO - Websocket connected
+2025-07-07 14:39:36,397 - market_data - INFO - ✅ WebSocket connected to live market data
+2025-07-07 14:39:36,472 - broker.broker - INFO - [Broker] Updated 2 position P&Ls
+2025-07-07 14:39:36,475 - trading_system - INFO - 📍 [Position] BTC-USD | LONG | Entry: $44873.05 | Current: $44765.10 | P&L: $-2.41 (-0.24%) | Time: 0m 0s
+2025-07-07 14:39:36,475 - trading_system - INFO - 📍 [Position] SOL-USD | SHORT | Entry: $109.73 | Current: $110.18 | P&L: $-4.10 (-0.41%) | Time: 0m 0s
+2025-07-07 14:39:36,477 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9959.2,
+  "initial_balance": 10000.0,
+  "account_growth": -0.41,
+  "margin_used": 40.0,
+  "max_leverage": 100.0,
+  "realized_pnl": 0.0,
+  "unrealized_pnl": -6.51,
+  "open_trades": 2,
+  "closed_trades": 2,
+  "win_rate": 0.0,
+  "daily_trades": 2,
+  "daily_limit": 5,
+  "max_profit": -2.405675566960667,
+  "max_loss": -4.10097512075096,
+  "total_profit": 0.0,
+  "total_loss": 0.0,
+  "brokerage_charges": 0.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:36,479 - broker.broker - INFO - [Broker] Position closed: SOL-USD
+2025-07-07 14:39:37,476 - trading_system - INFO - 📍 [Position] BTC-USD | LONG | Entry: $44873.05 | Current: $45045.17 | P&L: $3.84 (+0.38%) | Time: 0m 1s
+2025-07-07 14:39:37,478 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9974.89902487925,
+  "initial_balance": 10000.0,
+  "account_growth": -0.25,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -4.10097512075096,
+  "unrealized_pnl": 3.84,
+  "open_trades": 1,
+  "closed_trades": 2,
+  "win_rate": 0.0,
+  "daily_trades": 2,
+  "daily_limit": 5,
+  "max_profit": 3.8357098525728768,
+  "max_loss": 3.8357098525728768,
+  "total_profit": 0.0,
+  "total_loss": 4.10097512075096,
+  "brokerage_charges": 1.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:38,477 - trading_system - INFO - 📍 [Position] BTC-USD | LONG | Entry: $44873.05 | Current: $44981.77 | P&L: $2.42 (+0.24%) | Time: 0m 2s
+2025-07-07 14:39:38,479 - strategy.random - INFO - 🎯 Generated SELL signal for ETH-USD at $2795.12 (confidence: 75%)
+2025-07-07 14:39:38,479 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9974.89902487925,
+  "initial_balance": 10000.0,
+  "account_growth": -0.25,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -4.10097512075096,
+  "unrealized_pnl": 2.42,
+  "open_trades": 1,
+  "closed_trades": 2,
+  "win_rate": 0.0,
+  "daily_trades": 2,
+  "daily_limit": 5,
+  "max_profit": 2.422835086984145,
+  "max_loss": 2.422835086984145,
+  "total_profit": 0.0,
+  "total_loss": 4.10097512075096,
+  "brokerage_charges": 1.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:38,482 - strategy.manager - INFO - 🎯 [Strategy] Analysis #4: 1 actionable signals from 3 symbols (executed in 4.33ms)
+2025-07-07 14:39:38,495 - broker.broker - INFO - [Broker] Trade executed: SELL ETH-USD (executed in 2.76ms)
+2025-07-07 14:39:38,496 - trading_system - INFO - 🎯 Executed SELL for ETH-USD at $2795.12
+2025-07-07 14:39:39,475 - broker.broker - INFO - [Broker] Updated 2 position P&Ls
+2025-07-07 14:39:39,478 - trading_system - INFO - 📍 [Position] BTC-USD | LONG | Entry: $44873.05 | Current: $45081.55 | P&L: $4.65 (+0.46%) | Time: 0m 3s
+2025-07-07 14:39:39,480 - trading_system - INFO - 📍 [Position] ETH-USD | SHORT | Entry: $2795.12 | Current: $2807.90 | P&L: $-4.57 (-0.46%) | Time: 0m 0s
+2025-07-07 14:39:39,481 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9954.499024879251,
+  "initial_balance": 10000.0,
+  "account_growth": -0.46,
+  "margin_used": 40.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -4.10097512075096,
+  "unrealized_pnl": 0.07,
+  "open_trades": 2,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 4.646441460965992,
+  "max_loss": -4.572254500701294,
+  "total_profit": 0.0,
+  "total_loss": 4.10097512075096,
+  "brokerage_charges": 1.4,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:39,486 - broker.broker - INFO - [Broker] Position closed: ETH-USD (executed in 2.52ms)
+2025-07-07 14:39:40,479 - trading_system - INFO - 📍 [Position] BTC-USD | LONG | Entry: $44873.05 | Current: $44776.83 | P&L: $-2.14 (-0.21%) | Time: 0m 4s
+2025-07-07 14:39:40,482 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9969.72677037855,
+  "initial_balance": 10000.0,
+  "account_growth": -0.3,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -8.673229621452254,
+  "unrealized_pnl": -2.14,
+  "open_trades": 1,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": -2.1442714502357463,
+  "max_loss": -2.1442714502357463,
+  "total_profit": 0.0,
+  "total_loss": 8.673229621452254,
+  "brokerage_charges": 1.5999999999999999,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:41,483 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:41,486 - broker.broker - INFO - [Broker] Position closed: BTC-USD (executed in 5.70ms)
+2025-07-07 14:39:41,488 - broker.broker - ERROR - [Broker] Risk check failed: dictionary changed size during iteration
+2025-07-07 14:39:42,483 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:43,484 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:44,478 - market_data - INFO - 📈 Live Price Update #10 | UPS: 1.1 | Symbols: 3 | Status: connected
+2025-07-07 14:39:44,485 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:45,487 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:46,487 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:47,488 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:48,489 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:49,490 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:50,491 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:51,492 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:52,493 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:53,494 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:54,484 - market_data - INFO - 📈 Live Price Update #20 | UPS: 1.1 | Symbols: 3 | Status: connected
+2025-07-07 14:39:54,495 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:55,497 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:56,497 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:57,498 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:58,500 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:39:59,501 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:00,502 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:01,503 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:02,504 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:03,504 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:04,490 - market_data - INFO - 📈 Live Price Update #30 | UPS: 1.0 | Symbols: 3 | Status: connected
+2025-07-07 14:40:04,497 - trading_system - INFO - 🚀 [System Status] {
+  "uptime_seconds": 29.02,
+  "update_cycles": 30,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 9979.167323004234
+}
+2025-07-07 14:40:04,505 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9979.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 3,
+  "win_rate": 0.0,
+  "daily_trades": 3,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 1.7999999999999998,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:05,495 - strategy.random - INFO - 🎯 Generated SELL signal for BTC-USD at $44751.07 (confidence: 74%)
+2025-07-07 14:40:05,495 - strategy.manager - INFO - 🎯 [Strategy] Analysis #31: 1 actionable signals from 3 symbols (executed in 0.00ms)
+2025-07-07 14:40:05,499 - broker.broker - INFO - [Broker] Trade executed: SELL BTC-USD (executed in 8.54ms)
+2025-07-07 14:40:05,499 - trading_system - INFO - 🎯 Executed SELL for BTC-USD at $44751.07
+2025-07-07 14:40:05,506 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9978.567323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 4,
+  "win_rate": 0.0,
+  "daily_trades": 4,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.4,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:05,507 - broker.broker - INFO - [Broker] Position closed: BTC-USD (executed in 7.63ms)
+2025-07-07 14:40:06,507 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9978.567323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 4,
+  "win_rate": 0.0,
+  "daily_trades": 4,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.4,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:07,508 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9978.567323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.21,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 4,
+  "win_rate": 0.0,
+  "daily_trades": 4,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.4,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:08,497 - strategy.random - INFO - 🎯 Generated BUY signal for ETH-USD at $2835.52 (confidence: 88%)
+2025-07-07 14:40:08,497 - strategy.random - INFO - 🎯 Generated SELL signal for SOL-USD at $109.03 (confidence: 69%)
+2025-07-07 14:40:08,497 - strategy.manager - INFO - 🎯 [Strategy] Analysis #34: 2 actionable signals from 3 symbols (executed in 0.56ms)
+2025-07-07 14:40:08,501 - broker.broker - INFO - [Broker] Trade executed: BUY ETH-USD (executed in 3.60ms)
+2025-07-07 14:40:08,502 - trading_system - INFO - 🎯 Executed BUY for ETH-USD at $2835.52
+2025-07-07 14:40:08,508 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:09,494 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2833.94 | P&L: $-0.56 (-0.06%) | Time: 0m 0s
+2025-07-07 14:40:09,509 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": -0.56,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": -0.5572170183951893,
+  "max_loss": -0.5572170183951893,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:10,495 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2829.13 | P&L: $-2.25 (-0.23%) | Time: 0m 1s
+2025-07-07 14:40:10,510 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": -2.25,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": -2.253554903509717,
+  "max_loss": -2.253554903509717,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:11,497 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2849.59 | P&L: $4.96 (+0.50%) | Time: 0m 2s
+2025-07-07 14:40:11,512 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 4.96,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 4.962052815709346,
+  "max_loss": 4.962052815709346,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:12,498 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2838.79 | P&L: $1.15 (+0.12%) | Time: 0m 4s
+2025-07-07 14:40:12,512 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 1.15,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 1.153227626678698,
+  "max_loss": 1.153227626678698,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:13,499 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2832.81 | P&L: $-0.96 (-0.10%) | Time: 0m 5s
+2025-07-07 14:40:13,513 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": -0.96,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": -0.9557329872475019,
+  "max_loss": -0.9557329872475019,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:14,496 - market_data - INFO - 📈 Live Price Update #40 | UPS: 1.0 | Symbols: 3 | Status: connected
+2025-07-07 14:40:14,500 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2857.48 | P&L: $7.74 (+0.77%) | Time: 0m 6s
+2025-07-07 14:40:14,513 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 7.74,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 7.7446112176955335,
+  "max_loss": 7.7446112176955335,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:15,501 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2842.57 | P&L: $2.49 (+0.25%) | Time: 0m 7s
+2025-07-07 14:40:15,514 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 2.49,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 2.486316442839473,
+  "max_loss": 2.486316442839473,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:16,502 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2840.30 | P&L: $1.69 (+0.17%) | Time: 0m 8s
+2025-07-07 14:40:16,515 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 1.69,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 1.6857578151450883,
+  "max_loss": 1.6857578151450883,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:17,503 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2838.78 | P&L: $1.15 (+0.11%) | Time: 0m 9s
+2025-07-07 14:40:17,517 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 1.15,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 1.1497009366889384,
+  "max_loss": 1.1497009366889384,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:18,504 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2839.49 | P&L: $1.40 (+0.14%) | Time: 0m 10s
+2025-07-07 14:40:18,517 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 1.4,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 1.4000959259676533,
+  "max_loss": 1.4000959259676533,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:19,505 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2836.30 | P&L: $0.28 (+0.03%) | Time: 0m 11s
+2025-07-07 14:40:19,518 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": 0.28,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0.2750818192078349,
+  "max_loss": 0.2750818192078349,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:20,506 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2827.81 | P&L: $-2.72 (-0.27%) | Time: 0m 12s
+2025-07-07 14:40:20,519 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": -2.72,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": -2.7190779821690683,
+  "max_loss": -2.7190779821690683,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:21,506 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2828.54 | P&L: $-2.46 (-0.25%) | Time: 0m 13s
+2025-07-07 14:40:21,519 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9958.167323004234,
+  "initial_balance": 10000.0,
+  "account_growth": -0.42,
+  "margin_used": 20.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -19.03267699576714,
+  "unrealized_pnl": -2.46,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": -2.4616296129105133,
+  "max_loss": -2.4616296129105133,
+  "total_profit": 0.0,
+  "total_loss": 19.03267699576714,
+  "brokerage_charges": 2.8,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:22,507 - trading_system - INFO - 📍 [Position] ETH-USD | LONG | Entry: $2835.52 | Current: $2805.16 | P&L: $-10.71 (-1.07%) | Time: 0m 14s
+2025-07-07 14:40:22,509 - broker.broker - INFO - [Broker] Position closed: ETH-USD (executed in 9.97ms)
+2025-07-07 14:40:22,520 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": -10.71,
+  "open_trades": 1,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": -10.707030809163797,
+  "max_loss": -10.707030809163797,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:23,521 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:24,502 - market_data - INFO - 📈 Live Price Update #50 | UPS: 1.0 | Symbols: 3 | Status: connected
+2025-07-07 14:40:24,523 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:25,524 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:26,525 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:27,525 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:28,526 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:29,526 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:30,528 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:31,529 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:32,530 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:33,531 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:34,511 - market_data - INFO - 📈 Live Price Update #60 | UPS: 1.0 | Symbols: 3 | Status: connected
+2025-07-07 14:40:34,516 - trading_system - INFO - 🚀 [System Status] {
+  "uptime_seconds": 59.04,
+  "update_cycles": 60,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 9967.260292195071
+}
+2025-07-07 14:40:34,532 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:35,533 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:36,533 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:37,534 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:38,535 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:39,519 - strategy.random - INFO - 🎯 Generated BUY signal for SOL-USD at $109.87 (confidence: 65%)
+2025-07-07 14:40:39,521 - strategy.manager - INFO - 🎯 [Strategy] Analysis #65: 1 actionable signals from 3 symbols (executed in 1.56ms)
+2025-07-07 14:40:39,535 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:40,520 - strategy.random - INFO - 🎯 Generated BUY signal for ETH-USD at $2816.49 (confidence: 80%)
+2025-07-07 14:40:40,522 - strategy.manager - INFO - 🎯 [Strategy] Analysis #66: 1 actionable signals from 3 symbols (executed in 2.14ms)
+2025-07-07 14:40:40,536 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:41,538 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:42,539 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:43,522 - strategy.random - INFO - 🎯 Generated BUY signal for BTC-USD at $45176.20 (confidence: 90%)
+2025-07-07 14:40:43,522 - strategy.manager - INFO - 🎯 [Strategy] Analysis #69: 1 actionable signals from 3 symbols (executed in 0.53ms)
+2025-07-07 14:40:43,540 - trading_system - INFO - 💰 [Account] {
+  "current_balance": 9967.260292195071,
+  "initial_balance": 10000.0,
+  "account_growth": -0.33,
+  "margin_used": 0.0,
+  "max_leverage": 100.0,
+  "realized_pnl": -29.739707804930937,
+  "unrealized_pnl": 0,
+  "open_trades": 0,
+  "closed_trades": 5,
+  "win_rate": 0.0,
+  "daily_trades": 5,
+  "daily_limit": 5,
+  "max_profit": 0,
+  "max_loss": 0,
+  "total_profit": 0.0,
+  "total_loss": 29.739707804930937,
+  "brokerage_charges": 3.0,
+  "algo_status": "RUNNING"
+}
+2025-07-07 14:40:43,599 - trading_system - INFO - 🛑 Received signal 2, shutting down...
+2025-07-07 14:40:43,601 - trading_system - INFO - 🛑 Stopping Real-time Trading System...
+2025-07-07 14:40:44,517 - market_data - INFO - 📈 Live Price Update #70 | UPS: 1.0 | Symbols: 3 | Status: connected
+2025-07-07 14:40:44,523 - trading_system - INFO - 🛑 Received signal 2, shutting down...
+2025-07-07 14:40:44,523 - trading_system - INFO - 🛑 Stopping Real-time Trading System...
+2025-07-07 14:40:47,500 - risk_manager - INFO - [RiskManager] Risk monitoring stopped
+2025-07-07 14:40:47,504 - broker.broker - INFO - [Broker] Real-time monitoring stopped
+2025-07-07 14:40:47,505 - market_data - INFO - 🛑 Stopping Market Data System...
+2025-07-07 14:40:47,665 - market_data - WARNING - ⚠️ WebSocket connection closed: None - None
+2025-07-07 14:40:47,672 - market_data - INFO - ✅ Market Data System stopped
+2025-07-07 14:40:47,673 - strategy.manager - INFO - 🛑 Optimized Strategy Manager stopped
+2025-07-07 14:40:47,674 - broker.broker - INFO - [Broker] Real-time monitoring stopped
+2025-07-07 14:40:47,679 - broker.broker - INFO - [Broker] Broker system disconnected
+2025-07-07 14:40:47,679 - trading_system - INFO - ✅ Real-time Trading System stopped successfully
+2025-07-07 14:40:47,680 - trading_system - INFO - 🛑 Stopping Real-time Trading System...
+2025-07-07 14:40:47,682 - risk_manager - INFO - [RiskManager] Risk monitoring stopped
+2025-07-07 14:40:47,683 - broker.broker - INFO - [Broker] Real-time monitoring stopped
+2025-07-07 14:40:47,684 - market_data - INFO - 🛑 Stopping Market Data System...
+2025-07-07 14:40:47,684 - market_data - INFO - ✅ Market Data System stopped
+2025-07-07 14:40:47,685 - strategy.manager - INFO - 🛑 Optimized Strategy Manager stopped
+2025-07-07 14:40:47,685 - broker.broker - INFO - [Broker] Real-time monitoring stopped
+2025-07-07 14:40:47,686 - broker.broker - INFO - [Broker] Broker system disconnected
+2025-07-07 14:40:47,686 - trading_system - INFO - ✅ Real-time Trading System stopped successfully

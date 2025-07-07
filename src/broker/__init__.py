@@ -1,15 +1,21 @@
 """
-Broker package for trading operations and position management
+Broker package for unified trading operations and risk management
 """
 
-from .broker_client import BrokerClient
-from .account_manager import AccountManager
-from .position_manager import PositionManager
-from .trade_executor import TradeExecutor
+from .broker import UnifiedBroker, BrokerLogger
+from .risk_management import RiskManager, RiskLevel, TrailingStopType, RiskMetrics, TrailingStopConfig
+from .models import Account, Position, PositionType, PositionStatus
 
 __all__ = [
-    'BrokerClient',
-    'AccountManager', 
-    'PositionManager',
-    'TradeExecutor'
+    'UnifiedBroker',
+    'BrokerLogger',
+    'RiskManager',
+    'RiskLevel',
+    'TrailingStopType', 
+    'RiskMetrics',
+    'TrailingStopConfig',
+    'Account',
+    'Position',
+    'PositionType',
+    'PositionStatus'
 ] 

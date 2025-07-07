@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from pymongo import MongoClient, errors
-from src.system.message_formatter import MessageFormatter, MessageType
+# Removed message formatter dependency for simplified system
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -14,32 +14,23 @@ logger = logging.getLogger(__name__)
 class MongoDBClient:
     """MongoDB client for analysis results storage"""
     
-    def __init__(self, websocket_server=None):
-        """Initialize MongoDB client
-        
-        Args:
-            websocket_server: WebSocket server instance for sending messages
-        """
-        self.logger = logging.getLogger(__name__)
-        self.websocket_server = websocket_server
+    def __init__(self):
+        """Initialize MongoDB client"""
+        self.logger = logging.getLogger("mongodb")
         self.settings = get_settings()
         self.client = None
         self.db = None
-        self.collection = None
         self.is_connected = False
         
-    def send_message(self, message: Dict):
-        """Send message through WebSocket if available"""
-        if self.websocket_server:
-            self.websocket_server.queue_message(message)
-
+        # Collection names with text prefix to avoid conflicts
+        self.accounts_collection = "accounts"
+        self.positions_collection = "positions" 
+        self.trades_collection = "trades"
+        self.analysis_collection = "analysis"
+        
     def log_message(self, message: str, level: str = "info"):
         """Send log message"""
-        self.logger.log(getattr(logging, level.upper()), message)
-        if self.websocket_server:
-            self.send_message(
-                MessageFormatter.format_log(message, level, "mongodb_client")
-            )
+        self.logger.log(getattr(logging, level.upper()), f"[MongoDB] {message}")
 
     def connect(self) -> bool:
         """Connect to MongoDB database"""
@@ -53,9 +44,8 @@ class MongoDBClient:
             # Test connection
             self.client.admin.command('ping')
             
-            # Get database and collection
+            # Get database
             self.db = self.client[self.settings.DATABASE_NAME]
-            self.collection = self.db[self.settings.MONGODB_COLLECTION]
             
             # # Create indexes
             # self.create_indexes()
@@ -158,7 +148,7 @@ class MongoDBClient:
             }
             
             # Insert document
-            result = self.collection.insert_one(document)
+            result = self.db[self.analysis_collection].insert_one(document)
             
             if result.inserted_id:
                 document_id = str(result.inserted_id)
@@ -187,7 +177,7 @@ class MongoDBClient:
                 return []
         
         try:
-            cursor = self.collection.find().sort("timestamp", -1).limit(limit)
+            cursor = self.db[self.analysis_collection].find().sort("timestamp", -1).limit(limit)
             results = list(cursor)
             
             # Convert ObjectId to string for JSON serialization
