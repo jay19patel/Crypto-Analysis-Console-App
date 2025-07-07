@@ -249,9 +249,10 @@ class RealTimeMarketData:
                     self.live_prices[symbol] = price_update
                     self._update_count += 1
                     
-                    # Notify callback if registered
+                    # Notify callback with all current prices
                     if self.price_callback:
-                        self.price_callback(symbol, price_update)
+                        price_updates = [{"symbol": sym, "price": p["price"]} for sym, p in self.live_prices.items()]
+                        self.price_callback(symbol, price_update, price_updates)
                 
         except json.JSONDecodeError as e:
             self.logger.warning(f"WARN - [MarketData] WebSocket | Invalid message format: {str(e)}")

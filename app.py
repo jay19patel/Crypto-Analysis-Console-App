@@ -332,11 +332,21 @@ class OptimizedTradingSystem:
             if thread and thread.is_alive():
                 thread.join(timeout=2.0)
     
-    def _on_price_update(self, symbol: str, price_data: Dict) -> None:
+    def _on_price_update(self, symbol: str, price_data: Dict, all_prices: list = None) -> None:
         """Handle real-time price updates"""
         try:
             # Update current prices
             self.current_prices[symbol] = price_data
+            
+            # Log all prices in a single entry if available
+            if all_prices:
+                price_str = " ".join([f"{p['symbol']} ${p['price']:.2f}" for p in all_prices])
+                self.logger.log(
+                    "info",
+                    "PriceUpdate",
+                    f"📊 Live Price: {price_str}",
+                    all_prices
+                )
             
             # Update position PnL if we have a position for this symbol
             with self.position_cache_lock:
@@ -362,7 +372,7 @@ class OptimizedTradingSystem:
                 "PriceUpdate",
                 "Error processing price update",
                 {"error": str(e), "symbol": symbol},
-                execution_time=0.0
+                0.0
             )
     
     def _position_update_loop(self) -> None:

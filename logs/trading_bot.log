@@ -581,3 +581,461 @@
 2025-07-07 22:08:54,857 - INFO - [market_data] market_data_client | INFO - [MarketData] System | System stopped successfully (Time: 0.001s)
 2025-07-07 22:08:54,859 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager stopped successfully (Time: 0.000s) | Data: {"uptime": 240.305948}
 2025-07-07 22:08:54,860 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Trading system stopped successfully (Time: 0.007s) | Data: {"uptime_seconds": 240.3}
+2025-07-07 22:25:17,047 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Initializing Trading System
+2025-07-07 22:25:17,048 - INFO - [tradingsystem] app | INFO - [tradingsystem] Broker | Initializing broker system
+2025-07-07 22:25:17,049 - INFO - [broker.broker] broker | INFO - [Broker] Initialization | Broker system initialized (Time: 0.000s)
+2025-07-07 22:25:17,077 - INFO - [broker.broker] broker | INFO - [Broker] Database | Connection established successfully (Time: 0.027s) | Data: {"database": "trading_bot"}
+2025-07-07 22:25:17,078 - INFO - [broker.broker] broker | INFO - [Broker] Account | Loaded existing account: main (Time: 0.001s) | Data: {"balance": 10000.0}
+2025-07-07 22:25:17,078 - INFO - [broker.broker] broker | INFO - [Broker] Positions | Positions loaded from database (Time: 0.000s) | Data: {"total_loaded": 0}
+2025-07-07 22:25:17,080 - INFO - [tradingsystem] app | INFO - [tradingsystem] Risk | Initializing risk management system
+2025-07-07 22:25:17,080 - INFO - [tradingsystem] app | INFO - [tradingsystem] MarketData | Initializing real-time data feed
+2025-07-07 22:25:17,080 - INFO - [market_data] market_data_client | INFO - [MarketData] System | Starting Real-time Market Data System
+2025-07-07 22:25:17,081 - INFO - [market_data] market_data_client | INFO - [MarketData] WebSocket | Establishing connection
+2025-07-07 22:25:17,813 - INFO - [websocket] _logging | Websocket connected
+2025-07-07 22:25:17,815 - INFO - [market_data] market_data_client | INFO - [MarketData] WebSocket | Connection established
+2025-07-07 22:25:17,817 - INFO - [market_data] market_data_client | INFO - [MarketData] WebSocket | Subscribed to market data (Time: 0.001s)
+2025-07-07 22:25:18,082 - INFO - [market_data] market_data_client | INFO - [MarketData] Connection | WebSocket connected successfully (Time: 1.003s)
+2025-07-07 22:25:18,083 - INFO - [tradingsystem] app | INFO - [tradingsystem] Strategy | Initializing strategy system
+2025-07-07 22:25:18,085 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager started successfully (Time: 0.000s) | Data: {"start_time": "2025-07-07T16:55:18.084548+00:00"}
+2025-07-07 22:25:18,086 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | System initialization completed successfully (Time: 1.039s) | Data: {"components": ["broker", "risk", "market_data", "strategy"]}
+2025-07-07 22:25:18,087 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Starting real-time trading operations
+2025-07-07 22:25:18,089 - INFO - [tradingsystem] app | INFO - [tradingsystem] Position | Position update loop started (1-second interval)
+2025-07-07 22:25:18,091 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account update loop started
+2025-07-07 22:25:18,092 - INFO - [tradingsystem] app | INFO - [tradingsystem] Strategy | Strategy loop started
+2025-07-07 22:25:18,095 - INFO - [tradingsystem] app | INFO - [tradingsystem] Risk | Risk management loop started
+2025-07-07 22:25:18,100 - INFO - [broker.broker] broker | INFO - [Broker] Monitoring | Real-time monitoring started
+2025-07-07 22:25:18,103 - INFO - [risk_manager] risk_management | [RiskManager] Risk monitoring started
+2025-07-07 22:25:18,103 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Real-time trading system started (Time: 0.016s) | Data: {"update_interval": "5s", "components": ["prices", "positions", "account", "strategy", "risk"]}
+2025-07-07 22:25:22,099 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 4.01,
+  "update_cycles": 5,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 4.01, "update_cycles": 5, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 22:25:22,910 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2525.62 | Data: {"symbol": "ETH-USD", "price": 2525.62213564}
+2025-07-07 22:25:22,955 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: BTC-USD $107933.27 | Data: {"symbol": "BTC-USD", "price": 107933.26735663}
+2025-07-07 22:25:23,097 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #1 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 22:25:27,104 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 9.02,
+  "update_cycles": 10,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 9.02, "update_cycles": 10, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 22:25:27,943 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2526.19 | Data: {"symbol": "ETH-USD", "price": 2526.1919624}
+2025-07-07 22:25:28,010 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: BTC-USD $107948.68 | Data: {"symbol": "BTC-USD", "price": 107948.67801799}
+2025-07-07 22:25:28,095 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 22:25:28,099 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #2 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 22:25:30,569 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🛑 Received signal 2, shutting down... (Time: 0.000s) | Data: {"signal": 2}
+2025-07-07 22:25:30,570 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 22:25:32,579 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🛑 Received signal 2, shutting down... (Time: 0.000s) | Data: {"signal": 2}
+2025-07-07 22:25:32,580 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 22:25:32,977 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2526.38 | Data: {"symbol": "ETH-USD", "price": 2526.38314185}
+2025-07-07 22:25:33,017 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: BTC-USD $107951.03 | Data: {"symbol": "BTC-USD", "price": 107951.03395727}
+2025-07-07 22:25:34,109 - INFO - [risk_manager] risk_management | [RiskManager] Risk monitoring stopped
+2025-07-07 22:25:36,119 - INFO - [broker.broker] broker | INFO - [Broker] Monitoring | Monitoring system stopped
+2025-07-07 22:25:36,119 - INFO - [market_data] market_data_client | INFO - [MarketData] System | Stopping Market Data System
+2025-07-07 22:25:36,270 - WARNING - [market_data] market_data_client | WARN - [MarketData] WebSocket | Connection closed: None - None
+2025-07-07 22:25:36,275 - INFO - [market_data] market_data_client | INFO - [MarketData] System | System stopped successfully (Time: 0.155s)
+2025-07-07 22:25:36,276 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager stopped successfully (Time: 0.000s) | Data: {"uptime": 18.1915}
+2025-07-07 22:25:36,277 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Trading system stopped successfully (Time: 3.697s) | Data: {"uptime_seconds": 18.19}
+2025-07-07 22:25:36,282 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 22:25:36,283 - INFO - [risk_manager] risk_management | [RiskManager] Risk monitoring stopped
+2025-07-07 22:25:38,107 - INFO - [broker.broker] broker | INFO - [Broker] Monitoring | Monitoring system stopped
+2025-07-07 22:25:38,108 - INFO - [market_data] market_data_client | INFO - [MarketData] System | Stopping Market Data System
+2025-07-07 22:25:38,109 - INFO - [market_data] market_data_client | INFO - [MarketData] System | System stopped successfully (Time: 0.001s)
+2025-07-07 22:25:38,110 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager stopped successfully (Time: 0.000s) | Data: {"uptime": 20.026101}
+2025-07-07 22:25:38,111 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Trading system stopped successfully (Time: 1.829s) | Data: {"uptime_seconds": 20.02}
+2025-07-07 23:24:18,914 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Initializing Trading System
+2025-07-07 23:24:18,914 - INFO - [tradingsystem] app | INFO - [tradingsystem] Broker | Initializing broker system
+2025-07-07 23:24:18,916 - INFO - [broker.broker] broker | INFO - [Broker] Initialization | Broker system initialized (Time: 0.000s)
+2025-07-07 23:24:18,949 - INFO - [broker.broker] broker | INFO - [Broker] Database | Connection established successfully (Time: 0.033s) | Data: {"database": "trading_bot"}
+2025-07-07 23:24:18,952 - INFO - [broker.broker] broker | INFO - [Broker] Account | Loaded existing account: main (Time: 0.001s) | Data: {"balance": 10000.0}
+2025-07-07 23:24:18,952 - INFO - [broker.broker] broker | INFO - [Broker] Positions | Positions loaded from database (Time: 0.000s) | Data: {"total_loaded": 0}
+2025-07-07 23:24:18,953 - INFO - [tradingsystem] app | INFO - [tradingsystem] Risk | Initializing risk management system
+2025-07-07 23:24:18,953 - INFO - [tradingsystem] app | INFO - [tradingsystem] MarketData | Initializing real-time data feed
+2025-07-07 23:24:18,953 - INFO - [market_data] market_data_client | INFO - [MarketData] System | Starting Real-time Market Data System
+2025-07-07 23:24:18,953 - INFO - [market_data] market_data_client | INFO - [MarketData] WebSocket | Establishing connection
+2025-07-07 23:24:19,968 - INFO - [websocket] _logging | Websocket connected
+2025-07-07 23:24:19,970 - INFO - [market_data] market_data_client | INFO - [MarketData] WebSocket | Connection established
+2025-07-07 23:24:19,972 - INFO - [market_data] market_data_client | INFO - [MarketData] WebSocket | Subscribed to market data (Time: 0.001s)
+2025-07-07 23:24:20,456 - INFO - [market_data] market_data_client | INFO - [MarketData] Connection | WebSocket connected successfully (Time: 1.502s)
+2025-07-07 23:24:20,458 - INFO - [tradingsystem] app | INFO - [tradingsystem] Strategy | Initializing strategy system
+2025-07-07 23:24:20,459 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager started successfully (Time: 0.000s) | Data: {"start_time": "2025-07-07T17:54:20.459127+00:00"}
+2025-07-07 23:24:20,461 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | System initialization completed successfully (Time: 1.547s) | Data: {"components": ["broker", "risk", "market_data", "strategy"]}
+2025-07-07 23:24:20,462 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Starting real-time trading operations
+2025-07-07 23:24:20,464 - INFO - [tradingsystem] app | INFO - [tradingsystem] Position | Position update loop started (1-second interval)
+2025-07-07 23:24:20,466 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account update loop started
+2025-07-07 23:24:20,468 - INFO - [tradingsystem] app | INFO - [tradingsystem] Strategy | Strategy loop started
+2025-07-07 23:24:20,470 - INFO - [tradingsystem] app | INFO - [tradingsystem] Risk | Risk management loop started
+2025-07-07 23:24:20,475 - INFO - [broker.broker] broker | INFO - [Broker] Monitoring | Real-time monitoring started
+2025-07-07 23:24:20,477 - INFO - [risk_manager] risk_management | [RiskManager] Risk monitoring started
+2025-07-07 23:24:20,478 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Real-time trading system started (Time: 0.016s) | Data: {"update_interval": "5s", "components": ["prices", "positions", "account", "strategy", "risk"]}
+2025-07-07 23:24:23,940 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.84 | Data: [{"symbol": "ETH-USD", "price": 2530.83695025}]
+2025-07-07 23:24:23,978 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.84 BTC-USD $107873.92 | Data: [{"symbol": "ETH-USD", "price": 2530.83695025}, {"symbol": "BTC-USD", "price": 107873.91585532}]
+2025-07-07 23:24:24,476 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 4.01,
+  "update_cycles": 5,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 4.01, "update_cycles": 5, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:25,473 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #1 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:28,941 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.99 BTC-USD $107873.92 | Data: [{"symbol": "ETH-USD", "price": 2530.99129732}, {"symbol": "BTC-USD", "price": 107873.91585532}]
+2025-07-07 23:24:28,979 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.99 BTC-USD $107881.20 | Data: [{"symbol": "ETH-USD", "price": 2530.99129732}, {"symbol": "BTC-USD", "price": 107881.19586912}]
+2025-07-07 23:24:29,481 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 9.02,
+  "update_cycles": 10,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 9.02, "update_cycles": 10, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:30,471 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:24:30,477 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #2 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:34,485 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 14.02,
+  "update_cycles": 15,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 14.02, "update_cycles": 15, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:34,551 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.67 BTC-USD $107881.20 | Data: [{"symbol": "ETH-USD", "price": 2530.67369002}, {"symbol": "BTC-USD", "price": 107881.19586912}]
+2025-07-07 23:24:34,630 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.67 BTC-USD $107876.63 | Data: [{"symbol": "ETH-USD", "price": 2530.67369002}, {"symbol": "BTC-USD", "price": 107876.62988095}]
+2025-07-07 23:24:35,478 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #3 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:39,491 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 19.03,
+  "update_cycles": 20,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 19.03, "update_cycles": 20, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:39,562 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.44 BTC-USD $107876.63 | Data: [{"symbol": "ETH-USD", "price": 2530.44148589}, {"symbol": "BTC-USD", "price": 107876.62988095}]
+2025-07-07 23:24:39,647 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.44 BTC-USD $107874.82 | Data: [{"symbol": "ETH-USD", "price": 2530.44148589}, {"symbol": "BTC-USD", "price": 107874.82397896}]
+2025-07-07 23:24:40,474 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:24:40,479 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #4 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:44,495 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 24.03,
+  "update_cycles": 25,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 24.03, "update_cycles": 25, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:44,598 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.55 BTC-USD $107874.82 | Data: [{"symbol": "ETH-USD", "price": 2530.55140652}, {"symbol": "BTC-USD", "price": 107874.82397896}]
+2025-07-07 23:24:44,631 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.55 BTC-USD $107873.02 | Data: [{"symbol": "ETH-USD", "price": 2530.55140652}, {"symbol": "BTC-USD", "price": 107873.01563129}]
+2025-07-07 23:24:45,481 - INFO - [strategy.randomstrategy] simple_random_strategy | INFO - [RandomStrategy] Signal | Generated BUY signal for ETH-USD (Time: 0.000s) | Data: {"symbol": "ETH-USD", "price": 2530.55140652, "confidence": 84}
+2025-07-07 23:24:45,482 - INFO - [strategy.randomstrategy] simple_random_strategy | INFO - [RandomStrategy] Signal | Generated BUY signal for BTC-USD (Time: 0.000s) | Data: {"symbol": "BTC-USD", "price": 107873.01563129, "confidence": 71}
+2025-07-07 23:24:45,483 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #5 completed (Time: 0.002s) | Data: {"total_signals": 2, "actionable_signals": 2, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:49,501 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 29.04,
+  "update_cycles": 30,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 29.04, "update_cycles": 30, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:49,613 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.59 BTC-USD $107873.02 | Data: [{"symbol": "ETH-USD", "price": 2530.59112499}, {"symbol": "BTC-USD", "price": 107873.01563129}]
+2025-07-07 23:24:49,653 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.59 BTC-USD $107872.55 | Data: [{"symbol": "ETH-USD", "price": 2530.59112499}, {"symbol": "BTC-USD", "price": 107872.54872435}]
+2025-07-07 23:24:50,476 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:24:50,486 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #6 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:54,506 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 34.04,
+  "update_cycles": 35,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 34.04, "update_cycles": 35, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:54,639 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.64 BTC-USD $107872.55 | Data: [{"symbol": "ETH-USD", "price": 2530.64329589}, {"symbol": "BTC-USD", "price": 107872.54872435}]
+2025-07-07 23:24:54,679 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.64 BTC-USD $107874.07 | Data: [{"symbol": "ETH-USD", "price": 2530.64329589}, {"symbol": "BTC-USD", "price": 107874.07435898}]
+2025-07-07 23:24:55,490 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #7 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:24:59,510 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 39.05,
+  "update_cycles": 40,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 39.05, "update_cycles": 40, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:24:59,728 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.46 BTC-USD $107874.07 | Data: [{"symbol": "ETH-USD", "price": 2530.46477573}, {"symbol": "BTC-USD", "price": 107874.07435898}]
+2025-07-07 23:24:59,731 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.46 BTC-USD $107867.15 | Data: [{"symbol": "ETH-USD", "price": 2530.46477573}, {"symbol": "BTC-USD", "price": 107867.15455608}]
+2025-07-07 23:25:00,480 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:25:00,492 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #8 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:04,515 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 44.05,
+  "update_cycles": 45,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 44.05, "update_cycles": 45, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:04,749 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.06 BTC-USD $107867.15 | Data: [{"symbol": "ETH-USD", "price": 2530.05966568}, {"symbol": "BTC-USD", "price": 107867.15455608}]
+2025-07-07 23:25:04,775 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.06 BTC-USD $107854.04 | Data: [{"symbol": "ETH-USD", "price": 2530.05966568}, {"symbol": "BTC-USD", "price": 107854.03679387}]
+2025-07-07 23:25:05,496 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #9 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:09,520 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 49.06,
+  "update_cycles": 50,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 49.06, "update_cycles": 50, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:09,772 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.59 BTC-USD $107854.04 | Data: [{"symbol": "ETH-USD", "price": 2530.58572235}, {"symbol": "BTC-USD", "price": 107854.03679387}]
+2025-07-07 23:25:09,840 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.59 BTC-USD $107859.04 | Data: [{"symbol": "ETH-USD", "price": 2530.58572235}, {"symbol": "BTC-USD", "price": 107859.03952332}]
+2025-07-07 23:25:10,483 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:25:10,500 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #10 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:14,526 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 54.06,
+  "update_cycles": 55,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 54.06, "update_cycles": 55, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:14,791 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.61 BTC-USD $107859.04 | Data: [{"symbol": "ETH-USD", "price": 2530.60598734}, {"symbol": "BTC-USD", "price": 107859.03952332}]
+2025-07-07 23:25:14,837 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.61 BTC-USD $107859.82 | Data: [{"symbol": "ETH-USD", "price": 2530.60598734}, {"symbol": "BTC-USD", "price": 107859.8201823}]
+2025-07-07 23:25:15,503 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #11 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:19,531 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 59.07,
+  "update_cycles": 60,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 59.07, "update_cycles": 60, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:19,814 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.68 BTC-USD $107859.82 | Data: [{"symbol": "ETH-USD", "price": 2530.67957241}, {"symbol": "BTC-USD", "price": 107859.8201823}]
+2025-07-07 23:25:19,851 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.68 BTC-USD $107859.29 | Data: [{"symbol": "ETH-USD", "price": 2530.67957241}, {"symbol": "BTC-USD", "price": 107859.28712373}]
+2025-07-07 23:25:20,487 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:25:20,506 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #12 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:24,536 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 64.07,
+  "update_cycles": 65,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 64.07, "update_cycles": 65, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:24,846 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.78 BTC-USD $107859.29 | Data: [{"symbol": "ETH-USD", "price": 2530.77954909}, {"symbol": "BTC-USD", "price": 107859.28712373}]
+2025-07-07 23:25:24,880 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.78 BTC-USD $107859.82 | Data: [{"symbol": "ETH-USD", "price": 2530.77954909}, {"symbol": "BTC-USD", "price": 107859.82257593}]
+2025-07-07 23:25:25,510 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #13 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:29,540 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 69.08,
+  "update_cycles": 70,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 69.08, "update_cycles": 70, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:29,869 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.84 BTC-USD $107859.82 | Data: [{"symbol": "ETH-USD", "price": 2530.84197967}, {"symbol": "BTC-USD", "price": 107859.82257593}]
+2025-07-07 23:25:29,906 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2530.84 BTC-USD $107860.69 | Data: [{"symbol": "ETH-USD", "price": 2530.84197967}, {"symbol": "BTC-USD", "price": 107860.68541393}]
+2025-07-07 23:25:30,490 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:25:30,515 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #14 completed (Time: 0.001s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:34,544 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 74.08,
+  "update_cycles": 75,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 74.08, "update_cycles": 75, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:35,376 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.46 BTC-USD $107860.69 | Data: [{"symbol": "ETH-USD", "price": 2531.46347771}, {"symbol": "BTC-USD", "price": 107860.68541393}]
+2025-07-07 23:25:35,410 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.46 BTC-USD $107875.22 | Data: [{"symbol": "ETH-USD", "price": 2531.46347771}, {"symbol": "BTC-USD", "price": 107875.21971097}]
+2025-07-07 23:25:35,518 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #15 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:39,551 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 79.09,
+  "update_cycles": 80,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 79.09, "update_cycles": 80, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:40,428 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.55 BTC-USD $107875.22 | Data: [{"symbol": "ETH-USD", "price": 2531.55010022}, {"symbol": "BTC-USD", "price": 107875.21971097}]
+2025-07-07 23:25:40,457 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.55 BTC-USD $107875.00 | Data: [{"symbol": "ETH-USD", "price": 2531.55010022}, {"symbol": "BTC-USD", "price": 107874.99545592}]
+2025-07-07 23:25:40,493 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:25:40,521 - INFO - [strategy.randomstrategy] simple_random_strategy | INFO - [RandomStrategy] Signal | Generated BUY signal for ETH-USD (Time: 0.000s) | Data: {"symbol": "ETH-USD", "price": 2531.55010022, "confidence": 77}
+2025-07-07 23:25:40,522 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #16 completed (Time: 0.002s) | Data: {"total_signals": 2, "actionable_signals": 1, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:44,556 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 84.09,
+  "update_cycles": 85,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 84.09, "update_cycles": 85, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:45,442 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.80 BTC-USD $107875.00 | Data: [{"symbol": "ETH-USD", "price": 2531.80226626}, {"symbol": "BTC-USD", "price": 107874.99545592}]
+2025-07-07 23:25:45,477 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.80 BTC-USD $107884.37 | Data: [{"symbol": "ETH-USD", "price": 2531.80226626}, {"symbol": "BTC-USD", "price": 107884.36772396}]
+2025-07-07 23:25:45,525 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #17 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:49,565 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 89.1,
+  "update_cycles": 90,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 89.1, "update_cycles": 90, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:50,467 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.63 BTC-USD $107884.37 | Data: [{"symbol": "ETH-USD", "price": 2531.63187338}, {"symbol": "BTC-USD", "price": 107884.36772396}]
+2025-07-07 23:25:50,495 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:25:50,504 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.63 BTC-USD $107880.73 | Data: [{"symbol": "ETH-USD", "price": 2531.63187338}, {"symbol": "BTC-USD", "price": 107880.72596293}]
+2025-07-07 23:25:50,526 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #18 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:54,570 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 94.11,
+  "update_cycles": 95,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 94.11, "update_cycles": 95, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:25:55,486 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.41 BTC-USD $107880.73 | Data: [{"symbol": "ETH-USD", "price": 2531.4076923}, {"symbol": "BTC-USD", "price": 107880.72596293}]
+2025-07-07 23:25:55,529 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.41 BTC-USD $107871.34 | Data: [{"symbol": "ETH-USD", "price": 2531.4076923}, {"symbol": "BTC-USD", "price": 107871.34279562}]
+2025-07-07 23:25:55,529 - INFO - [strategy.randomstrategy] simple_random_strategy | INFO - [RandomStrategy] Signal | Generated SELL signal for BTC-USD (Time: 0.000s) | Data: {"symbol": "BTC-USD", "price": 107871.34279562, "confidence": 88}
+2025-07-07 23:25:55,531 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #19 completed (Time: 0.002s) | Data: {"total_signals": 2, "actionable_signals": 1, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:25:59,574 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 99.11,
+  "update_cycles": 100,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 99.11, "update_cycles": 100, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:26:00,498 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:26:00,511 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.52 BTC-USD $107871.34 | Data: [{"symbol": "ETH-USD", "price": 2531.51755138}, {"symbol": "BTC-USD", "price": 107871.34279562}]
+2025-07-07 23:26:00,532 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #20 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:26:00,550 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.52 BTC-USD $107873.22 | Data: [{"symbol": "ETH-USD", "price": 2531.51755138}, {"symbol": "BTC-USD", "price": 107873.22272711}]
+2025-07-07 23:26:04,580 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 104.12,
+  "update_cycles": 105,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 104.12, "update_cycles": 105, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:26:05,520 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.60 BTC-USD $107873.22 | Data: [{"symbol": "ETH-USD", "price": 2531.60446096}, {"symbol": "BTC-USD", "price": 107873.22272711}]
+2025-07-07 23:26:05,535 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #21 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:26:05,559 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.60 BTC-USD $107872.99 | Data: [{"symbol": "ETH-USD", "price": 2531.60446096}, {"symbol": "BTC-USD", "price": 107872.98571317}]
+2025-07-07 23:26:09,584 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 109.12,
+  "update_cycles": 110,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 109.12, "update_cycles": 110, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:26:10,500 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:26:10,538 - INFO - [strategy.randomstrategy] simple_random_strategy | INFO - [RandomStrategy] Signal | Generated SELL signal for ETH-USD (Time: 0.000s) | Data: {"symbol": "ETH-USD", "price": 2531.60446096, "confidence": 78}
+2025-07-07 23:26:10,540 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #22 completed (Time: 0.002s) | Data: {"total_signals": 2, "actionable_signals": 1, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:26:10,556 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.56 BTC-USD $107872.99 | Data: [{"symbol": "ETH-USD", "price": 2531.55627763}, {"symbol": "BTC-USD", "price": 107872.98571317}]
+2025-07-07 23:26:10,591 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.56 BTC-USD $107872.60 | Data: [{"symbol": "ETH-USD", "price": 2531.55627763}, {"symbol": "BTC-USD", "price": 107872.59517416}]
+2025-07-07 23:26:14,589 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 114.13,
+  "update_cycles": 115,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 114.13, "update_cycles": 115, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:26:15,542 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #23 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:26:15,582 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.75 BTC-USD $107872.60 | Data: [{"symbol": "ETH-USD", "price": 2531.74624283}, {"symbol": "BTC-USD", "price": 107872.59517416}]
+2025-07-07 23:26:15,652 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.75 BTC-USD $107872.86 | Data: [{"symbol": "ETH-USD", "price": 2531.74624283}, {"symbol": "BTC-USD", "price": 107872.86365489}]
+2025-07-07 23:26:19,595 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 119.13,
+  "update_cycles": 120,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 119.13, "update_cycles": 120, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:26:20,504 - INFO - [tradingsystem] app | INFO - [tradingsystem] Account | Account status update (Time: 0.000s) | Data: {"account": {"current_balance": 10000.0, "initial_balance": 10000.0, "account_growth": 0.0, "margin_used": 0.0, "max_leverage": 100.0, "realized_pnl": 0.0, "unrealized_pnl": 0, "open_trades": 0, "closed_trades": 0, "win_rate": 0.0, "daily_trades": 0, "daily_limit": 5, "max_profit": 0, "max_loss": 0, "total_profit": 0.0, "total_loss": 0.0, "brokerage_charges": 0.0, "algo_status": "RUNNING"}}
+2025-07-07 23:26:20,546 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] Analysis | Analysis #24 completed (Time: 0.000s) | Data: {"total_signals": 2, "actionable_signals": 0, "symbols_analyzed": ["ETH-USD", "BTC-USD"]}
+2025-07-07 23:26:20,611 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.89 BTC-USD $107872.86 | Data: [{"symbol": "ETH-USD", "price": 2531.89228721}, {"symbol": "BTC-USD", "price": 107872.86365489}]
+2025-07-07 23:26:20,652 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2531.89 BTC-USD $107873.31 | Data: [{"symbol": "ETH-USD", "price": 2531.89228721}, {"symbol": "BTC-USD", "price": 107873.30694808}]
+2025-07-07 23:26:24,600 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🚀 [System Status] {
+  "uptime_seconds": 124.14,
+  "update_cycles": 125,
+  "market_data_status": "connected",
+  "open_positions": 0,
+  "total_unrealized_pnl": 0,
+  "latest_signals": 0,
+  "risk_alerts": 0,
+  "account_balance": 10000.0
+} (Time: 0.000s) | Data: {"status_summary": {"uptime_seconds": 124.14, "update_cycles": 125, "market_data_status": "connected", "open_positions": 0, "total_unrealized_pnl": 0, "latest_signals": 0, "risk_alerts": 0, "account_balance": 10000.0}}
+2025-07-07 23:26:25,056 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🛑 Received signal 2, shutting down... (Time: 0.000s) | Data: {"signal": 2}
+2025-07-07 23:26:25,058 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 23:26:25,484 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🛑 Received signal 2, shutting down... (Time: 0.000s) | Data: {"signal": 2}
+2025-07-07 23:26:25,486 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 23:26:26,746 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2532.35 BTC-USD $107873.31 | Data: [{"symbol": "ETH-USD", "price": 2532.3500035}, {"symbol": "BTC-USD", "price": 107873.30694808}]
+2025-07-07 23:26:26,750 - INFO - [tradingsystem] app | INFO - [tradingsystem] PriceUpdate | 📊 Live Price: ETH-USD $2532.35 BTC-USD $107876.16 | Data: [{"symbol": "ETH-USD", "price": 2532.3500035}, {"symbol": "BTC-USD", "price": 107876.1585493}]
+2025-07-07 23:26:27,493 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | 🛑 Received signal 2, shutting down... (Time: 0.000s) | Data: {"signal": 2}
+2025-07-07 23:26:27,494 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 23:26:30,531 - INFO - [risk_manager] risk_management | [RiskManager] Risk monitoring stopped
+2025-07-07 23:26:30,548 - INFO - [broker.broker] broker | INFO - [Broker] Monitoring | Monitoring system stopped
+2025-07-07 23:26:30,549 - INFO - [market_data] market_data_client | INFO - [MarketData] System | Stopping Market Data System
+2025-07-07 23:26:30,659 - WARNING - [market_data] market_data_client | WARN - [MarketData] WebSocket | Connection closed: None - None
+2025-07-07 23:26:30,706 - INFO - [market_data] market_data_client | INFO - [MarketData] System | System stopped successfully (Time: 0.157s)
+2025-07-07 23:26:30,707 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager stopped successfully (Time: 0.000s) | Data: {"uptime": 130.248192}
+2025-07-07 23:26:30,708 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Trading system stopped successfully (Time: 3.214s) | Data: {"uptime_seconds": 130.24}
+2025-07-07 23:26:30,712 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Stopping real-time trading system
+2025-07-07 23:26:30,714 - INFO - [risk_manager] risk_management | [RiskManager] Risk monitoring stopped
+2025-07-07 23:26:30,714 - INFO - [broker.broker] broker | INFO - [Broker] Monitoring | Monitoring system stopped
+2025-07-07 23:26:30,715 - INFO - [market_data] market_data_client | INFO - [MarketData] System | Stopping Market Data System
+2025-07-07 23:26:30,715 - INFO - [market_data] market_data_client | INFO - [MarketData] System | System stopped successfully (Time: 0.000s)
+2025-07-07 23:26:30,716 - INFO - [strategy.strategymanager] simple_random_strategy | INFO - [StrategyManager] System | Strategy Manager stopped successfully (Time: 0.000s) | Data: {"uptime": 130.257035}
+2025-07-07 23:26:30,716 - INFO - [tradingsystem] app | INFO - [tradingsystem] System | Trading system stopped successfully (Time: 0.003s) | Data: {"uptime_seconds": 130.25}
