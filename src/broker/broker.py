@@ -276,9 +276,12 @@ class UnifiedBroker:
                 
                 # Check if we can open this position
                 position_type = PositionType.LONG if signal == 'BUY' else PositionType.SHORT
-                if symbol in self.positions:
-                    self.logger.log("warning", f"Position already open for {symbol}")
-                    return False
+                
+                # Check if we already have an open position for this symbol
+                for pos in self.open_positions.values():
+                    if pos.symbol == symbol:
+                        self.logger.log("warning", "Position", f"Position already open for {symbol}")
+                        return False
                 
                 # Calculate position size and margin
                 position_value, margin_required, trading_fee = self._calculate_position_size(

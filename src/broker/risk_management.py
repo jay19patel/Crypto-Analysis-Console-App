@@ -325,8 +325,9 @@ class RiskManager:
                 return False, f"Position size would exceed {self.max_position_risk*100:.1f}% limit"
             
             # Check correlation (simplified - check if same symbol already open)
-            if symbol in self.broker.open_positions:
-                return False, f"Position already open for {symbol}"
+            for pos in self.broker.open_positions.values():
+                if pos.symbol == symbol:
+                    return False, f"Position already open for {symbol}"
             
             # Check daily trade limits
             if not self.broker._can_trade_today():
@@ -337,6 +338,162 @@ class RiskManager:
         except Exception as e:
             self._log_risk_event("error", "New position risk check failed", {"error": str(e)})
             return False, f"Risk check failed: {str(e)}"
+    
+    def execute_signal_trade(self, signal_data: Dict[str, Any]) -> bool:
+        """Execute a trade based on signal with proper risk management"""
+        try:
+            signal = signal_data.get("signal", "").upper()
+            symbol = signal_data.get("symbol", "")
+            current_price = signal_data.get("current_price", 0.0)
+            
+            # Validate signal
+            if signal not in ["BUY", "SELL"]:
+                self._log_risk_event("warning", f"Invalid signal ignored: {signal}")
+                return False
+            
+            if not symbol or current_price <= 0:
+                self._log_risk_event("warning", f"Invalid signal data: {signal_data}")
+                return False
+            
+            # Check if we should allow new position
+            allowed, reason = self.should_allow_new_position(symbol, 0.0)  # We'll calculate size below
+            if not allowed:
+                self._log_risk_event("info", f"Trade rejected for {symbol}: {reason}")
+                return False
+            
+            # Calculate position size based on risk management
+            position_value, leverage = self._calculate_optimal_position_size(current_price)
+            
+            if position_value <= 0:
+                self._log_risk_event("warning", f"Invalid position size calculated for {symbol}")
+                return False
+            
+            # Execute trade through broker
+            success = self.broker.execute_trade(
+                signal=signal,
+                symbol=symbol,
+                current_price=current_price,
+                confidence=100.0,  # Full confidence from strategy
+                strategy_name="Simple Random Strategy",
+                leverage=leverage
+            )
+            
+            if success:
+                self._log_risk_event("info", f"Trade executed: {signal} {symbol} at ${current_price:.2f}", {
+                    "signal": signal,
+                    "symbol": symbol,
+                    "price": current_price,
+                    "position_value": position_value,
+                    "leverage": leverage
+                })
+                return True
+            else:
+                self._log_risk_event("error", f"Trade execution failed: {signal} {symbol}")
+                return False
+                
+        except Exception as e:
+            self._log_risk_event("error", f"Error executing signal trade: {str(e)}")
+            return False
+    
+    def _calculate_optimal_position_size(self, current_price: float) -> Tuple[float, float]:
+        """Calculate optimal position size based on risk management rules"""
+        try:
+            if not self.broker.account:
+                return 0.0, 1.0
+            
+            # Use account risk per trade setting (default 2%)
+            risk_amount = self.broker.account.current_balance * self.broker.account.risk_per_trade
+            
+            # Use default leverage from settings
+            leverage = self.settings.BROKER_DEFAULT_LEVERAGE
+            
+            # Calculate position value (risk amount * leverage, but cap at max position size)
+            position_value = min(
+                risk_amount * leverage,
+                self.broker.account.max_position_size,
+                self.broker.account.current_balance * 0.1  # Never more than 10% of balance
+            )
+            
+            return position_value, leverage
+            
+        except Exception as e:
+            self._log_risk_event("error", f"Error calculating position size: {str(e)}")
+            return 0.0, 1.0
+    
+    def monitor_positions(self) -> List[str]:
+        """Monitor all open positions and execute risk management actions"""
+        try:
+            actions_taken = []
+            
+            for position in list(self.broker.open_positions.values()):
+                if position.symbol in self.broker.current_prices:
+                    current_price = self.broker.current_prices[position.symbol]["price"]
+                    
+                    # Check stop loss
+                    if self._check_stop_loss_hit(position, current_price):
+                        if self.broker.close_position(position.id, current_price, "Stop Loss Hit"):
+                            actions_taken.append(f"Stop Loss: {position.symbol}")
+                            self._log_risk_event("info", f"Stop loss triggered for {position.symbol}")
+                            continue
+                    
+                    # Check target hit
+                    if self._check_target_hit(position, current_price):
+                        if self.broker.close_position(position.id, current_price, "Target Hit"):
+                            actions_taken.append(f"Target Hit: {position.symbol}")
+                            self._log_risk_event("info", f"Target reached for {position.symbol}")
+                            continue
+                    
+                    # Check holding time limit (48 hours)
+                    if self._check_time_limit_exceeded(position):
+                        if self.broker.close_position(position.id, current_price, "Time Limit Reached"):
+                            actions_taken.append(f"Time Limit: {position.symbol}")
+                            self._log_risk_event("info", f"Time limit reached for {position.symbol}")
+                            continue
+                    
+                    # Advanced risk management
+                    risk_metrics = self.analyze_position_risk(position, current_price)
+                    if self.execute_risk_action(position, risk_metrics, current_price):
+                        actions_taken.append(f"Risk Action: {position.symbol}")
+            
+            return actions_taken
+            
+        except Exception as e:
+            self._log_risk_event("error", f"Error monitoring positions: {str(e)}")
+            return []
+    
+    def _check_stop_loss_hit(self, position: Position, current_price: float) -> bool:
+        """Check if stop loss is hit"""
+        if not position.stop_loss:
+            return False
+        
+        if position.position_type == PositionType.LONG:
+            return current_price <= position.stop_loss
+        else:  # SHORT
+            return current_price >= position.stop_loss
+    
+    def _check_target_hit(self, position: Position, current_price: float) -> bool:
+        """Check if target is hit"""
+        if not position.target:
+            return False
+        
+        if position.position_type == PositionType.LONG:
+            return current_price >= position.target
+        else:  # SHORT
+            return current_price <= position.target
+    
+    def _check_time_limit_exceeded(self, position: Position) -> bool:
+        """Check if holding time exceeded maximum limit"""
+        try:
+            entry_time = position.entry_time
+            if entry_time.tzinfo is None:
+                entry_time = entry_time.replace(tzinfo=timezone.utc)
+            
+            current_time = datetime.now(timezone.utc)
+            holding_hours = (current_time - entry_time).total_seconds() / 3600
+            
+            return holding_hours >= self.settings.BROKER_MAX_HOLDING_HOURS
+        except:
+            return False
     
     # Private helper methods
     def _risk_monitoring_loop(self) -> None:

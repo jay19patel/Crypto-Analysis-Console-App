@@ -23,7 +23,7 @@ from typing import Dict, Any
 from src.broker.broker import UnifiedBroker
 from src.broker.risk_management import RiskManager
 from src.data.market_data_client import RealTimeMarketData
-from src.strategies.simple_random_strategy import OptimizedStrategyManager
+from src.strategies.simple_random_strategy import SimpleRandomStrategy
 from src.config import get_settings
 
 # Create logs directory
@@ -106,7 +106,7 @@ class OptimizedTradingSystem:
         self.broker: UnifiedBroker = None
         self.risk_manager: RiskManager = None
         self.market_data: RealTimeMarketData = None
-        self.strategy_manager: OptimizedStrategyManager = None
+        self.strategy: SimpleRandomStrategy = None
         
         # System state
         self.is_running = False
@@ -169,6 +169,7 @@ class OptimizedTradingSystem:
                 # 2. Initialize Risk Manager
                 self.logger.log("info", "Risk", "Initializing risk management system")
                 self.risk_manager = RiskManager(self.broker)
+                self.risk_manager.start_risk_monitoring()
                 
                 # 3. Initialize Market Data Client
                 self.logger.log("info", "MarketData", "Initializing real-time data feed")
@@ -178,13 +179,9 @@ class OptimizedTradingSystem:
                     self.logger.log("error", "MarketData", "Failed to start market data client")
                     return False
                 
-                # 4. Initialize Strategy Manager
+                # 4. Initialize Strategy
                 self.logger.log("info", "Strategy", "Initializing strategy system")
-                self.strategy_manager = OptimizedStrategyManager()
-                
-                if not self.strategy_manager.start():
-                    self.logger.log("error", "Strategy", "Failed to start strategy manager")
-                    return False
+                self.strategy = SimpleRandomStrategy()
                 
                 # 5. Initialize caches
                 self._initialize_caches()
@@ -198,7 +195,7 @@ class OptimizedTradingSystem:
                 
             except Exception as e:
                 self.logger.log(
-                    "error", "System", "System initialization failed",
+                    "error", "System", f"System initialization failed: {str(e)}",
                     {"error": str(e)},
                     timer.__exit__(None, None, None)
                 )
@@ -268,9 +265,9 @@ class OptimizedTradingSystem:
                 if self.market_data:
                     self.market_data.stop()
                 
-                # Stop strategy manager
-                if self.strategy_manager:
-                    self.strategy_manager.stop()
+                # Stop risk manager
+                if self.risk_manager:
+                    self.risk_manager.stop_risk_monitoring()
                 
                 uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds() if self.start_time else 0
                 self.logger.log(
@@ -430,23 +427,40 @@ class OptimizedTradingSystem:
                 time.sleep(1)
     
     def _strategy_loop(self) -> None:
-        """Real-time strategy checks"""
-        self.logger.log("info", "Strategy", "Strategy loop started")
-        
+        """Main strategy loop for signal generation and trade execution"""
         while not self._stop_event.is_set():
             try:
-                with self._time_operation("strategy_loop") as timer:
-                    if self.current_prices:
-                        self._check_strategy_signals()
-                    time.sleep(self.settings.STRATEGY_CHECK_INTERVAL)
+                # Generate signals for all symbols with current prices
+                for symbol, price_data in self.current_prices.items():
+                    signal = self.strategy.generate_signal(symbol, price_data["price"])
+                    self.latest_signals[symbol] = signal
                     
+                    # Execute actionable signals (BUY/SELL)
+                    if signal["signal"] in ["BUY", "SELL"]:
+                        self.logger.log(
+                            "info", "Strategy", f"New {signal['signal']} signal for {symbol}",
+                            {"symbol": symbol, "signal": signal}
+                        )
+                        
+                        # Execute trade through risk manager
+                        trade_executed = self.risk_manager.execute_signal_trade(signal)
+                        
+                        if trade_executed:
+                            self.logger.log(
+                                "info", "Trade", f"✅ Trade executed: {signal['signal']} {symbol}",
+                                {"symbol": symbol, "price": signal["current_price"]}
+                            )
+                        else:
+                            self.logger.log(
+                                "warning", "Trade", f"❌ Trade rejected: {signal['signal']} {symbol}",
+                                {"symbol": symbol, "reason": "Risk management or validation failed"}
+                            )
+                
+                time.sleep(1)  # Sleep to prevent excessive CPU usage
+                
             except Exception as e:
-                self.logger.log(
-                    "error", "Strategy", "Error in strategy loop",
-                    {"error": str(e)},
-                    0.0
-                )
-                time.sleep(1)
+                self.logger.log("error", "Strategy", f"Strategy loop error: {str(e)}")
+                time.sleep(5)  # Sleep longer on error
     
     def _risk_management_loop(self) -> None:
         """Real-time risk management"""
@@ -455,7 +469,16 @@ class OptimizedTradingSystem:
         while not self._stop_event.is_set():
             try:
                 with self._time_operation("risk_management") as timer:
-                    self._check_risk_management()
+                    # Monitor all open positions
+                    actions_taken = self.risk_manager.monitor_positions()
+                    
+                    if actions_taken:
+                        self.logger.log(
+                            "info", "Risk", f"Risk actions taken: {actions_taken}",
+                            {"actions": actions_taken},
+                            timer.__exit__(None, None, None)
+                        )
+                    
                     time.sleep(self.settings.RISK_CHECK_INTERVAL)
                     
             except Exception as e:
@@ -584,117 +607,9 @@ class OptimizedTradingSystem:
                     0.0
                 )
     
-    def _check_strategy_signals(self) -> None:
-        """Check for trading signals and execute trades"""
-        try:
-            # Generate signals for current prices
-            analysis_result = self.strategy_manager.analyze_and_generate_signals(self.current_prices)
-            
-            if analysis_result.get("status") == "completed":
-                actionable_signals = analysis_result.get("actionable_signals", {})
-                
-                for symbol, signal_data in actionable_signals.items():
-                    signal = signal_data.get("signal")
-                    confidence = signal_data.get("confidence", 0)
-                    current_price = signal_data.get("current_price", 0)
-                    
-                    if signal in ["BUY", "SELL"] and confidence >= self.settings.BROKER_MIN_CONFIDENCE:
-                        # Execute trade
-                        if self._can_execute_trade(signal_data):
-                            success = self.broker.execute_trade(
-                                signal=signal,
-                                symbol=symbol,
-                                current_price=current_price,
-                                confidence=confidence,
-                                strategy_name="Simple Random Strategy",
-                                leverage=self.settings.BROKER_DEFAULT_LEVERAGE
-                            )
-                            
-                            if success:
-                                self.logger.log(
-                                    "info", "Trade", f"🎯 Executed {signal} for {symbol} at ${current_price:.2f}",
-                                    {"signal": signal, "symbol": symbol, "current_price": current_price},
-                                    0.0
-                                )
-                            else:
-                                self.logger.log(
-                                    "warning", "Trade", f"⚠️ Failed to execute {signal} for {symbol}",
-                                    {"signal": signal, "symbol": symbol},
-                                    0.0
-                                )
-                
-                # Store latest signals
-                self.latest_signals = actionable_signals
-                
-        except Exception as e:
-            self.logger.log(
-                "error", "Strategy", "Error checking strategy signals",
-                {"error": str(e)},
-                0.0
-            )
+
     
-    def _check_risk_management(self) -> None:
-        """Check risk management for all positions"""
-        try:
-            risk_alerts = []
-            
-            for pos_id, position in self.broker.positions.items():
-                if position.status.value == "OPEN":
-                    current_price = self.current_prices.get(position.symbol, {}).get("price", 0)
-                    
-                    if current_price > 0:
-                        # Analyze position risk
-                        risk_metrics = self.risk_manager.analyze_position_risk(position, current_price)
-                        
-                        # Execute risk actions if needed
-                        action_taken = self.risk_manager.execute_risk_action(position, risk_metrics, current_price)
-                        
-                        if action_taken:
-                            risk_alerts.append(f"Risk action taken for {position.symbol}")
-                        
-                        # Check for stop loss or target hits
-                        if position.stop_loss and current_price <= position.stop_loss:
-                            self.broker.close_position(pos_id, current_price, "Stop Loss Hit")
-                            risk_alerts.append(f"Stop Loss hit for {position.symbol}")
-                        
-                        elif position.target and current_price >= position.target:
-                            self.broker.close_position(pos_id, current_price, "Target Hit")
-                            risk_alerts.append(f"Target hit for {position.symbol}")
-            
-            self.risk_alerts = risk_alerts
-            
-        except Exception as e:
-            self.logger.log(
-                "error", "Risk", "Error in risk management",
-                {"error": str(e)},
-                0.0
-            )
-    
-    def _can_execute_trade(self, signal_data: dict) -> bool:
-        """Check if we can execute a trade"""
-        try:
-            # Check daily trade limits
-            if not self.broker.account.can_trade_today():
-                return False
-            
-            # Check if we already have a position in this symbol
-            symbol = signal_data.get("symbol")
-            if symbol in self.broker.open_positions:
-                return False
-            
-            # Check account balance
-            if self.broker.account.current_balance < self.settings.BROKER_MAX_POSITION_SIZE:
-                return False
-            
-            return True
-            
-        except Exception as e:
-            self.logger.log(
-                "error", "Trade", "Error checking trade execution",
-                {"error": str(e)},
-                0.0
-            )
-            return False
+
     
     def _log_position_updates(self) -> None:
         """Log real-time position updates"""
