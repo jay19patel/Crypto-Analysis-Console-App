@@ -258,20 +258,27 @@ class UnifiedBroker:
             try:
                 signal = signal.upper().strip()
                 
+                self.logger.log("info", "Trade", f"🎯 Starting trade execution: {signal} {symbol} at ${current_price:.2f}", {
+                    "signal": signal,
+                    "symbol": symbol,
+                    "price": current_price,
+                    "confidence": confidence,
+                    "leverage": leverage
+                })
+                
                 # Validate signal
                 if signal not in ['BUY', 'SELL']:
-                    self.logger.log("warning", f"Invalid signal: {signal}", 
-                                  {"signal": signal, "symbol": symbol})
+                    self.logger.log("warning", "Trade", f"❌ Invalid signal rejected: {signal} for {symbol}")
                     return False
                 
                 # Check confidence threshold
                 if confidence < self.settings.BROKER_MIN_CONFIDENCE:
-                    self.logger.log("warning", f"Low confidence signal ignored", 
-                                  {"confidence": confidence, "threshold": self.settings.BROKER_MIN_CONFIDENCE})
+                    self.logger.log("warning", "Trade", f"❌ Low confidence signal rejected: {confidence}% < {self.settings.BROKER_MIN_CONFIDENCE}%")
                     return False
                 
                 # Check daily trades limit
                 if not self._can_trade_today():
+                    self.logger.log("warning", "Trade", f"❌ Daily trade limit reached: {self.account.daily_trades_count}/{self.account.daily_trades_limit}")
                     return False
                 
                 # Check if we can open this position
@@ -280,7 +287,7 @@ class UnifiedBroker:
                 # Check if we already have an open position for this symbol
                 for pos in self.open_positions.values():
                     if pos.symbol == symbol:
-                        self.logger.log("warning", "Position", f"Position already open for {symbol}")
+                        self.logger.log("warning", "Trade", f"❌ Position already open for {symbol}")
                         return False
                 
                 # Calculate position size and margin
@@ -288,18 +295,33 @@ class UnifiedBroker:
                     current_price, leverage
                 )
                 
+                self.logger.log("info", "Trade", f"💰 Position sizing calculated for {symbol}", {
+                    "position_value": position_value,
+                    "margin_required": margin_required,
+                    "trading_fee": trading_fee,
+                    "account_balance": self.account.current_balance
+                })
+                
                 if position_value <= 0:
-                    self.logger.log("warning", "Invalid position size calculated")
+                    self.logger.log("warning", "Trade", f"❌ Invalid position size: ${position_value:.2f}")
                     return False
                 
                 # Reserve margin
                 if not self._reserve_margin(margin_required, trading_fee):
+                    self.logger.log("warning", "Trade", f"❌ Insufficient margin: need ${margin_required + trading_fee:.2f}, have ${self.account.current_balance:.2f}")
                     return False
                 
                 # Calculate risk levels
                 stop_loss, target = self._calculate_risk_levels(
                     current_price, position_type
                 )
+                
+                self.logger.log("info", "Trade", f"🎯 Risk levels set for {symbol}", {
+                    "stop_loss": stop_loss,
+                    "target": target,
+                    "stop_loss_pct": self.stop_loss_percentage * 100,
+                    "target_pct": self.target_percentage * 100
+                })
                 
                 # Create position
                 position = Position()
@@ -331,7 +353,7 @@ class UnifiedBroker:
                     self._save_account()
                     
                     exec_time = self._operation_times.get("trade_execute", 0)
-                    self.logger.log("info", f"Trade executed: {signal} {symbol}", {
+                    self.logger.log("info", "Trade", f"✅ Trade executed successfully: {signal} {symbol}", {
                         "position_id": position.id,
                         "entry_price": current_price,
                         "quantity": position.quantity,
@@ -342,19 +364,25 @@ class UnifiedBroker:
                         "stop_loss": stop_loss,
                         "target": target,
                         "confidence": confidence,
-                        "strategy": strategy_name
-                    }, exec_time)
+                        "strategy": strategy_name,
+                        "execution_time": f"{exec_time:.3f}s"
+                    })
                     
                     return True
                 else:
                     # Release margin if position creation failed
                     self._release_margin(margin_required, 0, -trading_fee)
+                    self.logger.log("error", "Trade", f"❌ Failed to save position to database")
                     return False
                 
             except Exception as e:
                 exec_time = self._operation_times.get("trade_execute", 0)
-                self.logger.log("error", f"Trade execution failed: {e}", 
-                              {"error": str(e), "symbol": symbol}, exec_time)
+                self.logger.log("error", "Trade", f"❌ Trade execution failed: {e}", {
+                    "error": str(e), 
+                    "symbol": symbol,
+                    "signal": signal,
+                    "execution_time": f"{exec_time:.3f}s"
+                })
                 return False
     
     def close_position(self, position_id: str, exit_price: float, reason: str = "Manual") -> bool:

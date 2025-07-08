@@ -54,9 +54,13 @@ class Settings(BaseSettings):
     STRATEGY_SELL_PROBABILITY: float = 0.10  # 10% chance to SELL
     
     # Risk Management Configuration
-    RISK_MAX_PORTFOLIO_RISK: float = 0.15   # 15% max portfolio risk
-    RISK_MAX_POSITION_RISK: float = 0.05    # 5% max position risk
+    RISK_MAX_PORTFOLIO_RISK: float = 0.25  # 25% max portfolio risk (increased from 15%)
+    RISK_MAX_POSITION_RISK: float = 0.10   # 10% max position risk (increased from 5%)
     RISK_CORRELATION_THRESHOLD: float = 0.7  # Max correlation between positions
+    
+    # Position limits
+    BROKER_MAX_DAILY_TRADES: int = 10       # Maximum trades per day
+    BROKER_MAX_OPEN_POSITIONS: int = 5      # Maximum open positions at once
     
     # Logging Configuration
     LOG_LEVEL: str = "INFO"

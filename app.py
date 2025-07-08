@@ -31,8 +31,8 @@ os.makedirs('logs', exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - [%(name)s] %(module)s | %(message)s',
+    level=logging.DEBUG,
+    format='%(levelname)s - [%(module)s] %(message)s | %(msecs)dms',
     handlers=[
         logging.FileHandler('logs/trading_bot.log', encoding='utf-8'),
         logging.StreamHandler(sys.stdout)
@@ -515,10 +515,11 @@ class OptimizedTradingSystem:
         self._update_account_cache()
     
     def _update_position_cache(self) -> None:
-        """Update position cache with real-time P&L calculations"""
+        """Update position cache with real-time P&L calculations and holding time"""
         with self.position_cache_lock:
             try:
                 positions_data = {}
+                current_time = datetime.now(timezone.utc)
                 
                 for pos_id, position in self.broker.positions.items():
                     if position.status.value == "OPEN":
@@ -527,8 +528,21 @@ class OptimizedTradingSystem:
                         
                         if current_price > 0:
                             # Calculate real-time P&L
-                            pnl = position.calculate_pnl(current_price)
-                            position.calculate_holding_time()
+                            old_pnl = position.pnl
+                            position.calculate_pnl(current_price)
+                            
+                            # Calculate holding time in hours
+                            entry_time = position.entry_time
+                            if entry_time.tzinfo is None:
+                                entry_time = entry_time.replace(tzinfo=timezone.utc)
+                            
+                            holding_time_hours = (current_time - entry_time).total_seconds() / 3600
+                            
+                            # Calculate PnL percentage
+                            pnl_percentage = (position.pnl / position.invested_amount) * 100 if position.invested_amount > 0 else 0
+                            
+                            # Calculate margin usage
+                            margin_usage = position.calculate_margin_usage(current_price) if hasattr(position, 'calculate_margin_usage') else 0
                             
                             positions_data[pos_id] = {
                                 "id": position.id,
@@ -539,22 +553,55 @@ class OptimizedTradingSystem:
                                 "quantity": position.quantity,
                                 "invested_amount": position.invested_amount,
                                 "leverage": position.leverage,
-                                "pnl": pnl,
-                                "pnl_percentage": (pnl / position.invested_amount) * 100 if position.invested_amount > 0 else 0,
-                                "profit_after_amount": position.profit_after_amount,
-                                "holding_time": position.holding_time,
+                                "pnl": round(position.pnl, 2),
+                                "pnl_percentage": round(pnl_percentage, 2),
+                                "pnl_change": round(position.pnl - old_pnl, 4),
+                                "holding_time_hours": round(holding_time_hours, 2),
+                                "holding_time": f"{int(holding_time_hours)}h {int((holding_time_hours % 1) * 60)}m",
                                 "stop_loss": position.stop_loss,
                                 "target": position.target,
                                 "margin_used": position.margin_used,
-                                "margin_usage": position.calculate_margin_usage(current_price),
-                                "status": position.status.value
+                                "margin_usage": margin_usage,
+                                "status": position.status.value,
+                                "entry_time": position.entry_time.isoformat(),
+                                "last_updated": current_time.isoformat()
                             }
+                            
+                            # Log significant PnL changes
+                            if abs(position.pnl - old_pnl) > 1.0:  # Log if change > $1
+                                self.logger.log(
+                                    "info", "Position", 
+                                    f"📈 P&L Update: {position.symbol} ${position.pnl:.2f} ({pnl_percentage:+.2f}%)",
+                                    {
+                                        "symbol": position.symbol,
+                                        "pnl": position.pnl,
+                                        "pnl_percentage": pnl_percentage,
+                                        "pnl_change": position.pnl - old_pnl,
+                                        "current_price": current_price,
+                                        "holding_time": f"{holding_time_hours:.1f}h"
+                                    }
+                                )
                 
+                # Update cache
+                old_position_count = len(self.cached_positions)
                 self.cached_positions = positions_data
+                
+                # Log cache update summary every 10 updates or when position count changes
+                if len(positions_data) != old_position_count or self._update_cycles % 10 == 0:
+                    total_pnl = sum(pos.get("pnl", 0) for pos in positions_data.values())
+                    self.logger.log(
+                        "info", "Cache", 
+                        f"💼 Position cache updated: {len(positions_data)} positions, Total P&L: ${total_pnl:.2f}",
+                        {
+                            "position_count": len(positions_data),
+                            "total_pnl": total_pnl,
+                            "symbols": [pos["symbol"] for pos in positions_data.values()]
+                        }
+                    )
                 
             except Exception as e:
                 self.logger.log(
-                    "error", "Position", "Error updating position cache",
+                    "error", "Position", "❌ Error updating position cache",
                     {"error": str(e)},
                     0.0
                 )

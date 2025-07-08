@@ -62,10 +62,10 @@ class RiskManager:
         self.settings = get_settings()
         self.logger = logging.getLogger("risk_manager")
         
-        # Risk thresholds
-        self.max_portfolio_risk = 0.15  # 15% max portfolio risk
-        self.max_position_risk = 0.05   # 5% max position risk
-        self.correlation_threshold = 0.7  # Max correlation between positions
+        # Risk thresholds from config
+        self.max_portfolio_risk = self.settings.RISK_MAX_PORTFOLIO_RISK
+        self.max_position_risk = self.settings.RISK_MAX_POSITION_RISK
+        self.correlation_threshold = self.settings.RISK_CORRELATION_THRESHOLD
         
         # Trailing stop configurations per symbol
         self.trailing_configs: Dict[str, TrailingStopConfig] = {}
@@ -308,7 +308,14 @@ class RiskManager:
         """Check if a new position should be allowed based on risk analysis"""
         try:
             if not self.broker.account:
+                self._log_risk_event("error", "❌ No account available for position check")
                 return False, "No account available"
+            
+            self._log_risk_event("debug", f"Checking position allowance for {symbol}", {
+                "symbol": symbol,
+                "position_value": position_value,
+                "account_balance": self.broker.account.current_balance
+            })
             
             # Check portfolio risk
             current_portfolio_value = sum(pos.invested_amount for pos in self.broker.open_positions.values())
@@ -316,28 +323,57 @@ class RiskManager:
             
             new_portfolio_risk = (current_portfolio_value + position_value) / total_portfolio_value
             
+            self._log_risk_event("debug", f"Portfolio risk check for {symbol}", {
+                "current_portfolio_value": current_portfolio_value,
+                "total_portfolio_value": total_portfolio_value,
+                "new_portfolio_risk": f"{new_portfolio_risk:.2%}",
+                "max_portfolio_risk": f"{self.max_portfolio_risk:.2%}"
+            })
+            
             if new_portfolio_risk > self.max_portfolio_risk:
-                return False, f"Portfolio risk would exceed {self.max_portfolio_risk*100:.1f}%"
+                reason = f"Portfolio risk {new_portfolio_risk:.1%} would exceed {self.max_portfolio_risk:.1%} limit"
+                self._log_risk_event("warning", f"❌ Portfolio risk limit exceeded for {symbol}: {reason}")
+                return False, reason
             
             # Check position size risk
             position_risk = position_value / total_portfolio_value
+            
+            self._log_risk_event("debug", f"Position size risk check for {symbol}", {
+                "position_risk": f"{position_risk:.2%}",
+                "max_position_risk": f"{self.max_position_risk:.2%}"
+            })
+            
             if position_risk > self.max_position_risk:
-                return False, f"Position size would exceed {self.max_position_risk*100:.1f}% limit"
+                reason = f"Position size {position_risk:.1%} would exceed {self.max_position_risk:.1%} limit"
+                self._log_risk_event("warning", f"❌ Position size limit exceeded for {symbol}: {reason}")
+                return False, reason
             
             # Check correlation (simplified - check if same symbol already open)
             for pos in self.broker.open_positions.values():
                 if pos.symbol == symbol:
-                    return False, f"Position already open for {symbol}"
+                    reason = f"Position already open for {symbol}"
+                    self._log_risk_event("warning", f"❌ Duplicate position rejected for {symbol}")
+                    return False, reason
             
             # Check daily trade limits
             if not self.broker._can_trade_today():
-                return False, "Daily trade limit reached"
+                reason = "Daily trade limit reached"
+                self._log_risk_event("warning", f"❌ Daily trade limit reached")
+                return False, reason
+            
+            self._log_risk_event("info", f"✅ Position validation passed for {symbol}", {
+                "symbol": symbol,
+                "position_value": position_value,
+                "portfolio_risk": f"{new_portfolio_risk:.2%}",
+                "position_risk": f"{position_risk:.2%}"
+            })
             
             return True, "Position approved"
             
         except Exception as e:
-            self._log_risk_event("error", "New position risk check failed", {"error": str(e)})
-            return False, f"Risk check failed: {str(e)}"
+            error_msg = f"Risk check failed: {str(e)}"
+            self._log_risk_event("error", f"❌ Position validation error for {symbol}: {error_msg}")
+            return False, error_msg
     
     def execute_signal_trade(self, signal_data: Dict[str, Any]) -> bool:
         """Execute a trade based on signal with proper risk management"""
@@ -346,27 +382,41 @@ class RiskManager:
             symbol = signal_data.get("symbol", "")
             current_price = signal_data.get("current_price", 0.0)
             
+            self._log_risk_event("info", f"Processing {signal} signal for {symbol} at ${current_price:.2f}")
+            
             # Validate signal
             if signal not in ["BUY", "SELL"]:
-                self._log_risk_event("warning", f"Invalid signal ignored: {signal}")
+                self._log_risk_event("warning", f"❌ Invalid signal ignored: {signal} for {symbol}")
                 return False
             
             if not symbol or current_price <= 0:
-                self._log_risk_event("warning", f"Invalid signal data: {signal_data}")
+                self._log_risk_event("warning", f"❌ Invalid signal data for {symbol}: price={current_price}")
                 return False
             
             # Check if we should allow new position
-            allowed, reason = self.should_allow_new_position(symbol, 0.0)  # We'll calculate size below
-            if not allowed:
-                self._log_risk_event("info", f"Trade rejected for {symbol}: {reason}")
-                return False
-            
-            # Calculate position size based on risk management
             position_value, leverage = self._calculate_optimal_position_size(current_price)
+            allowed, reason = self.should_allow_new_position(symbol, position_value)
+            
+            if not allowed:
+                self._log_risk_event("warning", f"❌ Trade rejected for {symbol}: {reason}", {
+                    "symbol": symbol,
+                    "signal": signal,
+                    "price": current_price,
+                    "calculated_position_value": position_value,
+                    "rejection_reason": reason
+                })
+                return False
             
             if position_value <= 0:
-                self._log_risk_event("warning", f"Invalid position size calculated for {symbol}")
+                self._log_risk_event("warning", f"❌ Invalid position size calculated for {symbol}: ${position_value:.2f}")
                 return False
+            
+            self._log_risk_event("info", f"✅ Trade validation passed for {symbol}", {
+                "signal": signal,
+                "position_value": position_value,
+                "leverage": leverage,
+                "account_balance": self.broker.account.current_balance if self.broker.account else 0
+            })
             
             # Execute trade through broker
             success = self.broker.execute_trade(
@@ -379,7 +429,7 @@ class RiskManager:
             )
             
             if success:
-                self._log_risk_event("info", f"Trade executed: {signal} {symbol} at ${current_price:.2f}", {
+                self._log_risk_event("info", f"🎯 Trade executed successfully: {signal} {symbol} at ${current_price:.2f}", {
                     "signal": signal,
                     "symbol": symbol,
                     "price": current_price,
@@ -388,11 +438,14 @@ class RiskManager:
                 })
                 return True
             else:
-                self._log_risk_event("error", f"Trade execution failed: {signal} {symbol}")
+                self._log_risk_event("error", f"❌ Broker execution failed: {signal} {symbol}")
                 return False
                 
         except Exception as e:
-            self._log_risk_event("error", f"Error executing signal trade: {str(e)}")
+            self._log_risk_event("error", f"❌ Error executing signal trade: {str(e)}", {
+                "signal_data": signal_data,
+                "error": str(e)
+            })
             return False
     
     def _calculate_optimal_position_size(self, current_price: float) -> Tuple[float, float]:
