@@ -28,13 +28,14 @@ import random
 from dataclasses import dataclass
 
 # Import simplified components
-from src.broker.paper_broker import AsyncBroker, TradeRequest
+from src.broker.paper_broker import AsyncBroker
 from src.risk_manager import AsyncRiskManager
 from src.notifications import NotificationManager
 from src.config import get_settings, get_dummy_settings
 # NEW IMPORTS
 from src.live_price import LivePriceFetcher
-from src.strategies import RandomStrategy
+from src.strategy_manager import StrategyManager
+from src.schemas import TradingSignal, MarketData, SignalType
 
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
@@ -52,273 +53,10 @@ logging.basicConfig(
 logger = logging.getLogger("trading")
 
 
-class SignalType(Enum):
-    """Trading signal types"""
-    BUY = "BUY"
-    SELL = "SELL"
-    WAIT = "WAIT"
+# SignalType, TradingSignal, and MarketData are now imported from schemas
 
 
-@dataclass
-class TradingSignal:
-    """Trading signal with additional metadata"""
-    signal: SignalType
-    symbol: str
-    confidence: float
-    strategy_name: str
-    price: float
-    quantity: float = 0.01
-    leverage: float = 1.0
-    timestamp: datetime = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now(timezone.utc)
-
-
-@dataclass
-class MarketData:
-    """Market data structure"""
-    symbol: str
-    price: float
-    volume: float
-    change: float
-    timestamp: datetime
-    high_24h: float
-    low_24h: float
-    bid: float
-    ask: float
-
-
-class BaseStrategy(ABC):
-    """Base class for all trading strategies"""
-    
-    def __init__(self, symbol: str, name: str):
-        self.symbol = symbol
-        self.name = name
-        self.logger = logging.getLogger(f"strategy.{name}")
-        self.price_history = []
-        self.last_signal = SignalType.WAIT
-        self.signal_count = {"BUY": 0, "SELL": 0, "WAIT": 0}
-        
-    @abstractmethod
-    def signal(self, market_data: MarketData) -> TradingSignal:
-        """Generate trading signal based on market data"""
-        pass
-    
-    def update_price_history(self, price: float):
-        """Update price history for technical analysis"""
-        self.price_history.append(price)
-        # Keep only last 100 prices for memory efficiency
-        if len(self.price_history) > 100:
-            self.price_history.pop(0)
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get strategy statistics"""
-        total_signals = sum(self.signal_count.values())
-        return {
-            "name": self.name,
-            "symbol": self.symbol,
-            "total_signals": total_signals,
-            "signal_distribution": self.signal_count,
-            "last_signal": self.last_signal.value,
-            "price_history_length": len(self.price_history)
-        }
-
-
-class MovingAverageStrategy(BaseStrategy):
-    """Moving Average Crossover Strategy"""
-    
-    def __init__(self, symbol: str, short_window: int = 5, long_window: int = 20):
-        super().__init__(symbol, f"MA_{short_window}_{long_window}")
-        self.short_window = short_window
-        self.long_window = long_window
-        
-    def signal(self, market_data: MarketData) -> TradingSignal:
-        """Generate signal based on moving average crossover"""
-        self.update_price_history(market_data.price)
-        
-        if len(self.price_history) < self.long_window:
-            signal_type = SignalType.WAIT
-            confidence = 0.0
-        else:
-            # Calculate moving averages
-            short_ma = sum(self.price_history[-self.short_window:]) / self.short_window
-            long_ma = sum(self.price_history[-self.long_window:]) / self.long_window
-            
-            # Generate signal
-            if short_ma > long_ma and self.last_signal != SignalType.BUY:
-                signal_type = SignalType.BUY
-                confidence = min(95.0, 70.0 + abs(short_ma - long_ma) / long_ma * 100)
-            elif short_ma < long_ma and self.last_signal != SignalType.SELL:
-                signal_type = SignalType.SELL
-                confidence = min(95.0, 70.0 + abs(short_ma - long_ma) / long_ma * 100)
-            else:
-                signal_type = SignalType.WAIT
-                confidence = 50.0
-        
-        self.last_signal = signal_type
-        self.signal_count[signal_type.value] += 1
-        
-        return TradingSignal(
-            signal=signal_type,
-            symbol=self.symbol,
-            confidence=confidence,
-            strategy_name=self.name,
-            price=market_data.price,
-            quantity=0.01
-        )
-
-
-class RSIStrategy(BaseStrategy):
-    """RSI (Relative Strength Index) Strategy"""
-    
-    def __init__(self, symbol: str, period: int = 14, overbought: float = 70.0, oversold: float = 30.0):
-        super().__init__(symbol, f"RSI_{period}")
-        self.period = period
-        self.overbought = overbought
-        self.oversold = oversold
-        
-    def calculate_rsi(self, prices: List[float]) -> float:
-        """Calculate RSI value"""
-        if len(prices) < self.period + 1:
-            return 50.0  # Neutral RSI
-        
-        # Calculate price changes
-        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
-        
-        # Separate gains and losses
-        gains = [max(0, delta) for delta in deltas]
-        losses = [abs(min(0, delta)) for delta in deltas]
-        
-        # Calculate average gain and loss
-        avg_gain = sum(gains[-self.period:]) / self.period
-        avg_loss = sum(losses[-self.period:]) / self.period
-        
-        if avg_loss == 0:
-            return 100.0
-        
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        
-        return rsi
-    
-    def signal(self, market_data: MarketData) -> TradingSignal:
-        """Generate signal based on RSI"""
-        self.update_price_history(market_data.price)
-        
-        if len(self.price_history) < self.period + 1:
-            signal_type = SignalType.WAIT
-            confidence = 0.0
-        else:
-            rsi = self.calculate_rsi(self.price_history)
-            
-            if rsi < self.oversold:
-                signal_type = SignalType.BUY
-                confidence = min(95.0, 70.0 + (self.oversold - rsi) / self.oversold * 25)
-            elif rsi > self.overbought:
-                signal_type = SignalType.SELL
-                confidence = min(95.0, 70.0 + (rsi - self.overbought) / (100 - self.overbought) * 25)
-            else:
-                signal_type = SignalType.WAIT
-                confidence = 50.0
-        
-        self.last_signal = signal_type
-        self.signal_count[signal_type.value] += 1
-        
-        return TradingSignal(
-            signal=signal_type,
-            symbol=self.symbol,
-            confidence=confidence,
-            strategy_name=self.name,
-            price=market_data.price,
-            quantity=0.01
-        )
-
-
-class MomentumStrategy(BaseStrategy):
-    """Momentum Strategy based on price changes"""
-    
-    def __init__(self, symbol: str, lookback: int = 10, threshold: float = 0.02):
-        super().__init__(symbol, f"Momentum_{lookback}")
-        self.lookback = lookback
-        self.threshold = threshold
-        
-    def signal(self, market_data: MarketData) -> TradingSignal:
-        """Generate signal based on momentum"""
-        self.update_price_history(market_data.price)
-        
-        if len(self.price_history) < self.lookback:
-            signal_type = SignalType.WAIT
-            confidence = 0.0
-        else:
-            # Calculate momentum
-            old_price = self.price_history[-self.lookback]
-            current_price = market_data.price
-            momentum = (current_price - old_price) / old_price
-            
-            if momentum > self.threshold:
-                signal_type = SignalType.BUY
-                confidence = min(95.0, 70.0 + abs(momentum) * 500)
-            elif momentum < -self.threshold:
-                signal_type = SignalType.SELL
-                confidence = min(95.0, 70.0 + abs(momentum) * 500)
-            else:
-                signal_type = SignalType.WAIT
-                confidence = 50.0
-        
-        self.last_signal = signal_type
-        self.signal_count[signal_type.value] += 1
-        
-        return TradingSignal(
-            signal=signal_type,
-            symbol=self.symbol,
-            confidence=confidence,
-            strategy_name=self.name,
-            price=market_data.price,
-            quantity=0.01
-        )
-
-
-class StrategyManager:
-    """Manager for all trading strategies"""
-    
-    def __init__(self):
-        self.strategies: Dict[str, List[BaseStrategy]] = {}
-        self.logger = logging.getLogger("strategy_manager")
-        
-    def add_strategy(self, strategy: BaseStrategy):
-        """Add a strategy to the manager"""
-        if strategy.symbol not in self.strategies:
-            self.strategies[strategy.symbol] = []
-        
-        self.strategies[strategy.symbol].append(strategy)
-        self.logger.info(f"Added strategy {strategy.name} for {strategy.symbol}")
-    
-    def get_signals(self, symbol: str, market_data: MarketData) -> List[TradingSignal]:
-        """Get all signals for a symbol"""
-        signals = []
-        
-        if symbol in self.strategies:
-            for strategy in self.strategies[symbol]:
-                try:
-                    signal = strategy.signal(market_data)
-                    signals.append(signal)
-                except Exception as e:
-                    self.logger.error(f"Error getting signal from {strategy.name}: {e}")
-        
-        return signals
-    
-    def get_all_symbols(self) -> List[str]:
-        """Get all symbols with strategies"""
-        return list(self.strategies.keys())
-    
-    def get_strategy_stats(self) -> Dict[str, Any]:
-        """Get statistics for all strategies"""
-        stats = {}
-        for symbol, strategies in self.strategies.items():
-            stats[symbol] = [strategy.get_stats() for strategy in strategies]
-        return stats
+# Strategy classes are now in src/strategies.py and StrategyManager is in src/strategy_manager.py
 
 
 class PriceGenerator:
@@ -401,7 +139,7 @@ class ImprovedTradingSystem:
         self.broker = AsyncBroker()
         self.risk_manager = AsyncRiskManager(self.broker)
         self.notification_manager = NotificationManager()
-        self.strategy_manager = StrategyManager()
+        self.strategy_manager = StrategyManager(max_workers=4)
         self.live_price_fetcher = LivePriceFetcher()
         
         # Control flags
@@ -437,11 +175,9 @@ class ImprovedTradingSystem:
     def _setup_strategies(self):
         """Setup trading strategies for different symbols"""
         symbols = ["BTC-USD", "ETH-USD"]
-        self.random_strategies = {}
-        for symbol in symbols:
-            # Add random strategy per symbol
-            self.random_strategies[symbol] = RandomStrategy(symbol)
-        self.logger.info(f"Setup random strategies for {len(symbols)} symbols")
+        # Add default strategies (Random, Volatility, MovingAverage, RSI) for each symbol
+        self.strategy_manager.add_default_strategies(symbols)
+        self.logger.info(f"Setup default strategies for {len(symbols)} symbols")
 
     async def start(self) -> bool:
         """Start the trading system"""
@@ -490,6 +226,9 @@ class ImprovedTradingSystem:
         if self.strategy_thread and self.strategy_thread.is_alive():
             self.strategy_thread.join(timeout=10)
         
+        # Shutdown strategy manager
+        self.strategy_manager.shutdown()
+        
         # Stop async components
         await self.broker.stop()
         await self.risk_manager.stop()
@@ -502,7 +241,7 @@ class ImprovedTradingSystem:
         self.logger.info("📈 Starting price update loop (5s interval)")
         while self._running and not self._shutdown_event.is_set():
             try:
-                symbols = list(self.random_strategies.keys())
+                symbols = self.strategy_manager.get_all_symbols()
                 prices = {}
                 for symbol in symbols:
                     price = self.live_price_fetcher.get_price(symbol)
@@ -551,33 +290,37 @@ class ImprovedTradingSystem:
         self.logger.info("🎯 Starting strategy execution loop (30s interval)")
         while self._running and not self._shutdown_event.is_set():
             try:
-                symbols = list(self.random_strategies.keys())
+                symbols = self.strategy_manager.get_all_symbols()
                 for symbol in symbols:
                     with self.market_data_lock:
                         market_data = self.current_market_data.get(symbol)
+                    
                     if market_data:
-                        signal = self.random_strategies[symbol].generate_signal()
-                        self.logger.info(f"[RandomStrategy] {symbol}: {signal}")
-                        # If signal is BUY or SELL, create and execute trade
-                        if signal in ("BUY", "SELL"):
-                            from src.broker.paper_broker import TradeRequest
-                            trade_request = TradeRequest(
-                                symbol=symbol,
-                                signal=signal,
-                                price=market_data.price,
-                                quantity=0.01,
-                                leverage=1.0,
-                                strategy_name=f"RandomStrategy_{symbol}",
-                                confidence=100.0
-                            )
+                        # Execute all strategies in parallel and get the best signal
+                        strategy_result = self.strategy_manager.execute_strategies_parallel(symbol, market_data)
+                        selected_signal = strategy_result.selected_signal
+                        
+                        self.logger.info(f"[StrategyManager] {symbol}: {selected_signal.signal} "
+                                       f"from {selected_signal.strategy_name} "
+                                       f"(confidence: {selected_signal.confidence:.1f}%)")
+                        
+                        # Log all strategy results
+                        for result in strategy_result.strategy_results:
+                            self.logger.info(f"  - {result.strategy_name}: {result.signal.signal} "
+                                           f"(confidence: {result.signal.confidence:.1f}%)")
+                        
+                        # If signal is actionable, execute trade
+                        if selected_signal.signal in (SignalType.BUY, SignalType.SELL):
                             if self._main_loop is not None:
                                 asyncio.run_coroutine_threadsafe(
-                                    self._execute_signal(trade_request),
+                                    self._execute_signal(selected_signal),
                                     self._main_loop
                                 )
                             else:
                                 self.logger.error("Main event loop not set for trade execution!")
+                        
                         self._stats["signals_generated"] += 1
+                
                 self._stats["strategies_executed"] += 1
                 if not self._shutdown_event.wait(30):
                     continue
@@ -619,10 +362,13 @@ class ImprovedTradingSystem:
             if signal.signal == SignalType.WAIT:
                 return
             
+            # Import TradeRequest from broker
+            from src.broker.paper_broker import TradeRequest
+            
             # Create trade request
             trade_request = TradeRequest(
                 symbol=signal.symbol,
-                signal=signal.signal,
+                signal=signal.signal.value,  # Convert enum to string
                 price=signal.price,
                 quantity=signal.quantity,
                 leverage=signal.leverage,
@@ -653,7 +399,7 @@ class ImprovedTradingSystem:
                 # Send notification
                 await self.notification_manager.notify_trade_execution(
                     symbol=signal.symbol,
-                    signal=signal.signal,
+                    signal=signal.signal.value,  # Convert enum to string
                     price=signal.price,
                     trade_id=trade_request.id,
                     position_id=trade_request.position_id or "N/A"
@@ -735,6 +481,7 @@ class ImprovedTradingSystem:
             account_summary = await self.broker.get_account_summary_async()
             positions_summary = await self.broker.get_positions_summary_async()
             strategy_stats = self.strategy_manager.get_strategy_stats()
+            manager_stats = self.strategy_manager.get_manager_stats()
             
             self.logger.info("📊 System Summary:")
             self.logger.info(f"   Account Balance: ${account_summary.get('current_balance', 0):.2f}")
@@ -743,7 +490,9 @@ class ImprovedTradingSystem:
             self.logger.info(f"   Open Positions: {positions_summary.get('total_open', 0)}")
             self.logger.info(f"   Signals Generated: {self._stats['signals_generated']}")
             self.logger.info(f"   Price Updates: {self._stats['price_updates']}")
-            self.logger.info(f"   Active Strategies: {len([s for strategies in strategy_stats.values() for s in strategies])}")
+            self.logger.info(f"   Strategy Executions: {manager_stats.get('total_executions', 0)}")
+            self.logger.info(f"   Strategy Success Rate: {manager_stats.get('success_rate', 0):.1f}%")
+            self.logger.info(f"   Active Strategies: {manager_stats.get('total_strategies', 0)}")
             
         except Exception as e:
             self.logger.error(f"Error logging system summary: {e}")
@@ -774,7 +523,8 @@ class ImprovedTradingSystem:
             "price_thread_alive": self.price_thread.is_alive() if self.price_thread else False,
             "strategy_thread_alive": self.strategy_thread.is_alive() if self.strategy_thread else False,
             "active_symbols": len(self.current_market_data),
-            "strategy_stats": self.strategy_manager.get_strategy_stats()
+            "strategy_stats": self.strategy_manager.get_strategy_stats(),
+            "manager_stats": self.strategy_manager.get_manager_stats()
         }
 
 
