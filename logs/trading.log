@@ -1,0 +1,136 @@
+2025-07-15 15:38:14,450 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 15:38:14,451 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 15:38:14,451 - INFO - [strategy_manager] Added strategy MA_5_20 for BTC-USD
+2025-07-15 15:38:14,451 - INFO - [strategy_manager] Added strategy RSI_14 for BTC-USD
+2025-07-15 15:38:14,452 - INFO - [strategy_manager] Added strategy Momentum_10 for BTC-USD
+2025-07-15 15:38:14,452 - INFO - [strategy_manager] Added strategy MA_5_20 for ETH-USD
+2025-07-15 15:38:14,452 - INFO - [strategy_manager] Added strategy RSI_14 for ETH-USD
+2025-07-15 15:38:14,452 - INFO - [strategy_manager] Added strategy Momentum_10 for ETH-USD
+2025-07-15 15:38:14,453 - INFO - [strategy_manager] Added strategy MA_5_20 for AAPL
+2025-07-15 15:38:14,454 - INFO - [strategy_manager] Added strategy RSI_14 for AAPL
+2025-07-15 15:38:14,454 - INFO - [strategy_manager] Added strategy Momentum_10 for AAPL
+2025-07-15 15:38:14,454 - INFO - [strategy_manager] Added strategy MA_5_20 for GOOGL
+2025-07-15 15:38:14,454 - INFO - [strategy_manager] Added strategy RSI_14 for GOOGL
+2025-07-15 15:38:14,454 - INFO - [strategy_manager] Added strategy Momentum_10 for GOOGL
+2025-07-15 15:38:14,455 - INFO - [strategy_manager] Added strategy MA_5_20 for TSLA
+2025-07-15 15:38:14,455 - INFO - [strategy_manager] Added strategy RSI_14 for TSLA
+2025-07-15 15:38:14,455 - INFO - [strategy_manager] Added strategy Momentum_10 for TSLA
+2025-07-15 15:38:14,455 - INFO - [improved_trading_system] Setup strategies for 5 symbols
+2025-07-15 15:38:14,457 - INFO - [improved_trading_system] Improved trading system initialized
+2025-07-15 15:38:14,457 - INFO - [trading] 🗑️ Deleting all trading data...
+2025-07-15 15:38:14,457 - INFO - [improved_trading_system] 🗑️ Deleting all trading data...
+2025-07-15 15:38:14,548 - INFO - [mongodb.async] [AsyncMongoDB] Connected to MongoDB successfully
+2025-07-15 15:38:14,554 - INFO - [mongodb.async] [AsyncMongoDB] Collection accounts deleted
+2025-07-15 15:38:14,555 - INFO - [mongodb.async] [AsyncMongoDB] Collection positions deleted
+2025-07-15 15:38:14,556 - INFO - [mongodb.async] [AsyncMongoDB] Collection trades deleted
+2025-07-15 15:38:14,557 - INFO - [mongodb.async] [AsyncMongoDB] Collection analysis deleted
+2025-07-15 15:38:14,557 - INFO - [mongodb.async] [AsyncMongoDB] All trading data deleted from database
+2025-07-15 15:38:14,681 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 15:38:14,681 - INFO - [broker.async_broker] ✅ Created new account: main
+2025-07-15 15:38:14,681 - INFO - [broker.async_broker] ✅ All trading data deleted successfully
+2025-07-15 15:38:14,683 - INFO - [improved_trading_system] ✅ All trading data deleted successfully
+2025-07-15 15:38:14,683 - INFO - [trading] ✅ Data deletion completed
+2025-07-15 15:38:14,683 - INFO - [improved_trading_system] 🚀 Starting Improved Trading System
+2025-07-15 15:38:14,683 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 15:38:14,686 - INFO - [broker.async_broker] ✅ Loaded existing account: main
+2025-07-15 15:38:14,687 - INFO - [broker.async_broker] ✅ Loaded 0 positions from MongoDB
+2025-07-15 15:38:14,688 - INFO - [notifications.manager] Notification manager started
+2025-07-15 15:38:14,688 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 15:38:14,688 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 15:38:14,689 - INFO - [notifications.manager] Notification manager started
+2025-07-15 15:38:14,689 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 15:38:14,689 - INFO - [notifications.manager] Notification manager started
+2025-07-15 15:38:14,690 - INFO - [improved_trading_system] 📈 Starting price update loop (5s interval)
+2025-07-15 15:38:14,690 - INFO - [improved_trading_system] 🎯 Starting strategy execution loop (30s interval)
+2025-07-15 15:38:14,690 - INFO - [improved_trading_system] ✅ Improved trading system started successfully
+2025-07-15 15:38:14,690 - INFO - [improved_trading_system] 🔄 Starting main monitoring loop
+2025-07-15 15:38:14,691 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 15:38:14,691 - INFO - [improved_trading_system]    Account Balance: $10000.00
+2025-07-15 15:38:14,692 - INFO - [improved_trading_system]    Total Trades: 0
+2025-07-15 15:38:14,692 - INFO - [improved_trading_system]    Win Rate: 0.0%
+2025-07-15 15:38:14,692 - INFO - [improved_trading_system]    Open Positions: 0
+2025-07-15 15:38:14,692 - INFO - [improved_trading_system]    Signals Generated: 3
+2025-07-15 15:38:14,692 - INFO - [improved_trading_system]    Price Updates: 0
+2025-07-15 15:38:14,694 - INFO - [improved_trading_system]    Active Strategies: 15
+2025-07-15 15:38:14,694 - ERROR - [notifications.manager] Error processing notification system_error: 'Settings' object has no attribute 'EMAIL_NOTIFICATIONS_ENABLED'
+2025-07-15 15:38:14,714 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 15:38:19,718 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 15:38:24,735 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 15:38:29,743 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 16:48:53,157 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 16:48:53,158 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 16:48:53,158 - INFO - [improved_trading_system] Setup random strategies for 5 symbols
+2025-07-15 16:48:53,159 - INFO - [improved_trading_system] Improved trading system initialized
+2025-07-15 16:48:53,159 - INFO - [trading] 🗑️ Deleting all trading data...
+2025-07-15 16:48:53,159 - INFO - [improved_trading_system] 🗑️ Deleting all trading data...
+2025-07-15 16:48:53,236 - INFO - [mongodb.async] [AsyncMongoDB] Connected to MongoDB successfully
+2025-07-15 16:48:53,308 - INFO - [mongodb.async] [AsyncMongoDB] Collection accounts deleted
+2025-07-15 16:48:53,309 - INFO - [mongodb.async] [AsyncMongoDB] Collection positions deleted
+2025-07-15 16:48:53,310 - INFO - [mongodb.async] [AsyncMongoDB] Collection trades deleted
+2025-07-15 16:48:53,311 - INFO - [mongodb.async] [AsyncMongoDB] Collection analysis deleted
+2025-07-15 16:48:53,311 - INFO - [mongodb.async] [AsyncMongoDB] All trading data deleted from database
+2025-07-15 16:48:53,431 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 16:48:53,433 - INFO - [broker.async_broker] ✅ Created new account: main
+2025-07-15 16:48:53,433 - INFO - [broker.async_broker] ✅ All trading data deleted successfully
+2025-07-15 16:48:53,433 - INFO - [improved_trading_system] ✅ All trading data deleted successfully
+2025-07-15 16:48:53,433 - INFO - [trading] ✅ Data deletion completed
+2025-07-15 16:48:53,433 - INFO - [improved_trading_system] 🚀 Starting Improved Trading System
+2025-07-15 16:48:53,433 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 16:48:53,437 - INFO - [broker.async_broker] ✅ Loaded existing account: main
+2025-07-15 16:48:53,439 - INFO - [broker.async_broker] ✅ Loaded 0 positions from MongoDB
+2025-07-15 16:48:53,440 - INFO - [notifications.manager] Notification manager started
+2025-07-15 16:48:53,441 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 16:48:53,441 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 16:48:53,441 - INFO - [notifications.manager] Notification manager started
+2025-07-15 16:48:53,441 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 16:48:53,442 - INFO - [notifications.manager] Notification manager started
+2025-07-15 16:48:53,442 - INFO - [improved_trading_system] 📈 Starting price update loop (5s interval)
+2025-07-15 16:48:53,444 - INFO - [improved_trading_system] 🎯 Starting strategy execution loop (30s interval)
+2025-07-15 16:48:53,444 - INFO - [improved_trading_system] ✅ Improved trading system started successfully
+2025-07-15 16:48:53,444 - INFO - [improved_trading_system] [RandomStrategy] BTC-USD: WAIT
+2025-07-15 16:48:53,445 - INFO - [improved_trading_system] 🔄 Starting main monitoring loop
+2025-07-15 16:48:53,445 - INFO - [improved_trading_system] [RandomStrategy] ETH-USD: BUY
+2025-07-15 16:48:53,445 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 16:48:53,445 - INFO - [improved_trading_system] [RandomStrategy] AAPL: WAIT
+2025-07-15 16:48:53,446 - INFO - [improved_trading_system]    Account Balance: $10000.00
+2025-07-15 16:48:53,453 - INFO - [improved_trading_system] [RandomStrategy] GOOGL: SELL
+2025-07-15 16:48:53,453 - INFO - [improved_trading_system]    Total Trades: 0
+2025-07-15 16:48:53,453 - INFO - [improved_trading_system] [RandomStrategy] TSLA: SELL
+2025-07-15 16:48:53,454 - INFO - [improved_trading_system]    Win Rate: 0.0%
+2025-07-15 16:48:53,454 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 16:48:53,455 - INFO - [improved_trading_system]    Open Positions: 0
+2025-07-15 16:48:53,455 - INFO - [improved_trading_system]    Signals Generated: 5
+2025-07-15 16:48:53,455 - INFO - [improved_trading_system]    Price Updates: 0
+2025-07-15 16:48:53,456 - INFO - [improved_trading_system]    Active Strategies: 0
+2025-07-15 16:48:53,456 - ERROR - [notifications.manager] Error processing notification system_error: 'Settings' object has no attribute 'EMAIL_NOTIFICATIONS_ENABLED'
+2025-07-15 16:48:58,459 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 16:49:03,466 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 16:49:08,481 - ERROR - [improved_trading_system] Error in price update loop: There is no current event loop in thread 'Thread-4 (_price_update_loop)'.
+2025-07-15 16:49:10,477 - INFO - [trading] Received shutdown signal
+2025-07-15 16:49:10,478 - INFO - [improved_trading_system] 📈 Price update loop stopped
+2025-07-15 16:49:10,478 - INFO - [improved_trading_system] 🎯 Strategy execution loop stopped
+2025-07-15 16:49:10,701 - INFO - [trading] Received shutdown signal
+2025-07-15 16:49:10,884 - INFO - [trading] Received shutdown signal
+2025-07-15 16:49:11,056 - INFO - [trading] Received shutdown signal
+2025-07-15 16:49:53,459 - INFO - [improved_trading_system] 🛑 Stopping Improved Trading System
+2025-07-15 16:49:53,459 - INFO - [broker.async_broker] Stopping simplified async broker system
+2025-07-15 16:49:53,930 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 16:49:53,933 - INFO - [mongodb.async] [AsyncMongoDB] Disconnected from MongoDB
+2025-07-15 16:49:53,933 - INFO - [broker.async_broker] Simplified async broker system stopped
+2025-07-15 16:49:53,933 - INFO - [risk_manager.async] Stopping simplified async risk management system
+2025-07-15 16:49:54,941 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 16:49:54,943 - INFO - [risk_manager.async] Simplified async risk management system stopped
+2025-07-15 16:49:55,953 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 16:49:55,953 - INFO - [improved_trading_system] ✅ Improved trading system stopped
+2025-07-15 16:49:55,954 - INFO - [trading] 📊 Final System Statistics:
+2025-07-15 16:49:55,954 - INFO - [trading]    trades_executed: 0
+2025-07-15 16:49:55,954 - INFO - [trading]    trades_successful: 0
+2025-07-15 16:49:55,955 - INFO - [trading]    trades_failed: 0
+2025-07-15 16:49:55,955 - INFO - [trading]    total_pnl: 0.0
+2025-07-15 16:49:55,955 - INFO - [trading]    signals_generated: 5
+2025-07-15 16:49:55,956 - INFO - [trading]    price_updates: 0
+2025-07-15 16:49:55,956 - INFO - [trading]    strategies_executed: 1
+2025-07-15 16:49:55,956 - INFO - [trading]    system_running: False
+2025-07-15 16:49:55,956 - INFO - [trading]    price_thread_alive: False
+2025-07-15 16:49:55,958 - INFO - [trading]    strategy_thread_alive: False
+2025-07-15 16:49:55,958 - INFO - [trading]    active_symbols: 5
