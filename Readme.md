@@ -183,9 +183,6 @@ python Test/test_simplified_system.py
 ### Price Data
 - BTC-USD: $50,000 (crypto)
 - ETH-USD: $3,000 (crypto)
-- AAPL: $150 (stock)
-- GOOGL: $2,800 (stock)
-- TSLA: $800 (stock)
 
 ### Risk Thresholds
 - Max Portfolio Risk: 15%

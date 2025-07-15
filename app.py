@@ -328,19 +328,13 @@ class PriceGenerator:
         self.logger = logging.getLogger("price_generator")
         self.base_prices = {
             "BTC-USD": 50000.0,
-            "ETH-USD": 3000.0,
-            "AAPL": 150.0,
-            "GOOGL": 2800.0,
-            "TSLA": 800.0
+            "ETH-USD": 3000.0
         }
         self.current_prices = self.base_prices.copy()
         self.price_history = {symbol: [] for symbol in self.base_prices}
         self.volatility = {
             "BTC-USD": 0.03,
-            "ETH-USD": 0.04,
-            "AAPL": 0.02,
-            "GOOGL": 0.025,
-            "TSLA": 0.05
+            "ETH-USD": 0.04
         }
         
     def generate_market_data(self, symbol: str) -> MarketData:
@@ -408,7 +402,6 @@ class ImprovedTradingSystem:
         self.risk_manager = AsyncRiskManager(self.broker)
         self.notification_manager = NotificationManager()
         self.strategy_manager = StrategyManager()
-        # REPLACE price_generator with live_price_fetcher
         self.live_price_fetcher = LivePriceFetcher()
         
         # Control flags
@@ -433,6 +426,8 @@ class ImprovedTradingSystem:
             "price_updates": 0,
             "strategies_executed": 0
         }
+        # Store main event loop reference (will be set in start)
+        self._main_loop = None
         
         # Setup strategies
         self._setup_strategies()
@@ -441,7 +436,7 @@ class ImprovedTradingSystem:
 
     def _setup_strategies(self):
         """Setup trading strategies for different symbols"""
-        symbols = ["BTC-USD", "ETH-USD", "AAPL", "GOOGL", "TSLA"]
+        symbols = ["BTC-USD", "ETH-USD"]
         self.random_strategies = {}
         for symbol in symbols:
             # Add random strategy per symbol
@@ -452,35 +447,29 @@ class ImprovedTradingSystem:
         """Start the trading system"""
         try:
             self.logger.info("🚀 Starting Improved Trading System")
-            
+            # Store the main event loop
+            self._main_loop = asyncio.get_running_loop()
             # Start all async components
             if not await self.broker.start():
                 self.logger.error("❌ Failed to start broker")
                 return False
-            
             if not await self.risk_manager.start():
                 self.logger.error("❌ Failed to start risk manager")
                 return False
-            
             await self.notification_manager.start()
-            
             # Start threading components
             self._running = True
             self.price_thread = threading.Thread(target=self._price_update_loop, daemon=True)
             self.strategy_thread = threading.Thread(target=self._strategy_execution_loop, daemon=True)
-            
             self.price_thread.start()
             self.strategy_thread.start()
-            
             # Send startup notification
             await self.notification_manager.notify_system_error(
                 error_message="Improved system started successfully",
                 component="ImprovedTradingSystem"
             )
-            
             self.logger.info("✅ Improved trading system started successfully")
             return True
-            
         except Exception as e:
             self.logger.error(f"❌ Failed to start trading system: {e}")
             return False
@@ -516,9 +505,7 @@ class ImprovedTradingSystem:
                 symbols = list(self.random_strategies.keys())
                 prices = {}
                 for symbol in symbols:
-                    # Get live price
                     price = self.live_price_fetcher.get_price(symbol)
-                    # Build market data (minimal for demo)
                     market_data = MarketData(
                         symbol=symbol,
                         price=price,
@@ -533,18 +520,19 @@ class ImprovedTradingSystem:
                     with self.market_data_lock:
                         self.current_market_data[symbol] = market_data
                     prices[symbol] = {"price": price}
-                # Update broker prices (this will update position PnLs in memory)
-                asyncio.run_coroutine_threadsafe(
-                    self.broker.update_prices_async(prices),
-                    asyncio.get_event_loop()
-                )
-                # Print account and open positions' unrealized PnL
-                self._print_account_and_positions()
-                # Call risk management
-                asyncio.run_coroutine_threadsafe(
-                    self._update_risk_management(),
-                    asyncio.get_event_loop()
-                )
+                # Use the main event loop for all async calls from this thread
+                if self._main_loop is not None:
+                    asyncio.run_coroutine_threadsafe(
+                        self.broker.update_prices_async(prices),
+                        self._main_loop
+                    )
+                    self._print_account_and_positions(prices)
+                    asyncio.run_coroutine_threadsafe(
+                        self._update_risk_management(),
+                        self._main_loop
+                    )
+                else:
+                    self.logger.error("Main event loop not set!")
                 self._stats["price_updates"] += 1
                 if not self._shutdown_event.wait(5):
                     continue
@@ -565,14 +553,30 @@ class ImprovedTradingSystem:
             try:
                 symbols = list(self.random_strategies.keys())
                 for symbol in symbols:
-                    # Get current market data
                     with self.market_data_lock:
                         market_data = self.current_market_data.get(symbol)
                     if market_data:
-                        # Get random signal
                         signal = self.random_strategies[symbol].generate_signal()
                         self.logger.info(f"[RandomStrategy] {symbol}: {signal}")
-                        # (Optional) You can trigger trade logic here if needed
+                        # If signal is BUY or SELL, create and execute trade
+                        if signal in ("BUY", "SELL"):
+                            from src.broker.paper_broker import TradeRequest
+                            trade_request = TradeRequest(
+                                symbol=symbol,
+                                signal=signal,
+                                price=market_data.price,
+                                quantity=0.01,
+                                leverage=1.0,
+                                strategy_name=f"RandomStrategy_{symbol}",
+                                confidence=100.0
+                            )
+                            if self._main_loop is not None:
+                                asyncio.run_coroutine_threadsafe(
+                                    self._execute_signal(trade_request),
+                                    self._main_loop
+                                )
+                            else:
+                                self.logger.error("Main event loop not set for trade execution!")
                         self._stats["signals_generated"] += 1
                 self._stats["strategies_executed"] += 1
                 if not self._shutdown_event.wait(30):
@@ -587,23 +591,28 @@ class ImprovedTradingSystem:
                     break
         self.logger.info("🎯 Strategy execution loop stopped")
 
-    def _print_account_and_positions(self):
+    def _print_account_and_positions(self, prices: Dict[str, Dict[str, float]]):
         """Print account and open positions' unrealized PnL (no DB update)"""
         async def print_async():
             account = await self.broker.get_account_summary_async()
             positions = await self.broker.get_positions_summary_async()
+            print("\n[Prices]")
+            for symbol, price in prices.items():
+                print(f"{symbol}: ${price['price']:.2f}")
             print("\n[Account Summary]")
             print(f"Balance: ${account.get('current_balance', 0):.2f} | Unrealized PnL: ${account.get('total_unrealized_pnl', 0):.2f}")
             print("[Open Positions]")
             for pos in positions.get('open_positions', []):
                 print(f"{pos['symbol']} | Qty: {pos['quantity']} | Entry: {pos['entry_price']} | PnL: {pos['pnl']:.2f} | PnL%: {pos['pnl_percentage']:.2f}%")
-        # Run async print in event loop
-        asyncio.run_coroutine_threadsafe(print_async(), asyncio.get_event_loop())
+        if self._main_loop is not None:
+            asyncio.run_coroutine_threadsafe(print_async(), self._main_loop)
+        else:
+            self.logger.error("Main event loop not set for print!")
     
     async def _execute_signal(self, signal: TradingSignal):
         """Execute a trading signal"""
         try:
-            self.logger.info(f"📊 Processing signal: {signal.signal.value} {signal.symbol} "
+            self.logger.info(f"📊 Processing signal: {signal.signal} {signal.symbol} "
                            f"from {signal.strategy_name} (confidence: {signal.confidence:.1f}%)")
             
             # Check if signal is actionable
@@ -613,7 +622,7 @@ class ImprovedTradingSystem:
             # Create trade request
             trade_request = TradeRequest(
                 symbol=signal.symbol,
-                signal=signal.signal.value,
+                signal=signal.signal,
                 price=signal.price,
                 quantity=signal.quantity,
                 leverage=signal.leverage,
@@ -638,13 +647,13 @@ class ImprovedTradingSystem:
                 self._stats["trades_executed"] += 1
                 self._stats["trades_successful"] += 1
                 
-                self.logger.info(f"✅ Trade executed: {signal.signal.value} {signal.symbol} "
+                self.logger.info(f"✅ Trade executed: {signal.signal} {signal.symbol} "
                                f"at ${signal.price:.2f} via {signal.strategy_name}")
                 
                 # Send notification
                 await self.notification_manager.notify_trade_execution(
                     symbol=signal.symbol,
-                    signal=signal.signal.value,
+                    signal=signal.signal,
                     price=signal.price,
                     trade_id=trade_request.id,
                     position_id=trade_request.position_id or "N/A"
@@ -677,10 +686,7 @@ class ImprovedTradingSystem:
                     current_price=0.0,
                     risk_level=portfolio_risk.get("overall_risk_level", "unknown")
                 )
-            
-            # Update account summary based on current prices
-            await self.broker.update_account_summary_async()
-            
+                        
         except Exception as e:
             self.logger.error(f"Error updating risk management: {e}")
     

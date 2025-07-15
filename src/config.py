@@ -10,6 +10,7 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     """Application settings using Pydantic"""
+    EMAIL_NOTIFICATIONS_ENABLED: bool = Field(default=False, description="Enable email notifications")
     
     # Database Settings
     MONGODB_URI: str = Field(default="mongodb://localhost:27017", description="MongoDB connection URI")
@@ -51,7 +52,7 @@ class Settings(BaseSettings):
     
     # Dummy Data Settings
     DUMMY_SYMBOLS: List[str] = Field(
-        default=["BTC-USD", "ETH-USD", "AAPL", "GOOGL", "TSLA"],
+        default=["BTC-USD", "ETH-USD"],
         description="Dummy trading symbols"
     )
     DUMMY_PRICE_CHANGE_RANGE: float = Field(default=0.02, description="Dummy price change range (±2%)")
