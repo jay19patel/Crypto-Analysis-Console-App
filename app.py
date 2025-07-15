@@ -27,8 +27,8 @@ from typing import Dict, Any, List
 import os
 
 # Import simplified components
-from src.async_broker import AsyncBroker, TradeRequest
-from src.async_risk_manager import AsyncRiskManager
+from broker.paper_broker import AsyncBroker, TradeRequest
+from risk_manager import AsyncRiskManager
 from src.notifications import NotificationManager
 from src.config import get_settings, get_dummy_settings
 

@@ -62,13 +62,46 @@ I have successfully simplified the high-speed trading system by removing complex
 - ✅ System statistics
 - ✅ Demo trading scenarios
 
-### 5. `test_simplified_system.py` - Test Script (New)
+### 5. `Test/test_simplified_system.py` - Test Script (New)
 **Created:**
 - Comprehensive test suite for all components
 - Broker functionality testing
 - Risk manager testing
 - Notification system testing
 - Demonstrates all key features
+
+### 6. Database Settings
+- `MONGODB_URI`: MongoDB connection string (default: `mongodb://localhost:27017`)
+- `DATABASE_NAME`: Database name (default: `trading_system`)
+- `MONGODB_TIMEOUT`: Connection timeout in seconds (default: 5)
+
+
+### 7. Broker Settings
+- `BROKER_INITIAL_BALANCE`: Initial account balance (default: $10,000)
+- `BROKER_MAX_LEVERAGE`: Maximum leverage allowed (default: 5.0)
+- `BROKER_TRADING_FEE_PCT`: Trading fee percentage (default: 0.1%)
+- `BROKER_MIN_CONFIDENCE`: Minimum confidence for trade execution (default: 50%)
+- `BROKER_STOP_LOSS_PCT`: Default stop loss percentage (default: 5%)
+- `BROKER_TARGET_PCT`: Default target percentage (default: 10%)
+- `BROKER_MAX_HOLDING_HOURS`: Maximum position holding time (default: 48 hours)
+
+### 8. Risk Management Settings
+- `RISK_MAX_PORTFOLIO_RISK`: Maximum portfolio risk (default: 15%)
+- `RISK_MAX_POSITION_RISK`: Maximum position risk (default: 5%)
+- `RISK_CORRELATION_THRESHOLD`: Correlation threshold (default: 0.7)
+- `RISK_CHECK_INTERVAL`: Risk check interval in seconds (default: 5)
+
+### 9. Trading Settings
+- `DAILY_TRADES_LIMIT`: Daily trade limit (default: 50)
+- `MAX_POSITION_SIZE`: Maximum position size (default: $1,000)
+- `RISK_PER_TRADE`: Risk per trade (default: 2%)
+
+### 10. Dummy Data Settings
+- `DUMMY_SYMBOLS`: List of trading symbols for dummy data
+- `DUMMY_PRICE_CHANGE_RANGE`: Price change range for dummy data (default: ±2%)
+- `TRADING_LOOP_INTERVAL`: Trading loop interval in seconds (default: 5)
+
+
 
 ## System Architecture
 
@@ -129,7 +162,7 @@ python run_high_speed_trading.py
 
 ### Running Tests
 ```bash
-python test_simplified_system.py
+python Test/test_simplified_system.py
 ```
 
 ### Key Features Demonstrated

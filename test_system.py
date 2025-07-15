@@ -8,8 +8,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from src.async_broker import AsyncBroker, TradeRequest
-from src.async_risk_manager import AsyncRiskManager
+from src.broker.paper_broker import AsyncBroker, TradeRequest
+from src.risk_manager import AsyncRiskManager
 from src.notifications import NotificationManager
 
 # Configure logging
