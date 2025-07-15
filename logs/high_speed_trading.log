@@ -1,0 +1,77 @@
+2025-07-15 11:25:39,896 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 11:25:39,897 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 11:25:39,897 - INFO - [trading_system] Simplified trading system initialized
+2025-07-15 11:25:39,897 - INFO - [trading_system] 🚀 Starting Simplified Trading System
+2025-07-15 11:25:39,897 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 11:25:39,898 - INFO - [notifications.manager] Notification manager started
+2025-07-15 11:25:39,898 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 11:25:39,899 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 11:25:39,899 - INFO - [notifications.manager] Notification manager started
+2025-07-15 11:25:39,899 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 11:25:39,901 - INFO - [notifications.manager] Notification manager started
+2025-07-15 11:25:39,901 - INFO - [trading_system] ✅ Simplified trading system started successfully
+2025-07-15 11:25:39,901 - INFO - [trading_system] 🎭 Starting demo trading scenarios
+2025-07-15 11:25:39,901 - INFO - [trading_system] 📈 Demo: Executing BUY trade
+2025-07-15 11:25:39,902 - INFO - [trading_system] 🎯 Executing trade: BUY BTC-USD at $50000.00
+2025-07-15 11:25:39,902 - INFO - [broker.async_broker] 🚀 Executing trade: BUY BTC-USD at $50000.00
+2025-07-15 11:25:39,902 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 11:25:39,902 - INFO - [trading_system] ✅ Trade executed successfully: BUY BTC-USD
+2025-07-15 11:25:39,903 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:39,903 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY BTC-USD
+2025-07-15 11:25:39,904 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:39,904 - INFO - [notifications.manager] Notification sent: system_error - System Error: SimplifiedTradingSystem
+2025-07-15 11:25:39,904 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:39,904 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY BTC-USD
+2025-07-15 11:25:42,921 - INFO - [trading_system] 📉 Demo: Executing SELL trade
+2025-07-15 11:25:42,921 - INFO - [trading_system] 🎯 Executing trade: SELL ETH-USD at $3000.00
+2025-07-15 11:25:42,922 - INFO - [broker.async_broker] 🚀 Executing trade: SELL ETH-USD at $3000.00
+2025-07-15 11:25:42,922 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 11:25:42,923 - INFO - [trading_system] ✅ Trade executed successfully: SELL ETH-USD
+2025-07-15 11:25:42,923 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:42,924 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 11:25:42,926 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:42,927 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 11:25:45,939 - INFO - [trading_system] 🛡️ Demo: Risk management features
+2025-07-15 11:25:45,940 - INFO - [trading_system] Portfolio Risk Level: low
+2025-07-15 11:25:45,940 - INFO - [trading_system] Portfolio Risk Percentage: 0.0%
+2025-07-15 11:25:45,941 - INFO - [trading_system] Position BTC-USD: P&L $0.00
+2025-07-15 11:25:45,941 - INFO - [trading_system] Position ETH-USD: P&L $0.00
+2025-07-15 11:25:45,942 - INFO - [trading_system] 🔄 Starting simplified trading loop
+2025-07-15 11:25:55,943 - INFO - [trading_system] 🎯 Executing trade: SELL GOOGL at $2841.55
+2025-07-15 11:25:55,944 - INFO - [broker.async_broker] 🚀 Executing trade: SELL GOOGL at $2841.55
+2025-07-15 11:25:55,945 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 11:25:55,945 - INFO - [trading_system] ✅ Trade executed successfully: SELL GOOGL
+2025-07-15 11:25:55,946 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:55,946 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL GOOGL
+2025-07-15 11:25:55,947 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:25:55,947 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL GOOGL
+2025-07-15 11:26:00,960 - INFO - [trading_system] 📊 System Summary:
+2025-07-15 11:26:00,960 - INFO - [trading_system]    Account Balance: $9891.48
+2025-07-15 11:26:00,960 - INFO - [trading_system]    Total Trades: 3
+2025-07-15 11:26:00,960 - INFO - [trading_system]    Win Rate: 0.0%
+2025-07-15 11:26:00,961 - INFO - [trading_system]    Open Positions: 3
+2025-07-15 11:26:00,961 - INFO - [trading_system]    Unrealized P&L: $0.42
+2025-07-15 11:26:00,961 - INFO - [trading_system]    Risk Alerts: 0
+2025-07-15 11:26:00,961 - INFO - [trading_system]    Notifications Sent: 0
+2025-07-15 11:26:05,984 - INFO - [trading_system] 🎯 Executing trade: BUY ETH-USD at $2957.43
+2025-07-15 11:26:05,985 - WARNING - [trading_system] ❌ Trade rejected: Position already open for ETH-USD
+2025-07-15 11:26:56,123 - INFO - [trading_system] 🎯 Executing trade: BUY GOOGL at $2601.03
+2025-07-15 11:26:56,123 - WARNING - [trading_system] ❌ Trade rejected: Position already open for GOOGL
+2025-07-15 11:27:41,245 - INFO - [trading_system] 🎯 Executing trade: SELL ETH-USD at $2923.32
+2025-07-15 11:27:41,246 - WARNING - [trading_system] ❌ Trade rejected: Position already open for ETH-USD
+2025-07-15 11:28:01,298 - INFO - [trading_system] 🎯 Executing trade: BUY GOOGL at $2637.15
+2025-07-15 11:28:01,299 - WARNING - [trading_system] ❌ Trade rejected: Position already open for GOOGL
+2025-07-15 11:28:31,337 - INFO - [trading_system] 🎯 Executing trade: BUY BTC-USD at $49067.10
+2025-07-15 11:28:31,338 - WARNING - [trading_system] ❌ Trade rejected: Position already open for BTC-USD
+2025-07-15 11:28:36,348 - INFO - [broker.async_broker] ✅ Position closed: GOOGL at $2540.12
+2025-07-15 11:28:36,348 - INFO - [trading_system] 🛡️ Risk actions taken: ['Target Hit: GOOGL']
+2025-07-15 11:28:36,349 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:28:36,349 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: GOOGL
+2025-07-15 11:28:41,350 - INFO - [broker.async_broker] ✅ Position closed: BTC-USD at $47266.95
+2025-07-15 11:28:41,351 - INFO - [trading_system] 🛡️ Risk actions taken: ['Stop Loss: BTC-USD']
+2025-07-15 11:28:41,353 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:28:41,353 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: BTC-USD
+2025-07-15 11:29:41,499 - INFO - [broker.async_broker] ✅ Position closed: ETH-USD at $3156.35
+2025-07-15 11:29:41,500 - INFO - [trading_system] 🛡️ Risk actions taken: ['Stop Loss: ETH-USD']
+2025-07-15 11:29:41,501 - WARNING - [notifications.email] No email recipients configured
+2025-07-15 11:29:41,502 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: ETH-USD
