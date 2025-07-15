@@ -1,35 +1,34 @@
 """
-Broker Models
-Simple data models for trading account and positions
+Trading system models for account and position management
 """
 
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
 
 
 class PositionType(Enum):
-    """Position type"""
-    LONG = "long"
-    SHORT = "short"
+    """Position type enumeration"""
+    LONG = "LONG"
+    SHORT = "SHORT"
 
 
 class PositionStatus(Enum):
-    """Position status"""
-    OPEN = "open"
-    CLOSED = "closed"
-    PENDING = "pending"
+    """Position status enumeration"""
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
+    PENDING = "PENDING"
 
 
 @dataclass
 class Account:
     """Trading account model"""
-    id: str = ""
-    name: str = ""
-    initial_balance: float = 0.0
-    current_balance: float = 0.0
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = "Trading Account"
+    initial_balance: float = 10000.0
+    current_balance: float = 10000.0
     daily_trades_limit: int = 50
     max_position_size: float = 1000.0
     risk_per_trade: float = 0.02
@@ -43,10 +42,10 @@ class Account:
     daily_trades_count: int = 0
     total_margin_used: float = 0.0
     brokerage_charges: float = 0.0
-    last_trade_date: str = ""
+    last_trade_date: str = field(default_factory=lambda: datetime.now(timezone.utc).strftime('%Y-%m-%d'))
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert account to dictionary"""
         return {
             "id": self.id,
             "name": self.name,
@@ -65,13 +64,22 @@ class Account:
             "daily_trades_count": self.daily_trades_count,
             "total_margin_used": self.total_margin_used,
             "brokerage_charges": self.brokerage_charges,
-            "last_trade_date": self.last_trade_date
+            "last_trade_date": self.last_trade_date,
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Account':
-        """Create from dictionary"""
-        return cls(**data)
+        """Create account from dictionary"""
+        # Filter out MongoDB-specific fields
+        filtered_data = {k: v for k, v in data.items() if not k.startswith('_')}
+        
+        account = cls()
+        for key, value in filtered_data.items():
+            if hasattr(account, key):
+                setattr(account, key, value)
+        
+        return account
 
 
 @dataclass
@@ -80,6 +88,7 @@ class Position:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     symbol: str = ""
     position_type: PositionType = PositionType.LONG
+    status: PositionStatus = PositionStatus.OPEN
     entry_price: float = 0.0
     exit_price: Optional[float] = None
     quantity: float = 0.0
@@ -92,19 +101,17 @@ class Position:
     target: Optional[float] = None
     pnl: float = 0.0
     pnl_percentage: float = 0.0
-    status: PositionStatus = PositionStatus.OPEN
     entry_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     exit_time: Optional[datetime] = None
-    notes: str = ""
+    notes: Optional[str] = None
     
     def calculate_pnl(self, current_price: float) -> float:
-        """Calculate PnL based on current price"""
+        """Calculate P&L for the position"""
         if self.position_type == PositionType.LONG:
             self.pnl = (current_price - self.entry_price) * self.quantity
         else:
             self.pnl = (self.entry_price - current_price) * self.quantity
         
-        # Calculate percentage
         if self.invested_amount > 0:
             self.pnl_percentage = (self.pnl / self.invested_amount) * 100
         else:
@@ -113,29 +120,30 @@ class Position:
         return self.pnl
     
     def calculate_margin_usage(self, current_price: float) -> float:
-        """Calculate margin usage percentage"""
-        if self.leverage <= 1 or self.margin_used <= 0:
+        """Calculate current margin usage percentage"""
+        if self.margin_used <= 0:
             return 0.0
         
         current_value = current_price * self.quantity
-        required_margin = current_value / self.leverage
-        return (required_margin / self.margin_used) * 100
+        return (current_value / self.margin_used) * 100
     
-    def close_position(self, exit_price: float):
-        """Close position"""
+    def close_position(self, exit_price: float, reason: str = "Manual Close"):
+        """Close the position"""
         self.exit_price = exit_price
         self.exit_time = datetime.now(timezone.utc)
         self.status = PositionStatus.CLOSED
+        self.notes = reason
         
-        # Calculate final PnL
+        # Calculate final P&L
         self.calculate_pnl(exit_price)
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert position to dictionary"""
         return {
             "id": self.id,
             "symbol": self.symbol,
             "position_type": self.position_type.value,
+            "status": self.status.value,
             "entry_price": self.entry_price,
             "exit_price": self.exit_price,
             "quantity": self.quantity,
@@ -148,25 +156,43 @@ class Position:
             "target": self.target,
             "pnl": self.pnl,
             "pnl_percentage": self.pnl_percentage,
-            "status": self.status.value,
             "entry_time": self.entry_time.isoformat() if self.entry_time else None,
             "exit_time": self.exit_time.isoformat() if self.exit_time else None,
-            "notes": self.notes
+            "notes": self.notes,
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Position':
-        """Create from dictionary"""
-        # Handle enum conversions
-        if "position_type" in data:
-            data["position_type"] = PositionType(data["position_type"])
-        if "status" in data:
-            data["status"] = PositionStatus(data["status"])
+        """Create position from dictionary"""
+        # Filter out MongoDB-specific fields
+        filtered_data = {k: v for k, v in data.items() if not k.startswith('_')}
         
-        # Handle datetime conversions
-        if "entry_time" in data and data["entry_time"]:
-            data["entry_time"] = datetime.fromisoformat(data["entry_time"])
-        if "exit_time" in data and data["exit_time"]:
-            data["exit_time"] = datetime.fromisoformat(data["exit_time"])
+        position = cls()
         
-        return cls(**data) 
+        # Handle enum fields
+        if 'position_type' in filtered_data:
+            position.position_type = PositionType(filtered_data['position_type'])
+        
+        if 'status' in filtered_data:
+            position.status = PositionStatus(filtered_data['status'])
+        
+        # Handle datetime fields
+        if 'entry_time' in filtered_data and filtered_data['entry_time']:
+            if isinstance(filtered_data['entry_time'], str):
+                position.entry_time = datetime.fromisoformat(filtered_data['entry_time'].replace('Z', '+00:00'))
+            else:
+                position.entry_time = filtered_data['entry_time']
+        
+        if 'exit_time' in filtered_data and filtered_data['exit_time']:
+            if isinstance(filtered_data['exit_time'], str):
+                position.exit_time = datetime.fromisoformat(filtered_data['exit_time'].replace('Z', '+00:00'))
+            else:
+                position.exit_time = filtered_data['exit_time']
+        
+        # Set other fields
+        for key, value in filtered_data.items():
+            if hasattr(position, key) and key not in ['position_type', 'status', 'entry_time', 'exit_time']:
+                setattr(position, key, value)
+        
+        return position 

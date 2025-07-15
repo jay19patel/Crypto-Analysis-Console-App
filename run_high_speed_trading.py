@@ -6,12 +6,14 @@ and essential functionality.
 
 Usage:
     python run_high_speed_trading.py
+    python run_high_speed_trading.py --delete  # Delete all data
 
 Features:
     - Simplified async broker with dummy data
     - Basic risk management
     - Email notifications
     - Performance monitoring
+    - MongoDB persistence
 """
 
 import asyncio
@@ -19,6 +21,7 @@ import logging
 import signal
 import sys
 import time
+import argparse
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 import os
@@ -27,7 +30,7 @@ import os
 from src.async_broker import AsyncBroker, TradeRequest
 from src.async_risk_manager import AsyncRiskManager
 from src.notifications import NotificationManager
-from src.config import get_settings
+from src.config import get_settings, get_dummy_settings
 
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
@@ -46,11 +49,12 @@ logger = logging.getLogger("high_speed_trading")
 
 
 class SimplifiedTradingSystem:
-    """Simplified trading system with dummy data"""
+    """Simplified trading system with dummy data and MongoDB persistence"""
     
     def __init__(self):
         """Initialize simplified trading system"""
         self.settings = get_settings()
+        self.dummy_settings = get_dummy_settings()
         self.logger = logging.getLogger("trading_system")
         
         # Initialize components
@@ -78,7 +82,7 @@ class SimplifiedTradingSystem:
             "notifications_sent": 0
         }
         
-        # Dummy price data
+        # Dummy price data from config
         self._dummy_prices = {
             "BTC-USD": {"price": 50000.0, "volume": 1000.0, "change": 2.5},
             "ETH-USD": {"price": 3000.0, "volume": 500.0, "change": -1.2},
@@ -140,6 +144,25 @@ class SimplifiedTradingSystem:
         
         self.logger.info("✅ Simplified trading system stopped")
     
+    async def delete_all_data(self) -> bool:
+        """Delete all trading data"""
+        try:
+            self.logger.info("🗑️ Deleting all trading data...")
+            
+            # Delete data from broker (which handles MongoDB)
+            success = await self.broker.delete_all_data()
+            
+            if success:
+                self.logger.info("✅ All trading data deleted successfully")
+                return True
+            else:
+                self.logger.error("❌ Failed to delete trading data")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error deleting data: {e}")
+            return False
+    
     async def run_trading_loop(self):
         """Main trading loop with simplified execution"""
         try:
@@ -160,7 +183,7 @@ class SimplifiedTradingSystem:
                     await self._update_statistics()
                     
                     # Sleep for next iteration
-                    await asyncio.sleep(5.0)  # 5 second loop
+                    await asyncio.sleep(self.dummy_settings["trading_loop_interval"])
                     
                 except asyncio.CancelledError:
                     break
@@ -178,8 +201,11 @@ class SimplifiedTradingSystem:
         for symbol in self._dummy_prices:
             current_price = self._dummy_prices[symbol]["price"]
             
-            # Add small random change (-2% to +2%)
-            change_percent = random.uniform(-0.02, 0.02)
+            # Add small random change based on config
+            change_percent = random.uniform(
+                -self.dummy_settings["price_change_range"], 
+                self.dummy_settings["price_change_range"]
+            )
             new_price = current_price * (1 + change_percent)
             
             self._dummy_prices[symbol]["price"] = new_price
@@ -197,8 +223,8 @@ class SimplifiedTradingSystem:
             
             # 10% chance to generate a trade signal
             if random.random() < 0.1:
-                # Pick a random symbol
-                symbol = random.choice(list(self._dummy_prices.keys()))
+                # Pick a random symbol from config
+                symbol = random.choice(self.dummy_settings["symbols"])
                 current_price = self._dummy_prices[symbol]["price"]
                 
                 # Generate signal
@@ -327,6 +353,7 @@ class SimplifiedTradingSystem:
             self.logger.info(f"   Unrealized P&L: ${positions_summary.get('total_unrealized_pnl', 0):.2f}")
             self.logger.info(f"   Risk Alerts: {self._stats['risk_alerts']}")
             self.logger.info(f"   Notifications Sent: {notification_stats.get('emails_sent', 0)}")
+            self.logger.info(f"   MongoDB Connected: {broker_stats.get('mongodb_connected', False)}")
             
         except Exception as e:
             self.logger.error(f"Error logging system summary: {e}")
@@ -436,8 +463,22 @@ class SimplifiedTradingSystem:
         }
 
 
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Simplified Trading System")
+    parser.add_argument(
+        "--delete", 
+        action="store_true", 
+        help="Delete all trading data from database"
+    )
+    return parser.parse_args()
+
+
 async def main():
     """Main function to run the simplified trading system"""
+    # Parse command line arguments
+    args = parse_arguments()
+    
     # Create trading system
     trading_system = SimplifiedTradingSystem()
     
@@ -450,6 +491,13 @@ async def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     try:
+        # Handle --delete flag
+        if args.delete:
+            logger.info("🗑️ Deleting all trading data...")
+            await trading_system.delete_all_data()
+            logger.info("✅ Data deletion completed")
+            return
+        
         # Start the system
         if not await trading_system.start():
             logger.error("Failed to start trading system")

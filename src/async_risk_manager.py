@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from src.broker.models import Position, PositionType, PositionStatus
-from src.config import get_settings
+from src.config import get_settings, get_risk_settings
 from src.notifications import NotificationManager
 
 
@@ -74,12 +74,13 @@ class AsyncRiskManager:
         """Initialize async risk manager"""
         self.broker = broker
         self.settings = get_settings()
+        self.risk_settings = get_risk_settings()
         self.logger = logging.getLogger("risk_manager.async")
         
-        # Risk thresholds
-        self.max_portfolio_risk = 0.15  # 15% max portfolio risk
-        self.max_position_risk = 0.05   # 5% max position risk
-        self.correlation_threshold = 0.7
+        # Risk thresholds from config
+        self.max_portfolio_risk = self.risk_settings["max_portfolio_risk"]
+        self.max_position_risk = self.risk_settings["max_position_risk"]
+        self.correlation_threshold = self.risk_settings["correlation_threshold"]
         
         # Risk tracking
         self._risk_metrics: Dict[str, RiskMetrics] = {}
@@ -422,7 +423,7 @@ class AsyncRiskManager:
         # Critical conditions
         if (margin_usage > 95 or 
             pnl_percentage < -10 or 
-            holding_time_hours > 47):
+            holding_time_hours > self.settings.BROKER_MAX_HOLDING_HOURS):
             return RiskLevel.CRITICAL
         
         # High risk conditions
@@ -450,7 +451,7 @@ class AsyncRiskManager:
                 return RiskAction.EMERGENCY_CLOSE
             elif pnl_percentage < -10:
                 return RiskAction.CLOSE_POSITION
-            elif holding_time_hours > 47:
+            elif holding_time_hours > self.settings.BROKER_MAX_HOLDING_HOURS:
                 return RiskAction.CLOSE_POSITION
             else:
                 return RiskAction.EMERGENCY_CLOSE
@@ -487,7 +488,7 @@ class AsyncRiskManager:
         # Normalize factors to 0-100 scale
         margin_score = min(margin_usage, 100)
         pnl_score = abs(pnl_percentage) if pnl_percentage < 0 else 0
-        time_score = min(holding_time_hours / 48 * 100, 100)  # 48 hours max
+        time_score = min(holding_time_hours / self.settings.BROKER_MAX_HOLDING_HOURS * 100, 100)
         volatility_score_norm = min(volatility_score, 100)
         
         # Calculate weighted score
@@ -626,7 +627,7 @@ class AsyncRiskManager:
             current_time = datetime.now(timezone.utc)
             holding_hours = (current_time - entry_time).total_seconds() / 3600
             
-            return holding_hours >= 48  # 48 hours max
+            return holding_hours >= self.settings.BROKER_MAX_HOLDING_HOURS
         except:
             return False
     
@@ -642,7 +643,9 @@ class AsyncRiskManager:
                 ]),
                 "monitoring_status": "active",
                 "last_check": datetime.now(timezone.utc).isoformat(),
-                "execution_times": self._execution_times
+                "execution_times": self._execution_times,
+                "max_portfolio_risk": self.max_portfolio_risk,
+                "max_position_risk": self.max_position_risk
             }
             
         except Exception as e:

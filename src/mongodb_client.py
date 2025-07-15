@@ -1,54 +1,75 @@
 """
-MongoDB client for storing analysis results
+Async MongoDB client using motor for trading system
 """
 
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
-from pymongo import MongoClient, errors
-# Removed message formatter dependency for simplified system
+import motor.motor_asyncio
+from pymongo import errors
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-class MongoDBClient:
-    """MongoDB client for analysis results storage"""
+
+class AsyncMongoDBClient:
+    """Async MongoDB client using motor for trading system - Singleton pattern"""
+    
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        """Singleton pattern - ensure only one instance"""
+        if cls._instance is None:
+            cls._instance = super(AsyncMongoDBClient, cls).__new__(cls)
+        return cls._instance
     
     def __init__(self):
-        """Initialize MongoDB client"""
-        self.logger = logging.getLogger("mongodb")
+        """Initialize async MongoDB client - only once"""
+        if self._initialized:
+            return
+            
+        self.logger = logging.getLogger("mongodb.async")
         self.settings = get_settings()
         self.client = None
         self.db = None
         self.is_connected = False
+        self.indexes_created = False  # Track if indexes have been created
         
-        # Collection names with text prefix to avoid conflicts
+        # Collection names
         self.accounts_collection = "accounts"
-        self.positions_collection = "positions" 
+        self.positions_collection = "positions"
         self.trades_collection = "trades"
         self.analysis_collection = "analysis"
         
+        self._initialized = True
+        
     def log_message(self, message: str, level: str = "info"):
         """Send log message"""
-        self.logger.log(getattr(logging, level.upper()), f"[MongoDB] {message}")
+        self.logger.log(getattr(logging, level.upper()), f"[AsyncMongoDB] {message}")
 
-    def connect(self) -> bool:
-        """Connect to MongoDB database"""
+    async def connect(self) -> bool:
+        """Connect to MongoDB database asynchronously"""
         try:
-            # Connect to MongoDB
-            self.client = MongoClient(
+            if self.is_connected or self.client:
+                return True
+            
+            # Connect to MongoDB using motor
+            self.client = motor.motor_asyncio.AsyncIOMotorClient(
                 self.settings.MONGODB_URI,
                 serverSelectionTimeoutMS=self.settings.MONGODB_TIMEOUT * 1000
             )
             
             # Test connection
-            self.client.admin.command('ping')
+            await self.client.admin.command('ping')
             
             # Get database
             self.db = self.client[self.settings.DATABASE_NAME]
             
-            # # Create indexes
-            # self.create_indexes()
+            # Create indexes only if not already created
+            if not self.indexes_created:
+                await self.create_indexes()
+                self.indexes_created = True
             
             self.is_connected = True
             self.log_message("Connected to MongoDB successfully", "info")
@@ -58,21 +79,54 @@ class MongoDBClient:
             self.log_message(f"MongoDB connection error: {e}", "error")
             return False
 
-    def disconnect(self):
+    async def disconnect(self):
         """Disconnect from MongoDB"""
         if self.client:
             self.client.close()
             self.is_connected = False
+            self.indexes_created = False  # Reset indexes flag on disconnect
             self.log_message("Disconnected from MongoDB", "info")
 
-    def insert_document(self, collection: str, document: Dict) -> bool:
-        """Insert a document into collection"""
+    async def create_indexes(self) -> bool:
+        """Create useful indexes on collections"""
+        if self.is_connected or self.client:
+            return True
+        
+        try:
+            # Create indexes for accounts collection
+            await self.db[self.accounts_collection].create_index("id", unique=True)
+            await self.db[self.accounts_collection].create_index("last_trade_date")
+            
+            # Create indexes for positions collection
+            await self.db[self.positions_collection].create_index("id", unique=True)
+            await self.db[self.positions_collection].create_index("symbol")
+            await self.db[self.positions_collection].create_index("status")
+            await self.db[self.positions_collection].create_index("entry_time")
+            
+            # Create indexes for trades collection
+            await self.db[self.trades_collection].create_index("id", unique=True)
+            await self.db[self.trades_collection].create_index("symbol")
+            await self.db[self.trades_collection].create_index("timestamp")
+            
+            # Create indexes for analysis collection
+            await self.db[self.analysis_collection].create_index("timestamp")
+            await self.db[self.analysis_collection].create_index("analysis_data.symbol")
+            
+            self.log_message("MongoDB indexes created successfully", "info")
+            return True
+            
+        except Exception as e:
+            self.log_message(f"Error creating MongoDB indexes: {e}", "error")
+            return False
+
+    async def insert_document(self, collection: str, document: Dict) -> bool:
+        """Insert a document into collection asynchronously"""
         if not self.is_connected:
-            if not self.connect():
+            if not await self.connect():
                 return False
         
         try:
-            result = self.db[collection].insert_one(document)
+            result = await self.db[collection].insert_one(document)
             if result.acknowledged:
                 self.log_message(f"Document inserted into {collection}", "info")
                 return True
@@ -81,26 +135,49 @@ class MongoDBClient:
             self.log_message(f"Error inserting document: {e}", "error")
             return False
 
-    def find_document(self, collection: str, query: Dict) -> Optional[Dict]:
-        """Find a document in collection"""
+    async def find_document(self, collection: str, query: Dict) -> Optional[Dict]:
+        """Find a document in collection asynchronously"""
         if not self.is_connected:
-            if not self.connect():
+            if not await self.connect():
                 return None
         
         try:
-            return self.db[collection].find_one(query)
+            return await self.db[collection].find_one(query)
         except Exception as e:
             self.log_message(f"Error finding document: {e}", "error")
             return None
 
-    def update_document(self, collection: str, query: Dict, update: Dict) -> bool:
-        """Update a document in collection"""
+    async def find_documents(self, collection: str, query: Dict, limit: int = 0) -> List[Dict]:
+        """Find multiple documents in collection asynchronously"""
         if not self.is_connected:
-            if not self.connect():
+            if not await self.connect():
+                return []
+        
+        try:
+            cursor = self.db[collection].find(query)
+            if limit > 0:
+                cursor = cursor.limit(limit)
+            
+            documents = await cursor.to_list(length=None)
+            
+            # Convert ObjectId to string for JSON serialization
+            for doc in documents:
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+            
+            return documents
+        except Exception as e:
+            self.log_message(f"Error finding documents: {e}", "error")
+            return []
+
+    async def update_document(self, collection: str, query: Dict, update: Dict) -> bool:
+        """Update a document in collection asynchronously"""
+        if not self.is_connected:
+            if not await self.connect():
                 return False
         
         try:
-            result = self.db[collection].update_one(query, {"$set": update})
+            result = await self.db[collection].update_one(query, {"$set": update})
             if result.modified_count > 0:
                 self.log_message(f"Document updated in {collection}", "info")
                 return True
@@ -109,14 +186,30 @@ class MongoDBClient:
             self.log_message(f"Error updating document: {e}", "error")
             return False
 
-    def delete_document(self, collection: str, query: Dict) -> bool:
-        """Delete a document from collection"""
+    async def replace_document(self, collection: str, query: Dict, document: Dict) -> bool:
+        """Replace a document in collection asynchronously"""
         if not self.is_connected:
-            if not self.connect():
+            if not await self.connect():
                 return False
         
         try:
-            result = self.db[collection].delete_one(query)
+            result = await self.db[collection].replace_one(query, document, upsert=True)
+            if result.acknowledged:
+                self.log_message(f"Document replaced in {collection}", "info")
+                return True
+            return False
+        except Exception as e:
+            self.log_message(f"Error replacing document: {e}", "error")
+            return False
+
+    async def delete_document(self, collection: str, query: Dict) -> bool:
+        """Delete a document from collection asynchronously"""
+        if not self.is_connected:
+            if not await self.connect():
+                return False
+        
+        try:
+            result = await self.db[collection].delete_one(query)
             if result.deleted_count > 0:
                 self.log_message(f"Document deleted from {collection}", "info")
                 return True
@@ -125,18 +218,140 @@ class MongoDBClient:
             self.log_message(f"Error deleting document: {e}", "error")
             return False
 
-    def save_analysis_result(self, analysis_data: Dict[str, Any]) -> Optional[str]:
-        """
-        Save analysis result to MongoDB with datetime
-        
-        Args:
-            analysis_data: Complete analysis results dictionary
-            
-        Returns:
-            str: MongoDB document ID if saved successfully, None otherwise
-        """
+    async def delete_collection(self, collection: str) -> bool:
+        """Delete entire collection asynchronously"""
         if not self.is_connected:
-            if not self.connect():
+            if not await self.connect():
+                return False
+        
+        try:
+            await self.db[collection].drop()
+            self.log_message(f"Collection {collection} deleted", "info")
+            return True
+        except Exception as e:
+            self.log_message(f"Error deleting collection {collection}: {e}", "error")
+            return False
+
+    async def delete_all_data(self) -> bool:
+        """Delete all trading data from database"""
+        if not self.is_connected:
+            if not await self.connect():
+                return False
+        
+        try:
+            # Delete all collections
+            collections = [self.accounts_collection, self.positions_collection, 
+                         self.trades_collection, self.analysis_collection]
+            
+            for collection in collections:
+                await self.delete_collection(collection)
+            
+            self.log_message("All trading data deleted from database", "info")
+            return True
+        except Exception as e:
+            self.log_message(f"Error deleting all data: {e}", "error")
+            return False
+
+    # Account Management
+    async def save_account(self, account_data: Dict[str, Any]) -> bool:
+        """Save account data to MongoDB"""
+        try:
+            # Ensure account has timestamp
+            if "last_updated" not in account_data:
+                account_data["last_updated"] = datetime.now(timezone.utc).isoformat()
+            
+            return await self.replace_document(
+                self.accounts_collection, 
+                {"id": account_data["id"]}, 
+                account_data
+            )
+        except Exception as e:
+            self.log_message(f"Error saving account: {e}", "error")
+            return False
+
+    async def load_account(self, account_id: str = "main") -> Optional[Dict[str, Any]]:
+        """Load account data from MongoDB"""
+        try:
+            return await self.find_document(self.accounts_collection, {"id": account_id})
+        except Exception as e:
+            self.log_message(f"Error loading account: {e}", "error")
+            return None
+
+    # Position Management
+    async def save_position(self, position_data: Dict[str, Any]) -> bool:
+        """Save position data to MongoDB"""
+        try:
+            # Ensure position has timestamp
+            if "last_updated" not in position_data:
+                position_data["last_updated"] = datetime.now(timezone.utc).isoformat()
+            
+            return await self.replace_document(
+                self.positions_collection, 
+                {"id": position_data["id"]}, 
+                position_data
+            )
+        except Exception as e:
+            self.log_message(f"Error saving position: {e}", "error")
+            return False
+
+    async def load_positions(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Load positions from MongoDB"""
+        try:
+            query = {}
+            if status:
+                query["status"] = status
+            
+            return await self.find_documents(self.positions_collection, query)
+        except Exception as e:
+            self.log_message(f"Error loading positions: {e}", "error")
+            return []
+
+    async def delete_position(self, position_id: str) -> bool:
+        """Delete position from MongoDB"""
+        try:
+            return await self.delete_document(self.positions_collection, {"id": position_id})
+        except Exception as e:
+            self.log_message(f"Error deleting position: {e}", "error")
+            return False
+
+    # Trade Management
+    async def save_trade(self, trade_data: Dict[str, Any]) -> bool:
+        """Save trade data to MongoDB"""
+        try:
+            # Ensure trade has timestamp
+            if "timestamp" not in trade_data:
+                trade_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            
+            return await self.insert_document(self.trades_collection, trade_data)
+        except Exception as e:
+            self.log_message(f"Error saving trade: {e}", "error")
+            return False
+
+    async def load_trades(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Load recent trades from MongoDB"""
+        try:
+            if not self.is_connected:
+                if not await self.connect():
+                    return []
+                
+            cursor = self.db[self.trades_collection].find().sort("timestamp", -1).limit(limit)
+            trades = await cursor.to_list(length=None)
+            
+            # Convert ObjectId to string
+            for trade in trades:
+                if '_id' in trade:
+                    trade['_id'] = str(trade['_id'])
+            
+            return trades
+        except Exception as e:
+            self.log_message(f"Error loading trades: {e}", "error")
+            return []
+
+    # Analysis Management
+    async def save_analysis_result(self, analysis_data: Dict[str, Any]) -> Optional[str]:
+        """Save analysis result to MongoDB"""
+        if not self.is_connected:
+            if not await self.connect():
                 return None
         
         try:
@@ -148,7 +363,7 @@ class MongoDBClient:
             }
             
             # Insert document
-            result = self.db[self.analysis_collection].insert_one(document)
+            result = await self.db[self.analysis_collection].insert_one(document)
             
             if result.inserted_id:
                 document_id = str(result.inserted_id)
@@ -161,24 +376,16 @@ class MongoDBClient:
         except Exception as e:
             self.log_message(f"Error saving to MongoDB: {e}", "error")
             return None
-    
-    def get_recent_analyses(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Get recent analysis results
-        
-        Args:
-            limit: Number of recent records to retrieve
-            
-        Returns:
-            List of analysis results
-        """
+
+    async def get_recent_analyses(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent analysis results"""
         if not self.is_connected:
-            if not self.connect():
+            if not await self.connect():
                 return []
         
         try:
             cursor = self.db[self.analysis_collection].find().sort("timestamp", -1).limit(limit)
-            results = list(cursor)
+            results = await cursor.to_list(length=None)
             
             # Convert ObjectId to string for JSON serialization
             for result in results:
@@ -190,86 +397,23 @@ class MongoDBClient:
             self.log_message(f"Error retrieving from MongoDB: {e}", "error")
             return []
 
-    def get_historical_data(self, symbol: str, start_time: str, end_time: str) -> List[Dict[str, Any]]:
-        """
-        Get historical price data for a symbol within the specified time range
-        
-        Args:
-            symbol: Trading symbol (e.g., 'BTCUSD')
-            start_time: Start time in ISO format
-            end_time: End time in ISO format
-            
-        Returns:
-            List of historical price data points
-        """
-        if not self.is_connected:
-            if not self.connect():
-                return []
-        
-        try:
-            # Get historical data collection
-            historical_collection = self.db['historical_data']
-            
-            # Query for data within time range
-            query = {
-                'symbol': symbol,
-                'timestamp': {
-                    '$gte': start_time,
-                    '$lte': end_time
-                }
-            }
-            
-            # Sort by timestamp ascending
-            cursor = historical_collection.find(query).sort('timestamp', 1)
-            
-            # Convert cursor to list
-            data = list(cursor)
-            
-            # Convert ObjectId to string for JSON serialization
-            for item in data:
-                if '_id' in item:
-                    item['_id'] = str(item['_id'])
-            
-            if not data:
-                self.log_message(f"No historical data found for {symbol} between {start_time} and {end_time}", "warning")
-            else:
-                self.log_message(f"Retrieved {len(data)} historical data points for {symbol}", "info")
-            
-            return data
-            
-        except Exception as e:
-            self.log_message(f"Error retrieving historical data from MongoDB: {e}", "error")
-            return []
-    
-    def test_connection(self) -> bool:
+    async def test_connection(self) -> bool:
         """Test MongoDB connection"""
         try:
             if not self.is_connected:
-                return self.connect()
+                return await self.connect()
             
             # Test with a simple query
-            self.collection.count_documents({})
+            await self.db[self.accounts_collection].count_documents({})
             return True
             
         except Exception as e:
             self.log_message(f"MongoDB connection test failed: {e}", "error")
             return False
     
-    def create_indexes(self) -> bool:
-        """Create useful indexes on the collection"""
-        if not self.is_connected:
-            if not self.connect():
-                return False
-        
-        try:
-            # Create indexes for better query performance
-            self.collection.create_index("timestamp")
-            self.collection.create_index("analysis_data.symbol")
-            self.collection.create_index([("timestamp", -1), ("analysis_data.symbol", 1)])
-            
-            self.log_message("MongoDB indexes created successfully", "info")
-            return True
-            
-        except Exception as e:
-            self.log_message(f"Error creating MongoDB indexes: {e}", "error")
-            return False 
+    @classmethod
+    def reset_instance(cls):
+        """Reset singleton instance for testing purposes"""
+        if cls._instance:
+            cls._instance = None
+            cls._initialized = False 

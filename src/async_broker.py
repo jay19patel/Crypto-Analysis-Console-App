@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from src.broker.models import Account, Position, PositionType, PositionStatus
-from src.config import get_settings
+from src.config import get_settings, get_broker_settings
 from src.notifications import NotificationManager
+from src.mongodb_client import AsyncMongoDBClient
 
 
 class ExecutionStatus(Enum):
@@ -60,11 +61,12 @@ class TradeRequest:
 
 
 class AsyncBroker:
-    """Simplified async broker with dummy data"""
+    """Simplified async broker with dummy data and MongoDB persistence"""
     
     def __init__(self):
         """Initialize async broker"""
         self.settings = get_settings()
+        self.broker_settings = get_broker_settings()
         self.logger = logging.getLogger("broker.async_broker")
         
         # Dummy data storage
@@ -82,41 +84,29 @@ class AsyncBroker:
         # Notification system
         self.notification_manager = NotificationManager()
         
+        # MongoDB client
+        self.mongodb_client = AsyncMongoDBClient()
+        
         # Account and positions
         self.account: Optional[Account] = None
         self.positions: Dict[str, Position] = {}
         
-        # Initialize dummy account
-        self._initialize_dummy_account()
-        
         self.logger.info("Simplified async broker initialized")
-    
-    def _initialize_dummy_account(self):
-        """Initialize dummy account with fixed data"""
-        self.account = Account()
-        self.account.id = "main"
-        self.account.name = "Trading Account Main"
-        self.account.initial_balance = 10000.0
-        self.account.current_balance = 10000.0
-        self.account.daily_trades_limit = 50
-        self.account.max_position_size = 1000.0
-        self.account.risk_per_trade = 0.02
-        self.account.max_leverage = 5.0
-        self.account.total_trades = 0
-        self.account.profitable_trades = 0
-        self.account.losing_trades = 0
-        self.account.win_rate = 0.0
-        self.account.total_profit = 0.0
-        self.account.total_loss = 0.0
-        self.account.daily_trades_count = 0
-        self.account.total_margin_used = 0.0
-        self.account.brokerage_charges = 0.0
-        self.account.last_trade_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
     async def start(self) -> bool:
         """Start async broker system"""
         try:
             self.logger.info("Starting simplified async broker system")
+            
+            # Connect to MongoDB
+            if not await self.mongodb_client.connect():
+                self.logger.warning("Failed to connect to MongoDB, using in-memory storage")
+            
+            # Initialize account
+            await self._initialize_account()
+            
+            # Load positions
+            await self._load_positions()
             
             # Start notification manager
             await self.notification_manager.start()
@@ -135,10 +125,84 @@ class AsyncBroker:
         # Stop notification manager
         await self.notification_manager.stop()
         
+        # Disconnect from MongoDB
+        await self.mongodb_client.disconnect()
+        
         self.logger.info("Simplified async broker system stopped")
     
+    async def _initialize_account(self):
+        """Initialize or load trading account"""
+        try:
+            # Try to load existing account from MongoDB
+            account_data = await self.mongodb_client.load_account("main")
+            
+            if account_data:
+                self.account = Account.from_dict(account_data)
+                self.logger.info(f"✅ Loaded existing account: {self.account.id}")
+            else:
+                # Create new account with config settings
+                self.account = Account()
+                self.account.id = "main"
+                self.account.name = "Trading Account Main"
+                self.account.initial_balance = self.broker_settings["initial_balance"]
+                self.account.current_balance = self.broker_settings["initial_balance"]
+                self.account.daily_trades_limit = self.broker_settings["daily_trades_limit"]
+                self.account.max_position_size = self.broker_settings["max_position_size"]
+                self.account.risk_per_trade = self.broker_settings["risk_per_trade"]
+                self.account.max_leverage = self.broker_settings["max_leverage"]
+                self.account.total_trades = 0
+                self.account.profitable_trades = 0
+                self.account.losing_trades = 0
+                self.account.win_rate = 0.0
+                self.account.total_profit = 0.0
+                self.account.total_loss = 0.0
+                self.account.daily_trades_count = 0
+                self.account.total_margin_used = 0.0
+                self.account.brokerage_charges = 0.0
+                self.account.last_trade_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+                
+                # Save new account to MongoDB
+                await self.mongodb_client.save_account(self.account.to_dict())
+                
+                self.logger.info(f"✅ Created new account: {self.account.id}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize account: {e}")
+            # Create fallback account
+            self._create_fallback_account()
+    
+    def _create_fallback_account(self):
+        """Create fallback account if MongoDB fails"""
+        self.account = Account()
+        self.account.id = "main"
+        self.account.name = "Trading Account Main"
+        self.account.initial_balance = self.broker_settings["initial_balance"]
+        self.account.current_balance = self.broker_settings["initial_balance"]
+        self.account.daily_trades_limit = self.broker_settings["daily_trades_limit"]
+        self.account.max_position_size = self.broker_settings["max_position_size"]
+        self.account.risk_per_trade = self.broker_settings["risk_per_trade"]
+        self.account.max_leverage = self.broker_settings["max_leverage"]
+        self.account.last_trade_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    
+    async def _load_positions(self):
+        """Load positions from MongoDB"""
+        try:
+            # Load all positions from MongoDB
+            positions_data = await self.mongodb_client.load_positions()
+            
+            for position_data in positions_data:
+                position = Position.from_dict(position_data)
+                self.positions[position.id] = position
+                self._position_cache[position.id] = position
+            
+            self.logger.info(f"✅ Loaded {len(self.positions)} positions from MongoDB")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to load positions: {e}")
+            # Continue with empty positions
+    
     async def execute_trade_async(self, trade_request: TradeRequest) -> bool:
-        """Execute trade asynchronously with dummy data"""
+        """Execute trade asynchronously with dummy data and MongoDB persistence"""
         try:
             self.logger.info(f"🚀 Executing trade: {trade_request.signal} {trade_request.symbol} at ${trade_request.price:.2f}")
             
@@ -156,10 +220,16 @@ class AsyncBroker:
                 return False
             
             # Execute trade with dummy data
-            success = self._execute_trade_simple(trade_request)
+            success = await self._execute_trade_simple(trade_request)
             
             if success:
                 trade_request.status = ExecutionStatus.COMPLETED
+                
+                # Save trade to MongoDB
+                await self.mongodb_client.save_trade(trade_request.to_dict())
+                
+                # Save updated account to MongoDB
+                await self.mongodb_client.save_account(self.account.to_dict())
                 
                 # Send notification
                 await self.notification_manager.notify_trade_execution(
@@ -194,16 +264,22 @@ class AsyncBroker:
             return False
     
     async def close_position_async(self, position_id: str, exit_price: float, reason: str) -> bool:
-        """Close position asynchronously"""
+        """Close position asynchronously with MongoDB persistence"""
         try:
             position = self.positions.get(position_id)
             if not position or position.status != PositionStatus.OPEN:
                 return False
             
             # Close position with dummy data
-            success = self._close_position_simple(position_id, exit_price, reason)
+            success = await self._close_position_simple(position_id, exit_price, reason)
             
             if success:
+                # Save updated position to MongoDB
+                await self.mongodb_client.save_position(position.to_dict())
+                
+                # Save updated account to MongoDB
+                await self.mongodb_client.save_account(self.account.to_dict())
+                
                 # Send notification
                 await self.notification_manager.notify_position_close(
                     symbol=position.symbol,
@@ -289,6 +365,34 @@ class AsyncBroker:
             "total_unrealized_pnl": sum(p.pnl for p in self.positions.values() if p.status == PositionStatus.OPEN)
         }
     
+    async def delete_all_data(self) -> bool:
+        """Delete all trading data from MongoDB"""
+        try:
+            success = await self.mongodb_client.delete_all_data()
+            if success:
+                # Reset in-memory data
+                self.positions.clear()
+                self._position_cache.clear()
+                self._trade_stats = {
+                    "total_requests": 0,
+                    "successful_trades": 0,
+                    "failed_trades": 0,
+                    "avg_execution_time": 0.0
+                }
+                
+                # Reinitialize account
+                await self._initialize_account()
+                
+                self.logger.info("✅ All trading data deleted successfully")
+                return True
+            else:
+                self.logger.error("❌ Failed to delete trading data")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error deleting data: {e}")
+            return False
+    
     # Private methods
     def _validate_trade_request(self, trade_request: TradeRequest) -> bool:
         """Validate trade request"""
@@ -304,7 +408,7 @@ class AsyncBroker:
             trade_request.error_message = f"Invalid quantity: {trade_request.quantity}"
             return False
         
-        if trade_request.confidence < 50:  # Lower threshold for demo
+        if trade_request.confidence < self.broker_settings["min_confidence"]:
             trade_request.error_message = f"Low confidence: {trade_request.confidence}%"
             return False
         
@@ -340,13 +444,13 @@ class AsyncBroker:
         
         return True
     
-    def _execute_trade_simple(self, trade_request: TradeRequest) -> bool:
-        """Execute trade with dummy data"""
+    async def _execute_trade_simple(self, trade_request: TradeRequest) -> bool:
+        """Execute trade with dummy data and MongoDB persistence"""
         try:
             # Calculate position details
             position_value = trade_request.price * trade_request.quantity
             margin_required = position_value / trade_request.leverage
-            trading_fee = margin_required * 0.001  # 0.1% fee
+            trading_fee = margin_required * self.broker_settings["trading_fee_pct"]
             
             # Check if we have enough balance
             total_required = margin_required + trading_fee
@@ -366,13 +470,13 @@ class AsyncBroker:
             position.margin_used = margin_required
             position.trading_fee = trading_fee
             
-            # Calculate risk levels
+            # Calculate risk levels using config settings
             if position.position_type == PositionType.LONG:
-                position.stop_loss = trade_request.price * 0.95  # 5% below
-                position.target = trade_request.price * 1.10  # 10% above
+                position.stop_loss = trade_request.price * (1 - self.broker_settings["stop_loss_pct"])
+                position.target = trade_request.price * (1 + self.broker_settings["target_pct"])
             else:
-                position.stop_loss = trade_request.price * 1.05  # 5% above
-                position.target = trade_request.price * 0.90  # 10% below
+                position.stop_loss = trade_request.price * (1 + self.broker_settings["stop_loss_pct"])
+                position.target = trade_request.price * (1 - self.broker_settings["target_pct"])
             
             # Calculate initial PnL
             position.calculate_pnl(trade_request.price)
@@ -384,7 +488,10 @@ class AsyncBroker:
             self.account.total_trades += 1
             self.account.daily_trades_count += 1
             
-            # Save position
+            # Save position to MongoDB
+            await self.mongodb_client.save_position(position.to_dict())
+            
+            # Save position to memory
             self.positions[position.id] = position
             trade_request.position_id = position.id
             
@@ -394,8 +501,8 @@ class AsyncBroker:
             trade_request.error_message = str(e)
             return False
     
-    def _close_position_simple(self, position_id: str, exit_price: float, reason: str) -> bool:
-        """Close position with dummy data"""
+    async def _close_position_simple(self, position_id: str, exit_price: float, reason: str) -> bool:
+        """Close position with dummy data and MongoDB persistence"""
         try:
             position = self.positions.get(position_id)
             if not position or position.status != PositionStatus.OPEN:
@@ -447,5 +554,6 @@ class AsyncBroker:
             **self._trade_stats,
             "total_positions": len(self.positions),
             "open_positions": len([p for p in self.positions.values() if p.status == PositionStatus.OPEN]),
-            "account_balance": self.account.current_balance if self.account else 0.0
+            "account_balance": self.account.current_balance if self.account else 0.0,
+            "mongodb_connected": self.mongodb_client.is_connected
         } 
