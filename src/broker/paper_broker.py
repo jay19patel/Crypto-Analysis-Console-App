@@ -154,8 +154,7 @@ class AsyncBroker:
                 self.account.profitable_trades = 0
                 self.account.losing_trades = 0
                 self.account.win_rate = 0.0
-                self.account.total_profit = 0.0
-                self.account.total_loss = 0.0
+                self.account.realized_pnl = 0.0
                 self.account.daily_trades_count = 0
                 self.account.total_margin_used = 0.0
                 self.account.brokerage_charges = 0.0
@@ -324,8 +323,7 @@ class AsyncBroker:
             "profitable_trades": self.account.profitable_trades,
             "losing_trades": self.account.losing_trades,
             "win_rate": self.account.win_rate,
-            "total_profit": self.account.total_profit,
-            "total_loss": self.account.total_loss,
+            "realized_pnl": self.account.realized_pnl,
             "daily_trades_count": self.account.daily_trades_count,
             "daily_trades_limit": self.account.daily_trades_limit,
             "total_margin_used": self.account.total_margin_used,
@@ -522,13 +520,13 @@ class AsyncBroker:
             if exit_fee > 0:
                 self.account.brokerage_charges += exit_fee
             
-            # Update statistics
+            # Update realized P&L and statistics
+            self.account.realized_pnl += position.pnl
+            
             if position.pnl > 0:
                 self.account.profitable_trades += 1
-                self.account.total_profit += position.pnl
             else:
                 self.account.losing_trades += 1
-                self.account.total_loss += abs(position.pnl)
             
             # Calculate win rate
             if self.account.total_trades > 0:

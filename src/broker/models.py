@@ -37,8 +37,7 @@ class Account:
     profitable_trades: int = 0
     losing_trades: int = 0
     win_rate: float = 0.0
-    total_profit: float = 0.0
-    total_loss: float = 0.0
+    realized_pnl: float = 0.0
     daily_trades_count: int = 0
     total_margin_used: float = 0.0
     brokerage_charges: float = 0.0
@@ -59,8 +58,7 @@ class Account:
             "profitable_trades": self.profitable_trades,
             "losing_trades": self.losing_trades,
             "win_rate": self.win_rate,
-            "total_profit": self.total_profit,
-            "total_loss": self.total_loss,
+            "realized_pnl": self.realized_pnl,
             "daily_trades_count": self.daily_trades_count,
             "total_margin_used": self.total_margin_used,
             "brokerage_charges": self.brokerage_charges,

@@ -339,14 +339,24 @@ class ImprovedTradingSystem:
         async def print_async():
             account = await self.broker.get_account_summary_async()
             positions = await self.broker.get_positions_summary_async()
+            print("---------------------------------------------------------------")
             print("\n[Prices]")
             for symbol, price in prices.items():
                 print(f"{symbol}: ${price['price']:.2f}")
             print("\n[Account Summary]")
-            print(f"Balance: ${account.get('current_balance', 0):.2f} | Unrealized PnL: ${account.get('total_unrealized_pnl', 0):.2f}")
+            print(f"Current Balance: ${account.get('current_balance', 0):.2f} out of ${account.get('initial_balance', 0):.2f}")
+            print(f"Realized PnL: ${account.get('realized_pnl', 0):.2f} | Unrealized PnL: ${account.get('total_unrealized_pnl', 0):.2f}")
+            print(f"Total Trades: {account.get('total_trades', 0)}")
+            print(f"Profitable / Losing Trades: {account.get('profitable_trades', 0)} / {account.get('losing_trades', 0)}")
+            print(f"Win Rate: {account.get('win_rate', 0):.2f}%")
+            print(f"Daily Trades: {account.get('daily_trades_count', 0)} / {account.get('daily_trades_limit', 0)}")
+            print(f"Total Margin Used: ${account.get('total_margin_used', 0):.2f}")
+            print(f"Brokerage Charges: ${account.get('brokerage_charges', 0):.2f}")
             print("[Open Positions]")
             for pos in positions.get('open_positions', []):
                 print(f"{pos['symbol']} | Qty: {pos['quantity']} | Entry: {pos['entry_price']} | PnL: {pos['pnl']:.2f} | PnL%: {pos['pnl_percentage']:.2f}%")
+            print("---------------------------------------------------------------")
+
         if self._main_loop is not None:
             asyncio.run_coroutine_threadsafe(print_async(), self._main_loop)
         else:

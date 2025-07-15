@@ -176,3 +176,499 @@
 2025-07-15 20:19:41,090 - INFO - [trading]    strategy_thread_alive: False
 2025-07-15 20:19:41,091 - INFO - [trading]    active_symbols: 2
 2025-07-15 20:19:41,092 - INFO - [trading]    manager_stats: {'total_executions': 20, 'successful_executions': 20, 'failed_executions': 0, 'success_rate': 100.0, 'active_symbols': 2, 'total_strategies': 4}
+2025-07-15 20:31:48,602 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 20:31:48,603 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 20:31:48,604 - INFO - [strategy_manager] Added strategy Random_BTC-USD for BTC-USD
+2025-07-15 20:31:48,604 - INFO - [strategy_manager] Added strategy Volatility_20_BTC-USD for BTC-USD
+2025-07-15 20:31:48,605 - INFO - [strategy_manager] Added strategy Random_ETH-USD for ETH-USD
+2025-07-15 20:31:48,605 - INFO - [strategy_manager] Added strategy Volatility_20_ETH-USD for ETH-USD
+2025-07-15 20:31:48,605 - INFO - [strategy_manager] Added default strategies for 2 symbols
+2025-07-15 20:31:48,606 - INFO - [improved_trading_system] Setup default strategies for 2 symbols
+2025-07-15 20:31:48,606 - INFO - [improved_trading_system] Improved trading system initialized
+2025-07-15 20:31:48,608 - INFO - [trading] 🗑️ Deleting all trading data...
+2025-07-15 20:31:48,608 - INFO - [improved_trading_system] 🗑️ Deleting all trading data...
+2025-07-15 20:31:48,675 - INFO - [mongodb.async] [AsyncMongoDB] Connected to MongoDB successfully
+2025-07-15 20:31:48,679 - INFO - [mongodb.async] [AsyncMongoDB] Collection accounts deleted
+2025-07-15 20:31:48,682 - INFO - [mongodb.async] [AsyncMongoDB] Collection positions deleted
+2025-07-15 20:31:48,687 - INFO - [mongodb.async] [AsyncMongoDB] Collection trades deleted
+2025-07-15 20:31:48,691 - INFO - [mongodb.async] [AsyncMongoDB] Collection analysis deleted
+2025-07-15 20:31:48,692 - INFO - [mongodb.async] [AsyncMongoDB] All trading data deleted from database
+2025-07-15 20:31:48,731 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:31:48,731 - INFO - [broker.async_broker] ✅ Created new account: main
+2025-07-15 20:31:48,732 - INFO - [broker.async_broker] ✅ All trading data deleted successfully
+2025-07-15 20:31:48,734 - INFO - [improved_trading_system] ✅ All trading data deleted successfully
+2025-07-15 20:31:48,735 - INFO - [trading] ✅ Data deletion completed
+2025-07-15 20:31:48,735 - INFO - [improved_trading_system] 🚀 Starting Improved Trading System
+2025-07-15 20:31:48,735 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 20:31:48,739 - INFO - [broker.async_broker] ✅ Loaded existing account: main
+2025-07-15 20:31:48,744 - INFO - [broker.async_broker] ✅ Loaded 0 positions from MongoDB
+2025-07-15 20:31:48,745 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:31:48,746 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 20:31:48,746 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 20:31:48,748 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:31:48,748 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 20:31:48,752 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:31:48,753 - INFO - [improved_trading_system] 📈 Starting price update loop (5s interval)
+2025-07-15 20:31:48,754 - INFO - [improved_trading_system] 🎯 Starting strategy execution loop (30s interval)
+2025-07-15 20:31:48,755 - INFO - [improved_trading_system] ✅ Improved trading system started successfully
+2025-07-15 20:31:48,756 - INFO - [improved_trading_system] 🔄 Starting main monitoring loop
+2025-07-15 20:31:48,757 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 20:31:48,757 - INFO - [strategy_manager] Selected signal: SignalType.BUY from Random_BTC-USD with confidence 62.7%
+2025-07-15 20:31:48,759 - INFO - [improved_trading_system]    Account Balance: $10000.00
+2025-07-15 20:31:48,760 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.BUY from Random_BTC-USD (confidence: 62.7%)
+2025-07-15 20:31:48,760 - INFO - [improved_trading_system]    Total Trades: 0
+2025-07-15 20:31:48,761 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.BUY (confidence: 62.7%)
+2025-07-15 20:31:48,761 - INFO - [improved_trading_system]    Win Rate: 0.0%
+2025-07-15 20:31:48,762 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:31:48,762 - INFO - [improved_trading_system]    Open Positions: 0
+2025-07-15 20:31:48,764 - INFO - [improved_trading_system]    Signals Generated: 1
+2025-07-15 20:31:48,764 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_ETH-USD with confidence 81.5%
+2025-07-15 20:31:48,764 - INFO - [improved_trading_system]    Price Updates: 1
+2025-07-15 20:31:48,766 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.SELL from Random_ETH-USD (confidence: 81.5%)
+2025-07-15 20:31:48,768 - INFO - [improved_trading_system]    Strategy Executions: 1
+2025-07-15 20:31:48,769 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:31:48,770 - INFO - [improved_trading_system]    Strategy Success Rate: 100.0%
+2025-07-15 20:31:48,770 - INFO - [improved_trading_system]    Active Strategies: 4
+2025-07-15 20:31:48,771 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.SELL (confidence: 81.5%)
+2025-07-15 20:31:48,772 - INFO - [notifications.manager] Notification sent: system_error - System Error: ImprovedTradingSystem
+2025-07-15 20:31:48,777 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.BUY BTC-USD from Random_BTC-USD (confidence: 62.7%)
+2025-07-15 20:31:48,778 - WARNING - [improved_trading_system] ❌ Trade rejected by risk manager: Position size 5.1% would exceed 5.0% limit
+2025-07-15 20:31:48,778 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL ETH-USD from Random_ETH-USD (confidence: 81.5%)
+2025-07-15 20:31:48,779 - INFO - [broker.async_broker] 🚀 Executing trade: SELL ETH-USD at $2950.16
+2025-07-15 20:31:48,809 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:31:48,842 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:31:48,844 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:31:48,845 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:31:48,845 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.SELL ETH-USD at $2950.16 via Random_ETH-USD
+2025-07-15 20:31:48,847 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 20:31:48,848 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 20:31:58,786 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:31:58,794 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:31:58,795 - INFO - [broker.async_broker] ✅ Position closed: ETH-USD at $3244.50
+2025-07-15 20:31:58,796 - INFO - [improved_trading_system] 🛡️ Risk actions taken: ['Stop Loss: ETH-USD']
+2025-07-15 20:31:58,797 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: ETH-USD
+2025-07-15 20:32:18,785 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.WAIT from Random_BTC-USD (confidence: 91.5%)
+2025-07-15 20:32:18,786 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.WAIT (confidence: 91.5%)
+2025-07-15 20:32:18,787 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:32:18,789 - INFO - [strategy_manager] Selected signal: SignalType.BUY from Random_ETH-USD with confidence 56.7%
+2025-07-15 20:32:18,790 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.BUY from Random_ETH-USD (confidence: 56.7%)
+2025-07-15 20:32:18,791 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:32:18,792 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.BUY (confidence: 56.7%)
+2025-07-15 20:32:18,794 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.BUY ETH-USD from Random_ETH-USD (confidence: 56.7%)
+2025-07-15 20:32:18,796 - INFO - [broker.async_broker] 🚀 Executing trade: BUY ETH-USD at $3590.97
+2025-07-15 20:32:18,804 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:32:18,809 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:32:18,817 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:32:18,819 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:32:18,820 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.BUY ETH-USD at $3590.97 via Random_ETH-USD
+2025-07-15 20:32:18,822 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY ETH-USD
+2025-07-15 20:32:18,823 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY ETH-USD
+2025-07-15 20:32:33,903 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:32:33,911 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:32:33,913 - INFO - [broker.async_broker] ✅ Position closed: ETH-USD at $3999.55
+2025-07-15 20:32:33,914 - INFO - [improved_trading_system] 🛡️ Risk actions taken: ['Target Hit: ETH-USD']
+2025-07-15 20:32:33,916 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: ETH-USD
+2025-07-15 20:32:40,896 - INFO - [trading] Received shutdown signal
+2025-07-15 20:32:40,897 - INFO - [improved_trading_system] 📈 Price update loop stopped
+2025-07-15 20:32:40,898 - INFO - [improved_trading_system] 🎯 Strategy execution loop stopped
+2025-07-15 20:32:41,090 - INFO - [trading] Received shutdown signal
+2025-07-15 20:32:41,273 - INFO - [trading] Received shutdown signal
+2025-07-15 20:32:41,434 - INFO - [trading] Received shutdown signal
+2025-07-15 20:32:48,781 - INFO - [improved_trading_system] 🛑 Stopping Improved Trading System
+2025-07-15 20:32:48,782 - INFO - [strategy_manager] Shutting down strategy manager...
+2025-07-15 20:32:48,784 - INFO - [strategy_manager] Strategy manager shutdown complete
+2025-07-15 20:32:48,786 - INFO - [broker.async_broker] Stopping simplified async broker system
+2025-07-15 20:32:49,236 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:32:49,241 - INFO - [mongodb.async] [AsyncMongoDB] Disconnected from MongoDB
+2025-07-15 20:32:49,242 - INFO - [broker.async_broker] Simplified async broker system stopped
+2025-07-15 20:32:49,243 - INFO - [risk_manager.async] Stopping simplified async risk management system
+2025-07-15 20:32:50,249 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:32:50,251 - INFO - [risk_manager.async] Simplified async risk management system stopped
+2025-07-15 20:32:50,334 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:32:50,343 - INFO - [improved_trading_system] ✅ Improved trading system stopped
+2025-07-15 20:32:50,405 - INFO - [trading] 📊 Final System Statistics:
+2025-07-15 20:32:50,410 - INFO - [trading]    trades_executed: 2
+2025-07-15 20:32:50,418 - INFO - [trading]    trades_successful: 2
+2025-07-15 20:32:50,439 - INFO - [trading]    trades_failed: 0
+2025-07-15 20:32:50,440 - INFO - [trading]    total_pnl: 0.0
+2025-07-15 20:32:50,447 - INFO - [trading]    signals_generated: 4
+2025-07-15 20:32:50,449 - INFO - [trading]    price_updates: 11
+2025-07-15 20:32:50,451 - INFO - [trading]    strategies_executed: 2
+2025-07-15 20:32:50,452 - INFO - [trading]    system_running: False
+2025-07-15 20:32:50,454 - INFO - [trading]    price_thread_alive: False
+2025-07-15 20:32:50,455 - INFO - [trading]    strategy_thread_alive: False
+2025-07-15 20:32:50,456 - INFO - [trading]    active_symbols: 2
+2025-07-15 20:32:50,468 - INFO - [trading]    manager_stats: {'total_executions': 8, 'successful_executions': 8, 'failed_executions': 0, 'success_rate': 100.0, 'active_symbols': 2, 'total_strategies': 4}
+2025-07-15 20:36:18,050 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 20:36:18,052 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 20:36:18,054 - INFO - [strategy_manager] Added strategy Random_BTC-USD for BTC-USD
+2025-07-15 20:36:18,054 - INFO - [strategy_manager] Added strategy Volatility_20_BTC-USD for BTC-USD
+2025-07-15 20:36:18,056 - INFO - [strategy_manager] Added strategy Random_ETH-USD for ETH-USD
+2025-07-15 20:36:18,057 - INFO - [strategy_manager] Added strategy Volatility_20_ETH-USD for ETH-USD
+2025-07-15 20:36:18,058 - INFO - [strategy_manager] Added default strategies for 2 symbols
+2025-07-15 20:36:18,059 - INFO - [improved_trading_system] Setup default strategies for 2 symbols
+2025-07-15 20:36:18,059 - INFO - [improved_trading_system] Improved trading system initialized
+2025-07-15 20:36:18,060 - INFO - [trading] 🗑️ Deleting all trading data...
+2025-07-15 20:36:18,061 - INFO - [improved_trading_system] 🗑️ Deleting all trading data...
+2025-07-15 20:36:18,140 - INFO - [mongodb.async] [AsyncMongoDB] Connected to MongoDB successfully
+2025-07-15 20:36:18,146 - INFO - [mongodb.async] [AsyncMongoDB] Collection accounts deleted
+2025-07-15 20:36:18,156 - INFO - [mongodb.async] [AsyncMongoDB] Collection positions deleted
+2025-07-15 20:36:18,161 - INFO - [mongodb.async] [AsyncMongoDB] Collection trades deleted
+2025-07-15 20:36:18,166 - INFO - [mongodb.async] [AsyncMongoDB] Collection analysis deleted
+2025-07-15 20:36:18,168 - INFO - [mongodb.async] [AsyncMongoDB] All trading data deleted from database
+2025-07-15 20:36:18,230 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:36:18,232 - INFO - [broker.async_broker] ✅ Created new account: main
+2025-07-15 20:36:18,234 - INFO - [broker.async_broker] ✅ All trading data deleted successfully
+2025-07-15 20:36:18,235 - INFO - [improved_trading_system] ✅ All trading data deleted successfully
+2025-07-15 20:36:18,237 - INFO - [trading] ✅ Data deletion completed
+2025-07-15 20:36:18,238 - INFO - [improved_trading_system] 🚀 Starting Improved Trading System
+2025-07-15 20:36:18,240 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 20:36:18,247 - INFO - [broker.async_broker] ✅ Loaded existing account: main
+2025-07-15 20:36:18,252 - INFO - [broker.async_broker] ✅ Loaded 0 positions from MongoDB
+2025-07-15 20:36:18,255 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:36:18,256 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 20:36:18,257 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 20:36:18,261 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:36:18,264 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 20:36:18,267 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:36:18,271 - INFO - [improved_trading_system] 📈 Starting price update loop (5s interval)
+2025-07-15 20:36:18,272 - INFO - [improved_trading_system] 🎯 Starting strategy execution loop (30s interval)
+2025-07-15 20:36:18,273 - INFO - [improved_trading_system] ✅ Improved trading system started successfully
+2025-07-15 20:36:18,277 - INFO - [improved_trading_system] 🔄 Starting main monitoring loop
+2025-07-15 20:36:18,278 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_BTC-USD with confidence 73.6%
+2025-07-15 20:36:18,281 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 20:36:18,283 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.SELL from Random_BTC-USD (confidence: 73.6%)
+2025-07-15 20:36:18,285 - INFO - [improved_trading_system]    Account Balance: $10000.00
+2025-07-15 20:36:18,286 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.SELL (confidence: 73.6%)
+2025-07-15 20:36:18,287 - INFO - [improved_trading_system]    Total Trades: 0
+2025-07-15 20:36:18,288 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:36:18,290 - INFO - [improved_trading_system]    Win Rate: 0.0%
+2025-07-15 20:36:18,293 - INFO - [improved_trading_system]    Open Positions: 0
+2025-07-15 20:36:18,295 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_ETH-USD with confidence 90.2%
+2025-07-15 20:36:18,296 - INFO - [improved_trading_system]    Signals Generated: 1
+2025-07-15 20:36:18,299 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.SELL from Random_ETH-USD (confidence: 90.2%)
+2025-07-15 20:36:18,301 - INFO - [improved_trading_system]    Price Updates: 1
+2025-07-15 20:36:18,302 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.SELL (confidence: 90.2%)
+2025-07-15 20:36:18,303 - INFO - [improved_trading_system]    Strategy Executions: 2
+2025-07-15 20:36:18,304 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:36:18,305 - INFO - [improved_trading_system]    Strategy Success Rate: 100.0%
+2025-07-15 20:36:18,306 - INFO - [improved_trading_system]    Active Strategies: 4
+2025-07-15 20:36:18,307 - INFO - [notifications.manager] Notification sent: system_error - System Error: ImprovedTradingSystem
+2025-07-15 20:36:18,315 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL BTC-USD from Random_BTC-USD (confidence: 73.6%)
+2025-07-15 20:36:18,316 - WARNING - [improved_trading_system] ❌ Trade rejected by risk manager: Position size 5.0% would exceed 5.0% limit
+2025-07-15 20:36:18,317 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL ETH-USD from Random_ETH-USD (confidence: 90.2%)
+2025-07-15 20:36:18,317 - INFO - [broker.async_broker] 🚀 Executing trade: SELL ETH-USD at $3045.39
+2025-07-15 20:36:18,350 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:36:18,387 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:36:18,391 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:36:18,391 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:36:18,391 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.SELL ETH-USD at $3045.39 via Random_ETH-USD
+2025-07-15 20:36:18,392 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 20:36:18,393 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 20:36:48,309 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_BTC-USD with confidence 68.0%
+2025-07-15 20:36:48,310 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.SELL from Random_BTC-USD (confidence: 68.0%)
+2025-07-15 20:36:48,312 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.SELL (confidence: 68.0%)
+2025-07-15 20:36:48,313 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:36:48,314 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL BTC-USD from Random_BTC-USD (confidence: 68.0%)
+2025-07-15 20:36:48,316 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_ETH-USD with confidence 68.5%
+2025-07-15 20:36:48,317 - INFO - [broker.async_broker] 🚀 Executing trade: SELL BTC-USD at $45860.21
+2025-07-15 20:36:48,318 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.SELL from Random_ETH-USD (confidence: 68.5%)
+2025-07-15 20:36:48,321 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.SELL (confidence: 68.5%)
+2025-07-15 20:36:48,323 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:36:48,325 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:36:48,328 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL ETH-USD from Random_ETH-USD (confidence: 68.5%)
+2025-07-15 20:36:48,331 - WARNING - [improved_trading_system] ❌ Trade rejected by risk manager: Position already open for ETH-USD
+2025-07-15 20:36:48,333 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:36:48,338 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:36:48,340 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:36:48,341 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.SELL BTC-USD at $45860.21 via Random_BTC-USD
+2025-07-15 20:36:48,343 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL BTC-USD
+2025-07-15 20:36:48,346 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL BTC-USD
+2025-07-15 20:37:08,398 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:37:08,404 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:37:08,405 - INFO - [broker.async_broker] ✅ Position closed: BTC-USD at $41217.21
+2025-07-15 20:37:08,406 - INFO - [improved_trading_system] 🛡️ Risk actions taken: ['Target Hit: BTC-USD']
+2025-07-15 20:37:08,409 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: BTC-USD
+2025-07-15 20:37:18,326 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 20:37:18,327 - INFO - [improved_trading_system]    Account Balance: $10015.26
+2025-07-15 20:37:18,328 - INFO - [improved_trading_system]    Total Trades: 2
+2025-07-15 20:37:18,329 - INFO - [improved_trading_system]    Win Rate: 50.0%
+2025-07-15 20:37:18,330 - INFO - [improved_trading_system]    Open Positions: 1
+2025-07-15 20:37:18,331 - INFO - [improved_trading_system]    Signals Generated: 4
+2025-07-15 20:37:18,332 - INFO - [improved_trading_system]    Price Updates: 12
+2025-07-15 20:37:18,333 - INFO - [improved_trading_system]    Strategy Executions: 8
+2025-07-15 20:37:18,334 - INFO - [improved_trading_system]    Strategy Success Rate: 100.0%
+2025-07-15 20:37:18,335 - INFO - [improved_trading_system]    Active Strategies: 4
+2025-07-15 20:37:18,344 - INFO - [strategy_manager] Selected signal: SignalType.BUY from Random_BTC-USD with confidence 83.9%
+2025-07-15 20:37:18,346 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.BUY from Random_BTC-USD (confidence: 83.9%)
+2025-07-15 20:37:18,348 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.BUY (confidence: 83.9%)
+2025-07-15 20:37:18,350 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:37:18,352 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.BUY BTC-USD from Random_BTC-USD (confidence: 83.9%)
+2025-07-15 20:37:18,354 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.WAIT from Random_ETH-USD (confidence: 86.4%)
+2025-07-15 20:37:18,355 - INFO - [broker.async_broker] 🚀 Executing trade: BUY BTC-USD at $41567.00
+2025-07-15 20:37:18,361 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:37:18,364 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.WAIT (confidence: 86.4%)
+2025-07-15 20:37:18,367 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:37:18,374 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:37:18,379 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:37:18,381 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:37:18,382 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.BUY BTC-USD at $41567.00 via Random_BTC-USD
+2025-07-15 20:37:18,384 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY BTC-USD
+2025-07-15 20:37:18,385 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY BTC-USD
+2025-07-15 20:37:19,596 - INFO - [trading] Received shutdown signal
+2025-07-15 20:37:19,598 - INFO - [improved_trading_system] 📈 Price update loop stopped
+2025-07-15 20:37:19,598 - INFO - [improved_trading_system] 🎯 Strategy execution loop stopped
+2025-07-15 20:37:19,796 - INFO - [trading] Received shutdown signal
+2025-07-15 20:37:19,972 - INFO - [trading] Received shutdown signal
+2025-07-15 20:37:20,142 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:15,592 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:15,772 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:15,953 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:16,116 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:16,292 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:16,452 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:18,345 - INFO - [improved_trading_system] 🛑 Stopping Improved Trading System
+2025-07-15 20:38:18,346 - INFO - [strategy_manager] Shutting down strategy manager...
+2025-07-15 20:38:18,348 - INFO - [strategy_manager] Strategy manager shutdown complete
+2025-07-15 20:38:18,350 - INFO - [broker.async_broker] Stopping simplified async broker system
+2025-07-15 20:38:19,233 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:38:19,236 - INFO - [mongodb.async] [AsyncMongoDB] Disconnected from MongoDB
+2025-07-15 20:38:19,236 - INFO - [broker.async_broker] Simplified async broker system stopped
+2025-07-15 20:38:19,237 - INFO - [risk_manager.async] Stopping simplified async risk management system
+2025-07-15 20:38:20,237 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:38:20,238 - INFO - [risk_manager.async] Simplified async risk management system stopped
+2025-07-15 20:38:20,316 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:38:20,318 - INFO - [improved_trading_system] ✅ Improved trading system stopped
+2025-07-15 20:38:20,319 - INFO - [trading] 📊 Final System Statistics:
+2025-07-15 20:38:20,321 - INFO - [trading]    trades_executed: 3
+2025-07-15 20:38:20,322 - INFO - [trading]    trades_successful: 3
+2025-07-15 20:38:20,323 - INFO - [trading]    trades_failed: 0
+2025-07-15 20:38:20,323 - INFO - [trading]    total_pnl: 0.0
+2025-07-15 20:38:20,325 - INFO - [trading]    signals_generated: 6
+2025-07-15 20:38:20,326 - INFO - [trading]    price_updates: 13
+2025-07-15 20:38:20,327 - INFO - [trading]    strategies_executed: 3
+2025-07-15 20:38:20,328 - INFO - [trading]    system_running: False
+2025-07-15 20:38:20,329 - INFO - [trading]    price_thread_alive: False
+2025-07-15 20:38:20,331 - INFO - [trading]    strategy_thread_alive: False
+2025-07-15 20:38:20,334 - INFO - [trading]    active_symbols: 2
+2025-07-15 20:38:20,335 - INFO - [trading]    manager_stats: {'total_executions': 12, 'successful_executions': 12, 'failed_executions': 0, 'success_rate': 100.0, 'active_symbols': 2, 'total_strategies': 4}
+2025-07-15 20:38:26,086 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 20:38:26,087 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 20:38:26,088 - INFO - [strategy_manager] Added strategy Random_BTC-USD for BTC-USD
+2025-07-15 20:38:26,088 - INFO - [strategy_manager] Added strategy Volatility_20_BTC-USD for BTC-USD
+2025-07-15 20:38:26,089 - INFO - [strategy_manager] Added strategy Random_ETH-USD for ETH-USD
+2025-07-15 20:38:26,089 - INFO - [strategy_manager] Added strategy Volatility_20_ETH-USD for ETH-USD
+2025-07-15 20:38:26,089 - INFO - [strategy_manager] Added default strategies for 2 symbols
+2025-07-15 20:38:26,090 - INFO - [improved_trading_system] Setup default strategies for 2 symbols
+2025-07-15 20:38:26,090 - INFO - [improved_trading_system] Improved trading system initialized
+2025-07-15 20:38:26,090 - INFO - [trading] 🗑️ Deleting all trading data...
+2025-07-15 20:38:26,091 - INFO - [improved_trading_system] 🗑️ Deleting all trading data...
+2025-07-15 20:38:26,130 - INFO - [mongodb.async] [AsyncMongoDB] Connected to MongoDB successfully
+2025-07-15 20:38:26,134 - INFO - [mongodb.async] [AsyncMongoDB] Collection accounts deleted
+2025-07-15 20:38:26,137 - INFO - [mongodb.async] [AsyncMongoDB] Collection positions deleted
+2025-07-15 20:38:26,141 - INFO - [mongodb.async] [AsyncMongoDB] Collection trades deleted
+2025-07-15 20:38:26,143 - INFO - [mongodb.async] [AsyncMongoDB] Collection analysis deleted
+2025-07-15 20:38:26,143 - INFO - [mongodb.async] [AsyncMongoDB] All trading data deleted from database
+2025-07-15 20:38:26,206 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:38:26,206 - INFO - [broker.async_broker] ✅ Created new account: main
+2025-07-15 20:38:26,207 - INFO - [broker.async_broker] ✅ All trading data deleted successfully
+2025-07-15 20:38:26,207 - INFO - [improved_trading_system] ✅ All trading data deleted successfully
+2025-07-15 20:38:26,208 - INFO - [trading] ✅ Data deletion completed
+2025-07-15 20:38:26,208 - INFO - [improved_trading_system] 🚀 Starting Improved Trading System
+2025-07-15 20:38:26,209 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 20:38:26,211 - INFO - [broker.async_broker] ✅ Loaded existing account: main
+2025-07-15 20:38:26,214 - INFO - [broker.async_broker] ✅ Loaded 0 positions from MongoDB
+2025-07-15 20:38:26,217 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:38:26,217 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 20:38:26,220 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 20:38:26,222 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:38:26,222 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 20:38:26,223 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:38:26,224 - INFO - [improved_trading_system] 📈 Starting price update loop (5s interval)
+2025-07-15 20:38:26,225 - INFO - [improved_trading_system] 🎯 Starting strategy execution loop (30s interval)
+2025-07-15 20:38:26,226 - INFO - [improved_trading_system] ✅ Improved trading system started successfully
+2025-07-15 20:38:26,227 - INFO - [improved_trading_system] 🔄 Starting main monitoring loop
+2025-07-15 20:38:26,228 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 20:38:26,228 - INFO - [strategy_manager] Selected signal: SignalType.BUY from Random_BTC-USD with confidence 63.2%
+2025-07-15 20:38:26,228 - INFO - [improved_trading_system]    Account Balance: $10000.00
+2025-07-15 20:38:26,229 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.BUY from Random_BTC-USD (confidence: 63.2%)
+2025-07-15 20:38:26,230 - INFO - [improved_trading_system]    Total Trades: 0
+2025-07-15 20:38:26,230 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.BUY (confidence: 63.2%)
+2025-07-15 20:38:26,232 - INFO - [improved_trading_system]    Win Rate: 0.0%
+2025-07-15 20:38:26,233 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:38:26,233 - INFO - [improved_trading_system]    Open Positions: 0
+2025-07-15 20:38:26,235 - INFO - [improved_trading_system]    Signals Generated: 1
+2025-07-15 20:38:26,235 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.WAIT from Random_ETH-USD (confidence: 61.9%)
+2025-07-15 20:38:26,236 - INFO - [improved_trading_system]    Price Updates: 1
+2025-07-15 20:38:26,236 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:38:26,237 - INFO - [improved_trading_system]    Strategy Executions: 1
+2025-07-15 20:38:26,238 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.WAIT (confidence: 61.9%)
+2025-07-15 20:38:26,239 - INFO - [improved_trading_system]    Strategy Success Rate: 100.0%
+2025-07-15 20:38:26,240 - INFO - [improved_trading_system]    Active Strategies: 4
+2025-07-15 20:38:26,242 - INFO - [notifications.manager] Notification sent: system_error - System Error: ImprovedTradingSystem
+2025-07-15 20:38:26,251 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.BUY BTC-USD from Random_BTC-USD (confidence: 63.2%)
+2025-07-15 20:38:26,252 - WARNING - [improved_trading_system] ❌ Trade rejected by risk manager: Position size 5.1% would exceed 5.0% limit
+2025-07-15 20:38:56,252 - INFO - [strategy_manager] Selected signal: SignalType.BUY from Random_BTC-USD with confidence 75.6%
+2025-07-15 20:38:56,253 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.BUY from Random_BTC-USD (confidence: 75.6%)
+2025-07-15 20:38:56,254 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.BUY (confidence: 75.6%)
+2025-07-15 20:38:56,255 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:38:56,258 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.BUY BTC-USD from Random_BTC-USD (confidence: 75.6%)
+2025-07-15 20:38:56,259 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_ETH-USD with confidence 64.3%
+2025-07-15 20:38:56,260 - INFO - [broker.async_broker] 🚀 Executing trade: BUY BTC-USD at $49765.34
+2025-07-15 20:38:56,262 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.SELL from Random_ETH-USD (confidence: 64.3%)
+2025-07-15 20:38:56,265 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:38:56,266 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.SELL (confidence: 64.3%)
+2025-07-15 20:38:56,268 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL ETH-USD from Random_ETH-USD (confidence: 64.3%)
+2025-07-15 20:38:56,270 - INFO - [broker.async_broker] 🚀 Executing trade: SELL ETH-USD at $3468.55
+2025-07-15 20:38:56,356 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:38:56,442 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:38:56,449 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:38:56,450 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:38:56,452 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.BUY BTC-USD at $49765.34 via Random_BTC-USD
+2025-07-15 20:38:56,454 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY BTC-USD
+2025-07-15 20:38:56,455 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY BTC-USD
+2025-07-15 20:38:56,457 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:38:56,463 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:38:56,470 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:38:56,471 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:38:56,472 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.SELL ETH-USD at $3468.55 via Random_ETH-USD
+2025-07-15 20:38:56,474 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 20:38:56,475 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: SELL ETH-USD
+2025-07-15 20:38:58,691 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:58,693 - INFO - [improved_trading_system] 📈 Price update loop stopped
+2025-07-15 20:38:58,693 - INFO - [improved_trading_system] 🎯 Strategy execution loop stopped
+2025-07-15 20:38:58,899 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:59,072 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:59,233 - INFO - [trading] Received shutdown signal
+2025-07-15 20:38:59,374 - INFO - [trading] Received shutdown signal
+2025-07-15 20:39:26,251 - INFO - [improved_trading_system] 🛑 Stopping Improved Trading System
+2025-07-15 20:39:26,252 - INFO - [strategy_manager] Shutting down strategy manager...
+2025-07-15 20:39:26,253 - INFO - [strategy_manager] Strategy manager shutdown complete
+2025-07-15 20:39:26,253 - INFO - [broker.async_broker] Stopping simplified async broker system
+2025-07-15 20:39:26,798 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:39:26,800 - INFO - [mongodb.async] [AsyncMongoDB] Disconnected from MongoDB
+2025-07-15 20:39:26,801 - INFO - [broker.async_broker] Simplified async broker system stopped
+2025-07-15 20:39:26,801 - INFO - [risk_manager.async] Stopping simplified async risk management system
+2025-07-15 20:39:27,807 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:39:27,807 - INFO - [risk_manager.async] Simplified async risk management system stopped
+2025-07-15 20:39:28,807 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:39:28,809 - INFO - [improved_trading_system] ✅ Improved trading system stopped
+2025-07-15 20:39:28,811 - INFO - [trading] 📊 Final System Statistics:
+2025-07-15 20:39:28,812 - INFO - [trading]    trades_executed: 2
+2025-07-15 20:39:28,813 - INFO - [trading]    trades_successful: 2
+2025-07-15 20:39:28,814 - INFO - [trading]    trades_failed: 0
+2025-07-15 20:39:28,815 - INFO - [trading]    total_pnl: 0.0
+2025-07-15 20:39:28,817 - INFO - [trading]    signals_generated: 4
+2025-07-15 20:39:28,818 - INFO - [trading]    price_updates: 7
+2025-07-15 20:39:28,819 - INFO - [trading]    strategies_executed: 2
+2025-07-15 20:39:28,820 - INFO - [trading]    system_running: False
+2025-07-15 20:39:28,825 - INFO - [trading]    price_thread_alive: False
+2025-07-15 20:39:28,829 - INFO - [trading]    strategy_thread_alive: False
+2025-07-15 20:39:28,830 - INFO - [trading]    active_symbols: 2
+2025-07-15 20:39:28,834 - INFO - [trading]    manager_stats: {'total_executions': 8, 'successful_executions': 8, 'failed_executions': 0, 'success_rate': 100.0, 'active_symbols': 2, 'total_strategies': 4}
+2025-07-15 20:40:35,681 - INFO - [broker.async_broker] Simplified async broker initialized
+2025-07-15 20:40:35,682 - INFO - [risk_manager.async] Simplified async risk manager initialized
+2025-07-15 20:40:35,683 - INFO - [strategy_manager] Added strategy Random_BTC-USD for BTC-USD
+2025-07-15 20:40:35,684 - INFO - [strategy_manager] Added strategy Volatility_20_BTC-USD for BTC-USD
+2025-07-15 20:40:35,684 - INFO - [strategy_manager] Added strategy Random_ETH-USD for ETH-USD
+2025-07-15 20:40:35,685 - INFO - [strategy_manager] Added strategy Volatility_20_ETH-USD for ETH-USD
+2025-07-15 20:40:35,686 - INFO - [strategy_manager] Added default strategies for 2 symbols
+2025-07-15 20:40:35,686 - INFO - [improved_trading_system] Setup default strategies for 2 symbols
+2025-07-15 20:40:35,688 - INFO - [improved_trading_system] Improved trading system initialized
+2025-07-15 20:40:35,689 - INFO - [trading] 🗑️ Deleting all trading data...
+2025-07-15 20:40:35,689 - INFO - [improved_trading_system] 🗑️ Deleting all trading data...
+2025-07-15 20:40:35,747 - INFO - [mongodb.async] [AsyncMongoDB] Connected to MongoDB successfully
+2025-07-15 20:40:35,752 - INFO - [mongodb.async] [AsyncMongoDB] Collection accounts deleted
+2025-07-15 20:40:35,754 - INFO - [mongodb.async] [AsyncMongoDB] Collection positions deleted
+2025-07-15 20:40:35,757 - INFO - [mongodb.async] [AsyncMongoDB] Collection trades deleted
+2025-07-15 20:40:35,759 - INFO - [mongodb.async] [AsyncMongoDB] Collection analysis deleted
+2025-07-15 20:40:35,759 - INFO - [mongodb.async] [AsyncMongoDB] All trading data deleted from database
+2025-07-15 20:40:35,793 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:40:35,793 - INFO - [broker.async_broker] ✅ Created new account: main
+2025-07-15 20:40:35,794 - INFO - [broker.async_broker] ✅ All trading data deleted successfully
+2025-07-15 20:40:35,794 - INFO - [improved_trading_system] ✅ All trading data deleted successfully
+2025-07-15 20:40:35,796 - INFO - [trading] ✅ Data deletion completed
+2025-07-15 20:40:35,796 - INFO - [improved_trading_system] 🚀 Starting Improved Trading System
+2025-07-15 20:40:35,797 - INFO - [broker.async_broker] Starting simplified async broker system
+2025-07-15 20:40:35,800 - INFO - [broker.async_broker] ✅ Loaded existing account: main
+2025-07-15 20:40:35,802 - INFO - [broker.async_broker] ✅ Loaded 0 positions from MongoDB
+2025-07-15 20:40:35,804 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:40:35,805 - INFO - [broker.async_broker] Simplified async broker system started successfully
+2025-07-15 20:40:35,805 - INFO - [risk_manager.async] Starting simplified async risk management system
+2025-07-15 20:40:35,806 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:40:35,806 - INFO - [risk_manager.async] Simplified async risk management system started
+2025-07-15 20:40:35,808 - INFO - [notifications.manager] Notification manager started
+2025-07-15 20:40:35,809 - INFO - [improved_trading_system] 📈 Starting price update loop (5s interval)
+2025-07-15 20:40:35,809 - INFO - [improved_trading_system] 🎯 Starting strategy execution loop (30s interval)
+2025-07-15 20:40:35,810 - INFO - [improved_trading_system] ✅ Improved trading system started successfully
+2025-07-15 20:40:35,812 - INFO - [improved_trading_system] 🔄 Starting main monitoring loop
+2025-07-15 20:40:35,814 - INFO - [strategy_manager] Selected signal: SignalType.SELL from Random_BTC-USD with confidence 93.9%
+2025-07-15 20:40:35,815 - INFO - [improved_trading_system] 📊 System Summary:
+2025-07-15 20:40:35,815 - INFO - [improved_trading_system] [StrategyManager] BTC-USD: SignalType.SELL from Random_BTC-USD (confidence: 93.9%)
+2025-07-15 20:40:35,816 - INFO - [improved_trading_system]    Account Balance: $10000.00
+2025-07-15 20:40:35,816 - INFO - [improved_trading_system]   - Random_BTC-USD: SignalType.SELL (confidence: 93.9%)
+2025-07-15 20:40:35,817 - INFO - [improved_trading_system]    Total Trades: 0
+2025-07-15 20:40:35,818 - INFO - [improved_trading_system]   - Volatility_20_BTC-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:40:35,819 - INFO - [improved_trading_system]    Win Rate: 0.0%
+2025-07-15 20:40:35,820 - INFO - [improved_trading_system]    Open Positions: 0
+2025-07-15 20:40:35,822 - INFO - [strategy_manager] Selected signal: SignalType.BUY from Random_ETH-USD with confidence 93.9%
+2025-07-15 20:40:35,822 - INFO - [improved_trading_system]    Signals Generated: 1
+2025-07-15 20:40:35,823 - INFO - [improved_trading_system] [StrategyManager] ETH-USD: SignalType.BUY from Random_ETH-USD (confidence: 93.9%)
+2025-07-15 20:40:35,824 - INFO - [improved_trading_system]    Price Updates: 1
+2025-07-15 20:40:35,824 - INFO - [improved_trading_system]   - Volatility_20_ETH-USD: SignalType.WAIT (confidence: 0.0%)
+2025-07-15 20:40:35,824 - INFO - [improved_trading_system]    Strategy Executions: 2
+2025-07-15 20:40:35,826 - INFO - [improved_trading_system]   - Random_ETH-USD: SignalType.BUY (confidence: 93.9%)
+2025-07-15 20:40:35,826 - INFO - [improved_trading_system]    Strategy Success Rate: 100.0%
+2025-07-15 20:40:35,827 - INFO - [improved_trading_system]    Active Strategies: 4
+2025-07-15 20:40:35,828 - INFO - [notifications.manager] Notification sent: system_error - System Error: ImprovedTradingSystem
+2025-07-15 20:40:35,836 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.SELL BTC-USD from Random_BTC-USD (confidence: 93.9%)
+2025-07-15 20:40:35,837 - WARNING - [improved_trading_system] ❌ Trade rejected by risk manager: Position size 5.1% would exceed 5.0% limit
+2025-07-15 20:40:35,837 - INFO - [improved_trading_system] 📊 Processing signal: SignalType.BUY ETH-USD from Random_ETH-USD (confidence: 93.9%)
+2025-07-15 20:40:35,838 - INFO - [broker.async_broker] 🚀 Executing trade: BUY ETH-USD at $2872.62
+2025-07-15 20:40:35,869 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:40:35,896 - INFO - [mongodb.async] [AsyncMongoDB] Document inserted into trades
+2025-07-15 20:40:35,900 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:40:35,902 - INFO - [broker.async_broker] ✅ Trade executed successfully
+2025-07-15 20:40:35,902 - INFO - [improved_trading_system] ✅ Trade executed: SignalType.BUY ETH-USD at $2872.62 via Random_ETH-USD
+2025-07-15 20:40:35,903 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY ETH-USD
+2025-07-15 20:40:35,905 - INFO - [notifications.manager] Notification sent: trade_execution - Trade Executed: BUY ETH-USD
+2025-07-15 20:40:40,828 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in positions
+2025-07-15 20:40:40,836 - INFO - [mongodb.async] [AsyncMongoDB] Document replaced in accounts
+2025-07-15 20:40:40,837 - INFO - [broker.async_broker] ✅ Position closed: ETH-USD at $2706.42
+2025-07-15 20:40:40,838 - INFO - [improved_trading_system] 🛡️ Risk actions taken: ['Stop Loss: ETH-USD']
+2025-07-15 20:40:40,840 - INFO - [notifications.manager] Notification sent: position_close - Position Closed: ETH-USD
+2025-07-15 20:40:52,247 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:52,248 - INFO - [improved_trading_system] 🎯 Strategy execution loop stopped
+2025-07-15 20:40:52,250 - INFO - [improved_trading_system] 📈 Price update loop stopped
+2025-07-15 20:40:52,473 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:52,474 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:52,555 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:52,722 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:52,914 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:53,043 - INFO - [trading] Received shutdown signal
+2025-07-15 20:40:53,211 - INFO - [trading] Received shutdown signal
+2025-07-15 20:41:35,835 - INFO - [improved_trading_system] 🛑 Stopping Improved Trading System
+2025-07-15 20:41:35,837 - INFO - [strategy_manager] Shutting down strategy manager...
+2025-07-15 20:41:35,838 - INFO - [strategy_manager] Strategy manager shutdown complete
+2025-07-15 20:41:35,839 - INFO - [broker.async_broker] Stopping simplified async broker system
+2025-07-15 20:41:36,322 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:41:36,326 - INFO - [mongodb.async] [AsyncMongoDB] Disconnected from MongoDB
+2025-07-15 20:41:36,327 - INFO - [broker.async_broker] Simplified async broker system stopped
+2025-07-15 20:41:36,328 - INFO - [risk_manager.async] Stopping simplified async risk management system
+2025-07-15 20:41:37,322 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:41:37,324 - INFO - [risk_manager.async] Simplified async risk management system stopped
+2025-07-15 20:41:37,339 - INFO - [notifications.manager] Notification manager stopped
+2025-07-15 20:41:37,340 - INFO - [improved_trading_system] ✅ Improved trading system stopped
+2025-07-15 20:41:37,341 - INFO - [trading] 📊 Final System Statistics:
+2025-07-15 20:41:37,342 - INFO - [trading]    trades_executed: 1
+2025-07-15 20:41:37,343 - INFO - [trading]    trades_successful: 1
+2025-07-15 20:41:37,344 - INFO - [trading]    trades_failed: 0
+2025-07-15 20:41:37,345 - INFO - [trading]    total_pnl: 0.0
+2025-07-15 20:41:37,346 - INFO - [trading]    signals_generated: 2
+2025-07-15 20:41:37,347 - INFO - [trading]    price_updates: 4
+2025-07-15 20:41:37,348 - INFO - [trading]    strategies_executed: 1
+2025-07-15 20:41:37,350 - INFO - [trading]    system_running: False
+2025-07-15 20:41:37,351 - INFO - [trading]    price_thread_alive: False
+2025-07-15 20:41:37,352 - INFO - [trading]    strategy_thread_alive: False
+2025-07-15 20:41:37,353 - INFO - [trading]    active_symbols: 2
+2025-07-15 20:41:37,354 - INFO - [trading]    manager_stats: {'total_executions': 4, 'successful_executions': 4, 'failed_executions': 0, 'success_rate': 100.0, 'active_symbols': 2, 'total_strategies': 4}
