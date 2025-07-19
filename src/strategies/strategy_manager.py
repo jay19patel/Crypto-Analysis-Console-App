@@ -4,8 +4,7 @@ import time
 from typing import Dict, List, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-
-from .schemas import (
+from src.database.schemas import (
     MarketData, TradingSignal, SignalType, StrategyManagerResult, 
     StrategyResult, StrategyStats
 )

@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     MAX_POSITION_SIZE: float = Field(default=1000.0, description="Maximum position size")
     RISK_PER_TRADE: float = Field(default=0.02, description="Risk per trade (2%)")
     
+    # WebSocket Settings
+    WEBSOCKET_MAX_RETRIES: int = Field(default=5, description="Maximum WebSocket connection retries")
+    WEBSOCKET_RECONNECT_DELAY: int = Field(default=5, description="WebSocket reconnection delay in seconds")
+    WEBSOCKET_TIMEOUT: int = Field(default=30, description="WebSocket connection timeout in seconds")
+    WEBSOCKET_HEARTBEAT_INTERVAL: int = Field(default=30, description="WebSocket heartbeat interval in seconds")
+    WEBSOCKET_PING_TIMEOUT: int = Field(default=10, description="WebSocket ping timeout in seconds")
+    
     # Notification Settings
     EMAIL_ENABLED: bool = Field(default=True, description="Enable email notifications")
     EMAIL_HOST: str = Field(default="smtp.gmail.com", description="SMTP host")
@@ -117,6 +124,18 @@ def get_risk_settings() -> dict:
         "max_position_risk": settings.RISK_MAX_POSITION_RISK,
         "correlation_threshold": settings.RISK_CORRELATION_THRESHOLD,
         "check_interval": settings.RISK_CHECK_INTERVAL
+    }
+
+
+def get_websocket_settings() -> dict:
+    """Get WebSocket settings"""
+    settings = get_settings()
+    return {
+        "max_retries": settings.WEBSOCKET_MAX_RETRIES,
+        "reconnect_delay": settings.WEBSOCKET_RECONNECT_DELAY,
+        "timeout": settings.WEBSOCKET_TIMEOUT,
+        "heartbeat_interval": settings.WEBSOCKET_HEARTBEAT_INTERVAL,
+        "ping_timeout": settings.WEBSOCKET_PING_TIMEOUT
     }
 
 

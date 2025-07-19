@@ -12,7 +12,7 @@ from enum import Enum
 
 from src.broker.models import Position, PositionType, PositionStatus
 from src.config import get_settings, get_risk_settings
-from src.notifications import NotificationManager
+from src.services.notifications import NotificationManager
 
 
 class RiskLevel(Enum):

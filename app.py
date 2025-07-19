@@ -6,6 +6,7 @@ Features:
 - Separate threads for strategy execution (30s) and price updates (5s)
 - Proper risk management integration
 - Real-time price-dependent calculations
+- WebSocket live price integration
 
 Usage:
     python improved_app.py
@@ -29,13 +30,13 @@ from dataclasses import dataclass
 
 # Import simplified components
 from src.broker.paper_broker import AsyncBroker
-from src.risk_manager import AsyncRiskManager
-from src.notifications import NotificationManager
+from src.services.risk_manager import AsyncRiskManager
+from src.services.notifications import NotificationManager
 from src.config import get_settings, get_dummy_settings
 # NEW IMPORTS
-from src.live_price import LivePriceFetcher
-from src.strategy_manager import StrategyManager
-from src.schemas import TradingSignal, MarketData, SignalType
+from src.services.live_price_ws import RealTimeMarketData
+from src.strategies.strategy_manager import StrategyManager
+from src.database.schemas import TradingSignal, MarketData, SignalType
 
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
@@ -140,7 +141,9 @@ class ImprovedTradingSystem:
         self.risk_manager = AsyncRiskManager(self.broker)
         self.notification_manager = NotificationManager()
         self.strategy_manager = StrategyManager(max_workers=4)
-        self.live_price_fetcher = LivePriceFetcher()
+        
+        # Initialize WebSocket live price system with callback
+        self.live_price_system = RealTimeMarketData(price_callback=self._on_live_price_update)
         
         # Control flags
         self._running = False
@@ -162,7 +165,8 @@ class ImprovedTradingSystem:
             "total_pnl": 0.0,
             "signals_generated": 0,
             "price_updates": 0,
-            "strategies_executed": 0
+            "strategies_executed": 0,
+            "websocket_updates": 0
         }
         # Store main event loop reference (will be set in start)
         self._main_loop = None
@@ -179,12 +183,61 @@ class ImprovedTradingSystem:
         self.strategy_manager.add_default_strategies(symbols)
         self.logger.info(f"Setup default strategies for {len(symbols)} symbols")
 
+    def _on_live_price_update(self, live_prices: Dict[str, Dict]):
+        """Callback function called when WebSocket receives new price data"""
+        try:
+            self.logger.info(f"📈 WebSocket Price Update: {len(live_prices)} symbols updated")
+            
+            # Process each price update
+            for symbol, price_data in live_prices.items():
+                # Convert WebSocket data to MarketData format
+                market_data = MarketData(
+                    symbol=symbol,
+                    price=price_data.get("price", 0.0),
+                    volume=price_data.get("volume", 0.0),
+                    change=0.0,  # Calculate change if needed
+                    timestamp=datetime.now(timezone.utc),
+                    high_24h=price_data.get("high", price_data.get("price", 0.0)),
+                    low_24h=price_data.get("low", price_data.get("price", 0.0)),
+                    bid=price_data.get("price", 0.0) - 0.1,
+                    ask=price_data.get("price", 0.0) + 0.1
+                )
+                
+                # Update current market data
+                with self.market_data_lock:
+                    self.current_market_data[symbol] = market_data
+                
+                # Update broker prices
+                if self._main_loop is not None:
+                    prices = {symbol: {"price": price_data.get("price", 0.0)}}
+                    asyncio.run_coroutine_threadsafe(
+                        self.broker.update_prices_async(prices),
+                        self._main_loop
+                    )
+                    
+                    # Update risk management
+                    asyncio.run_coroutine_threadsafe(
+                        self._update_risk_management(),
+                        self._main_loop
+                    )
+                
+                self._stats["websocket_updates"] += 1
+                
+        except Exception as e:
+            self.logger.error(f"Error in live price callback: {e}")
+
     async def start(self) -> bool:
         """Start the trading system"""
         try:
             self.logger.info("🚀 Starting Improved Trading System")
             # Store the main event loop
             self._main_loop = asyncio.get_running_loop()
+            
+            # Start WebSocket live price system
+            if not self.live_price_system.start():
+                self.logger.error("❌ Failed to start WebSocket live price system")
+                return False
+            
             # Start all async components
             if not await self.broker.start():
                 self.logger.error("❌ Failed to start broker")
@@ -193,18 +246,18 @@ class ImprovedTradingSystem:
                 self.logger.error("❌ Failed to start risk manager")
                 return False
             await self.notification_manager.start()
+            
             # Start threading components
             self._running = True
-            self.price_thread = threading.Thread(target=self._price_update_loop, daemon=True)
             self.strategy_thread = threading.Thread(target=self._strategy_execution_loop, daemon=True)
-            self.price_thread.start()
             self.strategy_thread.start()
+            
             # Send startup notification
             await self.notification_manager.notify_system_error(
-                error_message="Improved system started successfully",
+                error_message="Improved system started successfully with WebSocket live prices",
                 component="ImprovedTradingSystem"
             )
-            self.logger.info("✅ Improved trading system started successfully")
+            self.logger.info("✅ Improved trading system started successfully with WebSocket")
             return True
         except Exception as e:
             self.logger.error(f"❌ Failed to start trading system: {e}")
@@ -219,10 +272,10 @@ class ImprovedTradingSystem:
         self._running = False
         self._shutdown_event.set()
         
-        # Wait for threads to finish
-        if self.price_thread and self.price_thread.is_alive():
-            self.price_thread.join(timeout=10)
+        # Stop WebSocket system
+        self.live_price_system.stop()
         
+        # Wait for threads to finish
         if self.strategy_thread and self.strategy_thread.is_alive():
             self.strategy_thread.join(timeout=10)
         
@@ -236,55 +289,6 @@ class ImprovedTradingSystem:
         
         self.logger.info("✅ Improved trading system stopped")
     
-    def _price_update_loop(self):
-        """Price update loop - runs every 5 seconds"""
-        self.logger.info("📈 Starting price update loop (5s interval)")
-        while self._running and not self._shutdown_event.is_set():
-            try:
-                symbols = self.strategy_manager.get_all_symbols()
-                prices = {}
-                for symbol in symbols:
-                    price = self.live_price_fetcher.get_price(symbol)
-                    market_data = MarketData(
-                        symbol=symbol,
-                        price=price,
-                        volume=0.0,
-                        change=0.0,
-                        timestamp=datetime.now(timezone.utc),
-                        high_24h=price,
-                        low_24h=price,
-                        bid=price-0.1,
-                        ask=price+0.1
-                    )
-                    with self.market_data_lock:
-                        self.current_market_data[symbol] = market_data
-                    prices[symbol] = {"price": price}
-                # Use the main event loop for all async calls from this thread
-                if self._main_loop is not None:
-                    asyncio.run_coroutine_threadsafe(
-                        self.broker.update_prices_async(prices),
-                        self._main_loop
-                    )
-                    self._print_account_and_positions(prices)
-                    asyncio.run_coroutine_threadsafe(
-                        self._update_risk_management(),
-                        self._main_loop
-                    )
-                else:
-                    self.logger.error("Main event loop not set!")
-                self._stats["price_updates"] += 1
-                if not self._shutdown_event.wait(5):
-                    continue
-                else:
-                    break
-            except Exception as e:
-                self.logger.error(f"Error in price update loop: {e}")
-                if not self._shutdown_event.wait(5):
-                    continue
-                else:
-                    break
-        self.logger.info("📈 Price update loop stopped")
-
     def _strategy_execution_loop(self):
         """Strategy execution loop - runs every 30 seconds"""
         self.logger.info("🎯 Starting strategy execution loop (30s interval)")
@@ -340,7 +344,7 @@ class ImprovedTradingSystem:
             account = await self.broker.get_account_summary_async()
             positions = await self.broker.get_positions_summary_async()
             print("---------------------------------------------------------------")
-            print("\n[Prices]")
+            print("\n[Live Prices from WebSocket]")
             for symbol, price in prices.items():
                 print(f"{symbol}: ${price['price']:.2f}")
             print("\n[Account Summary]")
@@ -492,6 +496,7 @@ class ImprovedTradingSystem:
             positions_summary = await self.broker.get_positions_summary_async()
             strategy_stats = self.strategy_manager.get_strategy_stats()
             manager_stats = self.strategy_manager.get_manager_stats()
+            websocket_stats = self.live_price_system.get_performance_stats()
             
             self.logger.info("📊 System Summary:")
             self.logger.info(f"   Account Balance: ${account_summary.get('current_balance', 0):.2f}")
@@ -499,10 +504,12 @@ class ImprovedTradingSystem:
             self.logger.info(f"   Win Rate: {account_summary.get('win_rate', 0):.1f}%")
             self.logger.info(f"   Open Positions: {positions_summary.get('total_open', 0)}")
             self.logger.info(f"   Signals Generated: {self._stats['signals_generated']}")
-            self.logger.info(f"   Price Updates: {self._stats['price_updates']}")
+            self.logger.info(f"   WebSocket Updates: {self._stats['websocket_updates']}")
             self.logger.info(f"   Strategy Executions: {manager_stats.get('total_executions', 0)}")
             self.logger.info(f"   Strategy Success Rate: {manager_stats.get('success_rate', 0):.1f}%")
             self.logger.info(f"   Active Strategies: {manager_stats.get('total_strategies', 0)}")
+            self.logger.info(f"   WebSocket Status: {websocket_stats.get('status', 'unknown')}")
+            self.logger.info(f"   WebSocket Uptime: {websocket_stats.get('uptime_seconds', 0):.1f}s")
             
         except Exception as e:
             self.logger.error(f"Error logging system summary: {e}")
@@ -511,9 +518,6 @@ class ImprovedTradingSystem:
         """Check system health and performance"""
         try:
             # Check if threads are alive
-            if self.price_thread and not self.price_thread.is_alive():
-                self.logger.error("❌ Price update thread died")
-                
             if self.strategy_thread and not self.strategy_thread.is_alive():
                 self.logger.error("❌ Strategy execution thread died")
             
@@ -521,6 +525,11 @@ class ImprovedTradingSystem:
             broker_stats = self.broker.get_performance_stats()
             if not broker_stats.get("mongodb_connected", False):
                 self.logger.warning("⚠️ MongoDB connection lost")
+            
+            # Check WebSocket status
+            websocket_stats = self.live_price_system.get_performance_stats()
+            if websocket_stats.get("status") != "connected":
+                self.logger.warning("⚠️ WebSocket connection lost")
             
         except Exception as e:
             self.logger.error(f"Error checking system health: {e}")
@@ -530,11 +539,11 @@ class ImprovedTradingSystem:
         return {
             **self._stats,
             "system_running": self._running,
-            "price_thread_alive": self.price_thread.is_alive() if self.price_thread else False,
             "strategy_thread_alive": self.strategy_thread.is_alive() if self.strategy_thread else False,
             "active_symbols": len(self.current_market_data),
             "strategy_stats": self.strategy_manager.get_strategy_stats(),
-            "manager_stats": self.strategy_manager.get_manager_stats()
+            "manager_stats": self.strategy_manager.get_manager_stats(),
+            "websocket_stats": self.live_price_system.get_performance_stats()
         }
 
 

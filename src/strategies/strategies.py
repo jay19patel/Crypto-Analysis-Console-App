@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 import statistics
 
-from .schemas import TradingSignal, MarketData, SignalType, StrategyStats, StrategyResult
+from src.database.schemas import TradingSignal, MarketData, SignalType, StrategyStats, StrategyResult
 
 
 class BaseStrategy(ABC):

@@ -9,8 +9,8 @@ import logging
 from datetime import datetime, timezone
 
 from src.broker.paper_broker import AsyncBroker, TradeRequest
-from src.risk_manager import AsyncRiskManager
-from src.notifications import NotificationManager
+from src.services.risk_manager import AsyncRiskManager
+from src.services.notifications import NotificationManager
 
 # Configure logging
 logging.basicConfig(

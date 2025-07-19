@@ -13,8 +13,8 @@ from enum import Enum
 
 from src.broker.models import Account, Position, PositionType, PositionStatus
 from src.config import get_settings, get_broker_settings
-from src.notifications import NotificationManager
-from src.mongodb_client import AsyncMongoDBClient
+from src.services.notifications import NotificationManager
+from src.database.mongodb_client import AsyncMongoDBClient
 
 
 class ExecutionStatus(Enum):

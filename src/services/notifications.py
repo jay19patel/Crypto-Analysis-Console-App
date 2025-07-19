@@ -105,36 +105,41 @@ class EmailNotifier:
     
     def send_email(self, subject: str, body: str, recipients: List[str] = None) -> bool:
         """Send email notification"""
-        if not self.settings.EMAIL_NOTIFICATIONS_ENABLED:
-            return False
+        # if not self.settings.EMAIL_NOTIFICATIONS_ENABLED:
+        #     return False
         
-        if not recipients:
-            recipients = self.settings.EMAIL_TO
+        # if not recipients:
+        #     recipients = self.settings.EMAIL_TO
         
-        if not recipients:
-            self.logger.warning("No email recipients configured")
-            return False
+        # if not recipients:
+        #     self.logger.warning("No email recipients configured")
+        #     return False
         
         try:
-            with self._connection_lock:
-                smtp = self._create_smtp_connection()
-                if not smtp:
-                    return False
+            # with self._connection_lock:
+            #     smtp = self._create_smtp_connection()
+            #     if not smtp:
+            #         return False
                 
-                # Create message
-                msg = MIMEMultipart()
-                msg['From'] = self.settings.EMAIL_FROM
-                msg['To'] = ', '.join(recipients)
-                msg['Subject'] = f"[Trading Bot] {subject}"
+            #     # Create message
+            #     msg = MIMEMultipart()
+            #     msg['From'] = self.settings.EMAIL_FROM
+            #     msg['To'] = ', '.join(recipients)
+            #     msg['Subject'] = f"[Trading Bot] {subject}"
                 
-                # Add body
-                msg.attach(MIMEText(body, 'html'))
+            #     # Add body
+            #     msg.attach(MIMEText(body, 'html'))
                 
-                # Send email
-                smtp.send_message(msg)
-                smtp.quit()
+            #     # Send email
+            #     smtp.send_message(msg)
+            #     smtp.quit()
                 
-                self.logger.info(f"Email sent successfully to {len(recipients)} recipients")
+            #     self.logger.info(f"Email sent successfully to {len(recipients)} recipients")
+                print(f"""---------------------------[EMAIL]---------------------------
+                        Subject : {subject}
+                        body :  {body}
+                        recipients :  {recipients}
+                        -------------------------------------------------------------""")
                 return True
                 
         except Exception as e:
