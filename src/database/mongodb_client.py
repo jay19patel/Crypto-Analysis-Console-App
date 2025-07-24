@@ -42,6 +42,7 @@ class AsyncMongoDBClient:
         self.positions_collection = "positions"
         self.trades_collection = "trades"
         self.liveprice = "liveprice"
+        self.notifications  = "notifications"
         
         self._initialized = True
         
@@ -242,7 +243,7 @@ class AsyncMongoDBClient:
         try:
             # Delete all collections
             collections = [self.accounts_collection, self.positions_collection, 
-                         self.trades_collection, self.liveprice]
+                         self.trades_collection, self.liveprice,self.notifications]
             
             for collection in collections:
                 await self.delete_collection(collection)

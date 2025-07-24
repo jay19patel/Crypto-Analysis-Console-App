@@ -10,7 +10,7 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     """Application settings using Pydantic"""
-    EMAIL_NOTIFICATIONS_ENABLED: bool = Field(default=False, description="Enable email notifications")
+    EMAIL_NOTIFICATIONS_ENABLED: bool = Field(default=True, description="Enable email notifications")
     
     # Database Settings
     MONGODB_URI: str = Field(default="mongodb://localhost:27017", description="MongoDB connection URI")
@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     EMAIL_PASSWORD: str = Field(default="", description="Email password")
     EMAIL_FROM: str = Field(default="", description="From email address")
     EMAIL_TO: str = Field(default="", description="To email address")
+    
+    # FastAPI-Mail Settings
+    FASTAPI_MAIL_USERNAME: str = Field(default="developer.jay19@gmail.com", description="FastAPI-Mail email username")
+    FASTAPI_MAIL_PASSWORD: str = Field(default="j@y1999", description="FastAPI-Mail email password")
+    FASTAPI_MAIL_FROM: str = Field(default="developer.jay19@gmail.com", description="FastAPI-Mail from email address")
+    FASTAPI_MAIL_FROM_NAME: str = Field(default="Trading Bot", description="FastAPI-Mail from name")
+    FASTAPI_MAIL_PORT: int = Field(default=587, description="FastAPI-Mail SMTP port")
+    FASTAPI_MAIL_SERVER: str = Field(default="smtp.gmail.com", description="FastAPI-Mail SMTP server")
+    FASTAPI_MAIL_STARTTLS: bool = Field(default=True, description="Use STARTTLS for FastAPI-Mail")
+    FASTAPI_MAIL_SSL_TLS: bool = Field(default=False, description="Use SSL/TLS for FastAPI-Mail")
     
     # System Settings
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
@@ -146,4 +156,19 @@ def get_dummy_settings() -> dict:
         "symbols": settings.DUMMY_SYMBOLS,
         "price_change_range": settings.DUMMY_PRICE_CHANGE_RANGE,
         "trading_loop_interval": settings.TRADING_LOOP_INTERVAL
+    }
+
+
+def get_fastapi_mail_config() -> dict:
+    """Get FastAPI-Mail config as dict"""
+    settings = get_settings()
+    return {
+        "MAIL_USERNAME": settings.FASTAPI_MAIL_USERNAME,
+        "MAIL_PASSWORD": settings.FASTAPI_MAIL_PASSWORD,
+        "MAIL_FROM": settings.FASTAPI_MAIL_FROM,
+        "MAIL_FROM_NAME": settings.FASTAPI_MAIL_FROM_NAME,
+        "MAIL_PORT": settings.FASTAPI_MAIL_PORT,
+        "MAIL_SERVER": settings.FASTAPI_MAIL_SERVER,
+        "MAIL_STARTTLS": settings.FASTAPI_MAIL_STARTTLS,
+        "MAIL_SSL_TLS": settings.FASTAPI_MAIL_SSL_TLS,
     } 

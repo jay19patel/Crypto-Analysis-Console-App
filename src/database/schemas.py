@@ -135,3 +135,30 @@ class SystemStats(BaseModel):
     price_thread_alive: bool = False
     strategy_thread_alive: bool = False
     active_symbols: int = 0 
+
+
+class NotificationStatus(str, Enum):
+    SENT = "sent"
+    FAILED = "failed"
+
+class NotificationLog(BaseModel):
+    """Schema for logging notifications sent via email, with status"""
+    type: str
+    priority: str
+    title: str
+    message: str
+    data: Dict[str, Any] = {}
+    timestamp: datetime
+    user_id: Optional[str] = None
+    trade_id: Optional[str] = None
+    position_id: Optional[str] = None
+    symbol: Optional[str] = None
+    price: Optional[float] = None
+    pnl: Optional[float] = None
+    status: NotificationStatus
+    error: Optional[str] = None
+
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        } 
