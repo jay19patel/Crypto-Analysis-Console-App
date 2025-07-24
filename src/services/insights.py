@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 import math
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pymongo import MongoClient
+import os
 
 @dataclass
 class MarketInsights:
@@ -320,3 +325,149 @@ class MarketDataAnalyzer:
         except Exception as e:
             self.logger.error(f"Error saving insights to JSON: {str(e)}")
             return "" 
+
+    @staticmethod
+    def fetch_live_prices_from_db(symbol: str, mongo_uri: str, db_name: str, collection_name: str, limit: int = 100) -> list:
+        """Fetch live price data for a specific symbol from MongoDB"""
+        client = MongoClient(mongo_uri)
+        db = client[db_name]
+        collection = db[collection_name]
+        cursor = collection.find({"symbol": symbol}).sort("timestamp", -1).limit(limit)
+        data = list(cursor)
+        client.close()
+        return data
+
+    @staticmethod
+    def dataframe_from_price_data(price_data_list: list) -> pd.DataFrame:
+        """Convert list of price data dicts to pandas DataFrame and optimize/clean"""
+        if not price_data_list:
+            return pd.DataFrame()
+        # Remove MongoDB _id
+        for d in price_data_list:
+            d.pop('_id', None)
+        df = pd.DataFrame(price_data_list)
+        # Convert timestamp to datetime
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        # Sort by timestamp ascending
+        df = df.sort_values('timestamp').reset_index(drop=True)
+        return df
+
+    def add_insights_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Add insights columns to DataFrame using analyze_market_data for each row"""
+        if df.empty:
+            return df
+        insights_list = []
+        for _, row in df.iterrows():
+            insights = self.analyze_market_data(row['symbol'], row.to_dict())
+            insights_dict = self.get_insights_as_dict(insights)
+            # Flatten nested dicts
+            flat = {}
+            for k, v in insights_dict.items():
+                if isinstance(v, dict):
+                    for subk, subv in v.items():
+                        flat[f"{k}_{subk}"] = subv
+                else:
+                    flat[k] = v
+            insights_list.append(flat)
+        insights_df = pd.DataFrame(insights_list)
+        # Merge with original df
+        result = pd.concat([df.reset_index(drop=True), insights_df.reset_index(drop=True)], axis=1)
+        return result
+
+    @staticmethod
+    def save_dataframe_and_visualizations(df: pd.DataFrame, output_dir: str, symbol: str = None):
+        """Save DataFrame as CSV and generate visualizations for insights and data"""
+        os.makedirs(output_dir, exist_ok=True)
+        # Save CSV
+        csv_path = os.path.join(output_dir, f"{symbol or 'data'}_with_insights.csv")
+        df.to_csv(csv_path, index=False)
+        # Visualizations
+        plt.style.use('seaborn-v0_8')
+        # 1. Price over time
+        if 'timestamp' in df.columns and 'mark_price' in df.columns:
+            plt.figure(figsize=(12,6))
+            plt.plot(df['timestamp'], df['mark_price'], label='Mark Price')
+            if 'spot_price' in df.columns:
+                plt.plot(df['timestamp'], df['spot_price'], label='Spot Price', alpha=0.7)
+            plt.title(f"{symbol} Price Over Time")
+            plt.xlabel('Timestamp')
+            plt.ylabel('Price')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_price_lineplot.png"))
+            plt.close()
+        # 2. Volume over time
+        if 'timestamp' in df.columns and 'volume' in df.columns:
+            plt.figure(figsize=(12,6))
+            plt.bar(df['timestamp'], df['volume'], color='skyblue')
+            plt.title(f"{symbol} Volume Over Time")
+            plt.xlabel('Timestamp')
+            plt.ylabel('Volume')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_volume_barchart.png"))
+            plt.close()
+        # 3. Daily change percentage (if available)
+        if 'price_insights_daily_change_percentage' in df.columns:
+            plt.figure(figsize=(12,6))
+            plt.plot(df['timestamp'], df['price_insights_daily_change_percentage'], label='Daily Change %', color='orange')
+            plt.title(f"{symbol} Daily Change Percentage Over Time")
+            plt.xlabel('Timestamp')
+            plt.ylabel('Daily Change (%)')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_daily_change_lineplot.png"))
+            plt.close()
+        # 4. Volatility level count
+        if 'volatility_insights_volatility_level' in df.columns:
+            plt.figure(figsize=(8,5))
+            sns.countplot(x='volatility_insights_volatility_level', data=df)
+            plt.title(f"{symbol} Volatility Level Distribution")
+            plt.xlabel('Volatility Level')
+            plt.ylabel('Count')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_volatility_level_bar.png"))
+            plt.close()
+        # 5. Funding rate over time
+        if 'timestamp' in df.columns and 'funding_rate' in df.columns:
+            plt.figure(figsize=(12,6))
+            plt.plot(df['timestamp'], df['funding_rate'], label='Funding Rate', color='green')
+            plt.title(f"{symbol} Funding Rate Over Time")
+            plt.xlabel('Timestamp')
+            plt.ylabel('Funding Rate')
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_funding_rate_lineplot.png"))
+            plt.close()
+        # 6. Risk level count
+        if 'risk_insights_overall_risk_level' in df.columns:
+            plt.figure(figsize=(8,5))
+            sns.countplot(x='risk_insights_overall_risk_level', data=df)
+            plt.title(f"{symbol} Overall Risk Level Distribution")
+            plt.xlabel('Risk Level')
+            plt.ylabel('Count')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_risk_level_bar.png"))
+            plt.close()
+        # 7. Trend direction count
+        if 'trend_insights_trend_direction' in df.columns:
+            plt.figure(figsize=(8,5))
+            sns.countplot(x='trend_insights_trend_direction', data=df)
+            plt.title(f"{symbol} Trend Direction Distribution")
+            plt.xlabel('Trend Direction')
+            plt.ylabel('Count')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_trend_direction_bar.png"))
+            plt.close()
+        # 8. Correlation heatmap (for numeric columns)
+        numeric_cols = df.select_dtypes(include='number').columns
+        if len(numeric_cols) > 2:
+            plt.figure(figsize=(14,10))
+            corr = df[numeric_cols].corr()
+            sns.heatmap(corr, annot=False, cmap='coolwarm')
+            plt.title(f"{symbol} Numeric Feature Correlation Heatmap")
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f"{symbol}_correlation_heatmap.png"))
+            plt.close()
+        # More plots can be added as needed
+        return csv_path 

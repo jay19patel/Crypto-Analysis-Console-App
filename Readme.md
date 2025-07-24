@@ -368,6 +368,54 @@ def custom_price_callback(live_prices):
 - System status updates
 - Error notifications
 
+## Live Price Saving
+
+- Use `--liveSave` flag to save live WebSocket prices to MongoDB in the `liveprice` collection.
+- Example:
+  ```bash
+  python app.py --liveSave
+  ```
+
+## Analysis Script
+
+- Run `analysis.py` to analyze and visualize live price data for a specific symbol.
+- Example:
+  ```bash
+  python analysis.py --symbol BTC-USD
+  ```
+
 ---
 
 **🎉 The system is now fully integrated with live WebSocket price feeds and ready for real-time trading!** 
+
+# Market Data Analysis & Insights
+
+This project includes a powerful analysis pipeline for market data. You can generate insights, CSVs, and visualizations for any symbol using MongoDB data.
+
+## Requirements
+- pandas
+- matplotlib
+- seaborn
+- pymongo
+
+Install with:
+```
+pip install pandas matplotlib seaborn pymongo
+```
+
+## Usage
+1. Edit `analysis.py` and set your MongoDB URI, database, collection, and symbol at the top of the file.
+2. Run:
+```
+python analysis.py
+```
+3. Outputs:
+   - All charts and the CSV will be saved in the `analysis_output/` folder.
+   - The CSV will contain both raw data and all computed insights as columns.
+   - Visualizations include price/volume line plots, bar charts for insights, and a correlation heatmap.
+
+## Example
+- Set `SYMBOL = 'BTC-USD'` and your DB info in `analysis.py`.
+- Run the script. Check `analysis_output/` for results.
+
+--- 

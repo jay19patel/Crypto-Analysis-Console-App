@@ -29,16 +29,39 @@ class TradingSignal(BaseModel):
 
 
 class MarketData(BaseModel):
-    """Market data structure"""
-    symbol: str
+    """Market data structure (expanded)"""
     price: float
-    volume: float
-    change: float
+    mark_price: float = None
+    spot_price: float = None
+    volume: float = None
+    turnover: float = None
+    turnover_usd: float = None
+    high: float = None
+    low: float = None
+    open: float = None
+    close: float = None
+    open_interest: float = None
+    oi_value: float = None
+    oi_contracts: float = None
+    oi_value_usd: float = None
+    oi_change_usd_6h: float = None
+    funding_rate: float = None
+    mark_basis: float = None
+    mark_change_24h: float = None
+    underlying_asset_symbol: str = None
+    description: str = None
+    initial_margin: float = None
+    tick_size: float = None
+    price_band_lower: float = None
+    price_band_upper: float = None
+    best_bid: float = None
+    best_ask: float = None
+    bid_size: float = None
+    ask_size: float = None
+    mark_iv: float = None
+    size: float = None
+    symbol: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now())
-    high_24h: float
-    low_24h: float
-    bid: float
-    ask: float
     
     class Config:
         json_encoders = {

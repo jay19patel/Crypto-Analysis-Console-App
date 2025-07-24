@@ -53,84 +53,10 @@ logging.basicConfig(
 
 logger = logging.getLogger("trading")
 
-
-# SignalType, TradingSignal, and MarketData are now imported from schemas
-
-
-# Strategy classes are now in src/strategies.py and StrategyManager is in src/strategy_manager.py
-
-
-class PriceGenerator:
-    """Generate realistic price movements"""
-    
-    def __init__(self):
-        self.logger = logging.getLogger("price_generator")
-        self.base_prices = {
-            "BTC-USD": 50000.0,
-            "ETH-USD": 3000.0
-        }
-        self.current_prices = self.base_prices.copy()
-        self.price_history = {symbol: [] for symbol in self.base_prices}
-        self.volatility = {
-            "BTC-USD": 0.03,
-            "ETH-USD": 0.04
-        }
-        
-    def generate_market_data(self, symbol: str) -> MarketData:
-        """Generate realistic market data for a symbol"""
-        if symbol not in self.current_prices:
-            self.current_prices[symbol] = 100.0
-            self.volatility[symbol] = 0.02
-        
-        # Generate price movement
-        volatility = self.volatility[symbol]
-        change_percent = random.normalvariate(0, volatility)
-        
-        # Apply trend bias (small upward bias)
-        trend_bias = 0.0001
-        change_percent += trend_bias
-        
-        # Update price
-        old_price = self.current_prices[symbol]
-        new_price = old_price * (1 + change_percent)
-        self.current_prices[symbol] = new_price
-        
-        # Update price history
-        self.price_history[symbol].append(new_price)
-        if len(self.price_history[symbol]) > 1000:
-            self.price_history[symbol].pop(0)
-        
-        # Calculate 24h high/low
-        recent_prices = self.price_history[symbol][-288:]  # Last 24h (5s intervals)
-        high_24h = max(recent_prices) if recent_prices else new_price
-        low_24h = min(recent_prices) if recent_prices else new_price
-        
-        # Generate bid/ask spread
-        spread = new_price * 0.001  # 0.1% spread
-        bid = new_price - spread / 2
-        ask = new_price + spread / 2
-        
-        return MarketData(
-            symbol=symbol,
-            price=new_price,
-            volume=random.uniform(100, 1000),
-            change=change_percent * 100,
-            timestamp=datetime.now(timezone.utc),
-            high_24h=high_24h,
-            low_24h=low_24h,
-            bid=bid,
-            ask=ask
-        )
-    
-    def get_current_price(self, symbol: str) -> float:
-        """Get current price for a symbol"""
-        return self.current_prices.get(symbol, 0.0)
-
-
 class ImprovedTradingSystem:
     """Improved trading system with strategy classes and threading"""
     
-    def __init__(self):
+    def __init__(self, live_save: bool = False):
         """Initialize the improved trading system"""
         self.settings = get_settings()
         self.dummy_settings = get_dummy_settings()
@@ -174,6 +100,9 @@ class ImprovedTradingSystem:
         # Setup strategies
         self._setup_strategies()
         
+        self.live_save = live_save
+        self._last_live_save_time = {}  # symbol -> last save timestamp
+        
         self.logger.info("Improved trading system initialized")
 
     def _setup_strategies(self):
@@ -186,26 +115,64 @@ class ImprovedTradingSystem:
     def _on_live_price_update(self, live_prices: Dict[str, Dict]):
         """Callback function called when WebSocket receives new price data"""
         try:
-            self.logger.info(f"📈 WebSocket Price Update: {len(live_prices)} symbols updated")
-            
             # Process each price update
             for symbol, price_data in live_prices.items():
                 # Convert WebSocket data to MarketData format
                 market_data = MarketData(
                     symbol=symbol,
                     price=price_data.get("price", 0.0),
-                    volume=price_data.get("volume", 0.0),
-                    change=0.0,  # Calculate change if needed
-                    timestamp=datetime.now(timezone.utc),
-                    high_24h=price_data.get("high", price_data.get("price", 0.0)),
-                    low_24h=price_data.get("low", price_data.get("price", 0.0)),
-                    bid=price_data.get("price", 0.0) - 0.1,
-                    ask=price_data.get("price", 0.0) + 0.1
+                    mark_price=price_data.get("mark_price"),
+                    spot_price=price_data.get("spot_price"),
+                    volume=price_data.get("volume"),
+                    turnover=price_data.get("turnover"),
+                    turnover_usd=price_data.get("turnover_usd"),
+                    high=price_data.get("high"),
+                    low=price_data.get("low"),
+                    open=price_data.get("open"),
+                    close=price_data.get("close"),
+                    open_interest=price_data.get("open_interest"),
+                    oi_value=price_data.get("oi_value"),
+                    oi_contracts=price_data.get("oi_contracts"),
+                    oi_value_usd=price_data.get("oi_value_usd"),
+                    oi_change_usd_6h=price_data.get("oi_change_usd_6h"),
+                    funding_rate=price_data.get("funding_rate"),
+                    mark_basis=price_data.get("mark_basis"),
+                    mark_change_24h=price_data.get("mark_change_24h"),
+                    underlying_asset_symbol=price_data.get("underlying_asset_symbol"),
+                    description=price_data.get("description"),
+                    initial_margin=price_data.get("initial_margin"),
+                    tick_size=price_data.get("tick_size"),
+                    price_band_lower=price_data.get("price_band_lower"),
+                    price_band_upper=price_data.get("price_band_upper"),
+                    best_bid=price_data.get("best_bid"),
+                    best_ask=price_data.get("best_ask"),
+                    bid_size=price_data.get("bid_size"),
+                    ask_size=price_data.get("ask_size"),
+                    mark_iv=price_data.get("mark_iv"),
+                    size=price_data.get("size"),
+                    timestamp=datetime.now(timezone.utc)
                 )
                 
                 # Update current market data
                 with self.market_data_lock:
                     self.current_market_data[symbol] = market_data
+                
+                # --- Live Save Logic ---
+                if self.live_save:
+                    now = time.time()
+                    last_save = self._last_live_save_time.get(symbol, 0)
+                    if now - last_save >= 20:
+                        try:
+                            from src.database.mongodb_client import AsyncMongoDBClient
+                            if self._main_loop is not None:
+                                client = AsyncMongoDBClient()
+                                asyncio.run_coroutine_threadsafe(
+                                    client.save_live_price_async(market_data),
+                                    self._main_loop
+                                )
+                                self._last_live_save_time[symbol] = now
+                        except Exception as e:
+                            self.logger.error(f"Error saving live price for {symbol}: {e}")
                 
                 # Update broker prices
                 if self._main_loop is not None:
@@ -555,6 +522,11 @@ def parse_arguments():
         action="store_true", 
         help="Delete all trading data from database and start a new session"
     )
+    parser.add_argument(
+        "--liveSave",
+        action="store_true",
+        help="Enable live saving of WebSocket price data to MongoDB (liveprice collection)"
+    )
     return parser.parse_args()
 
 
@@ -564,7 +536,7 @@ async def main():
     args = parse_arguments()
     
     # Create trading system
-    trading_system = ImprovedTradingSystem()
+    trading_system = ImprovedTradingSystem(live_save=args.liveSave)
     
     # Setup signal handlers for graceful shutdown
     def signal_handler(signum, frame):

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import motor.motor_asyncio
 from pymongo import errors
 from src.config import get_settings
+from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class AsyncMongoDBClient:
         self.accounts_collection = "accounts"
         self.positions_collection = "positions"
         self.trades_collection = "trades"
-        self.analysis_collection = "analysis"
+        self.liveprice = "liveprice"
         
         self._initialized = True
         
@@ -241,7 +242,7 @@ class AsyncMongoDBClient:
         try:
             # Delete all collections
             collections = [self.accounts_collection, self.positions_collection, 
-                         self.trades_collection, self.analysis_collection]
+                         self.trades_collection, self.liveprice]
             
             for collection in collections:
                 await self.delete_collection(collection)
@@ -417,3 +418,24 @@ class AsyncMongoDBClient:
         if cls._instance:
             cls._instance = None
             cls._initialized = False 
+
+    async def save_live_price_async(self, market_data):
+        """Save a MarketData object (or dict) to the 'liveprice' collection asynchronously"""
+        if not self.is_connected:
+            if not await self.connect():
+                return False
+        try:
+            # Convert to dict if needed
+            if hasattr(market_data, '__dict__'):
+                doc = dict(market_data.__dict__)
+            else:
+                doc = dict(market_data)
+            # Convert timestamp to ISO if needed
+            if 'timestamp' in doc and hasattr(doc['timestamp'], 'isoformat'):
+                doc['timestamp'] = doc['timestamp'].isoformat()
+            await self.db[self.liveprice].insert_one(doc)
+            self.log_message(f"Live price saved for {doc.get('symbol', '?')}", "info")
+            return True
+        except Exception as e:
+            self.log_message(f"Error saving live price: {e}", "error")
+            return False 
