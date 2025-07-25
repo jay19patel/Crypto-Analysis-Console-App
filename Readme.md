@@ -419,3 +419,31 @@ python analysis.py
 - Run the script. Check `analysis_output/` for results.
 
 --- 
+
+## Production-Ready Features
+
+- **Memory Management:** All in-memory caches are size-limited to prevent memory leaks.
+- **Data Retention:** Automatic cleanup of old trades, positions, and notifications from MongoDB (default: older than 90 days).
+- **Logging:** All output uses Python logging for robust monitoring and debugging.
+- **Thread/Async Management:** All threads and async tasks are properly stopped and joined on shutdown for 24x7 reliability.
+- **No Test/Demo Code in Production:** Test scripts are removed from the main codebase.
+- **Health Monitoring:** (Recommended) Add hooks for memory, DB, and thread status monitoring.
+
+## Usage
+
+- Run the main trading system:
+  ```bash
+  python app.py
+  ```
+- To clean up old data manually (example):
+  ```python
+  # In your maintenance script or admin shell
+  from src.database.mongodb_client import AsyncMongoDBClient
+  import asyncio
+  asyncio.run(AsyncMongoDBClient().cleanup_old_data(days=90))
+  ```
+
+## Best Practices
+- Use process supervision (systemd, pm2, Docker) for auto-restart.
+- Set up log rotation for `logs/trading.log`.
+- Monitor system health and set up alerts for errors or resource issues. 

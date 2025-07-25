@@ -30,11 +30,7 @@ class RealTimeMarketData:
         # Real-time price storage with thread safety
         self.live_prices: Dict[str, Dict] = {}
         self.price_lock = threading.Lock()
-        
-        # Historical data storage with timestamps
-        self.historical_data: Dict[str, List[Dict]] = {}
-        self.data_lock = threading.Lock()
-        
+                
         # WebSocket connection management
         self.ws = None
         self.is_connected = False
@@ -309,22 +305,6 @@ class RealTimeMarketData:
                     }
                     self.live_prices[symbol] = price_update
                     self._update_count += 1
-                    
-                    # Store historical data with timestamp
-                    with self.data_lock:
-                        if symbol not in self.historical_data:
-                            self.historical_data[symbol] = []
-                        
-                        # Add timestamp to the data
-                        historical_entry = price_update.copy()
-                        historical_entry['timestamp'] = datetime.now(timezone.utc).isoformat()
-                        historical_entry['symbol'] = symbol
-                        
-                        self.historical_data[symbol].append(historical_entry)
-                        
-                        # Keep only last 1000 entries per symbol
-                        if len(self.historical_data[symbol]) > 1000:
-                            self.historical_data[symbol] = self.historical_data[symbol][-1000:]
                     
                     # Notify callback with current prices
                     if self.price_callback:

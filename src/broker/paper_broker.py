@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from enum import Enum
+from collections import OrderedDict
 
 from src.broker.models import Account, Position, PositionType, PositionStatus
 from src.config import get_settings, get_broker_settings
@@ -70,8 +71,9 @@ class AsyncBroker:
         self.logger = logging.getLogger("broker.async_broker")
         
         # Dummy data storage
-        self._price_cache: Dict[str, Dict] = {}
-        self._position_cache: Dict[str, Position] = {}
+        self._price_cache: OrderedDict[str, Dict] = OrderedDict()
+        self._position_cache: OrderedDict[str, Position] = OrderedDict()
+        self._cache_max_size = 500
         
         # Performance tracking
         self._trade_stats = {
@@ -301,7 +303,9 @@ class AsyncBroker:
         """Update prices asynchronously with dummy data"""
         try:
             # Update local cache
-            self._price_cache.update(prices)
+            for symbol, price_dict in prices.items():
+                # When updating price cache
+                self._update_cache(self._price_cache, symbol, price_dict)
             
             # Update position PnLs
             self._update_position_pnls(prices)
@@ -371,6 +375,7 @@ class AsyncBroker:
                 # Reset in-memory data
                 self.positions.clear()
                 self._position_cache.clear()
+                self._price_cache.clear() # Clear price cache as well
                 self._trade_stats = {
                     "total_requests": 0,
                     "successful_trades": 0,
@@ -545,6 +550,11 @@ class AsyncBroker:
                 current_price = prices[position.symbol].get("price", 0.0)
                 if current_price > 0:
                     position.calculate_pnl(current_price)
+    
+    def _update_cache(self, cache, key, value):
+        cache[key] = value
+        if len(cache) > self._cache_max_size:
+            cache.popitem(last=False)
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get performance statistics"""

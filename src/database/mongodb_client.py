@@ -239,7 +239,6 @@ class AsyncMongoDBClient:
         if not self.is_connected:
             if not await self.connect():
                 return False
-        
         try:
             # Delete all collections
             collections = [self.accounts_collection, self.positions_collection, 
@@ -440,3 +439,22 @@ class AsyncMongoDBClient:
         except Exception as e:
             self.log_message(f"Error saving live price: {e}", "error")
             return False 
+
+    async def cleanup_old_data(self, days: int = 90) -> None:
+        """Delete trades, positions, and notifications older than 'days' days for data retention."""
+        if not self.is_connected:
+            if not await self.connect():
+                self.log_message("Could not connect to MongoDB for cleanup", "error")
+                return
+        cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
+        cutoff_iso = datetime.fromtimestamp(cutoff, tz=timezone.utc).isoformat()
+        try:
+            # Remove old trades
+            result_trades = await self.db[self.trades_collection].delete_many({"timestamp": {"$lt": cutoff_iso}})
+            # Remove old positions
+            result_positions = await self.db[self.positions_collection].delete_many({"exit_time": {"$lt": cutoff_iso}})
+            # Remove old notifications
+            result_notifications = await self.db[self.notifications].delete_many({"timestamp": {"$lt": cutoff_iso}})
+            self.log_message(f"Cleanup complete: {result_trades.deleted_count} trades, {result_positions.deleted_count} positions, {result_notifications.deleted_count} notifications deleted.", "info")
+        except Exception as e:
+            self.log_message(f"Error during cleanup: {e}", "error") 
