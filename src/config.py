@@ -76,10 +76,10 @@ class Settings(BaseSettings):
     TRADING_LOOP_INTERVAL: int = Field(default=5, description="Trading loop interval in seconds")
     
     # Performance Settings
+    STRATEGY_CLASSES: List[str] = Field(default=["EMAStrategy"], description="Strategy classes to use")
     MAX_BACKGROUND_WORKERS: int = Field(default=4, description="Maximum background workers")
     TASK_QUEUE_SIZE: int = Field(default=1000, description="Task queue size")
     PRICE_UPDATE_INTERVAL: int = Field(default=1, description="Price update interval in seconds")
-    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

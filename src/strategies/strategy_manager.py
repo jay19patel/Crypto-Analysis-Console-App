@@ -8,10 +8,11 @@ from src.database.schemas import (
     MarketData, TradingSignal, SignalType, StrategyManagerResult, 
     StrategyResult, StrategyStats
 )
-from .strategies import (
-    BaseStrategy, RandomStrategy, VolatilityStrategy, 
-    MovingAverageStrategy, RSIStrategy
-)
+from src.strategies.base_strategy import BaseStrategy
+import statistics
+import pandas as pd
+from src.config import get_settings
+import importlib
 
 
 class StrategyManager:
@@ -23,6 +24,7 @@ class StrategyManager:
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.lock = threading.Lock()
+        self.settings = get_settings()
         
         # Statistics
         self.total_executions = 0
@@ -38,26 +40,15 @@ class StrategyManager:
             self.strategies[strategy.symbol].append(strategy)
             self.logger.info(f"Added strategy {strategy.name} for {strategy.symbol}")
     
-    def add_default_strategies(self, symbols: List[str]):
-        """Add default strategies for given symbols"""
+    def add_default_strategies(self, symbols: List[str], historical_data_provider):
+        """Add default strategies for given symbols, using STRATEGY_CLASSES from config.py"""
         for symbol in symbols:
-            # Add Random Strategy
-            random_strategy = RandomStrategy(symbol)
-            self.add_strategy(random_strategy)
-            
-            # Add Volatility Strategy
-            volatility_strategy = VolatilityStrategy(symbol)
-            self.add_strategy(volatility_strategy)
-            
-            # # Add Moving Average Strategy
-            # ma_strategy = MovingAverageStrategy(symbol)
-            # self.add_strategy(ma_strategy)
-            
-            # # Add RSI Strategy
-            # rsi_strategy = RSIStrategy(symbol)
-            # self.add_strategy(rsi_strategy)
-            
-        self.logger.info(f"Added default strategies for {len(symbols)} symbols")
+            for class_name in self.settings.STRATEGY_CLASSES:
+                module = importlib.import_module("src.strategies.strategies")
+                strategy_class = getattr(module, class_name)
+                strategy = strategy_class(symbol, historical_data_provider)
+                self.add_strategy(strategy)
+        self.logger.info(f"Added default strategies for {len(symbols)} symbols from config STRATEGY_CLASSES")
     
     def execute_strategies_parallel(self, symbol: str, market_data: MarketData) -> StrategyManagerResult:
         """Execute all strategies for a symbol in parallel and return the best signal"""

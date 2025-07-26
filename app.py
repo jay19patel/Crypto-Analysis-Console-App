@@ -37,6 +37,7 @@ from src.config import get_settings, get_dummy_settings
 from src.services.live_price_ws import RealTimeMarketData
 from src.strategies.strategy_manager import StrategyManager
 from src.database.schemas import TradingSignal, MarketData, SignalType
+from src.broker.historical_data import HistoricalDataProvider
 
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
@@ -107,9 +108,11 @@ class ImprovedTradingSystem:
 
     def _setup_strategies(self):
         """Setup trading strategies for different symbols"""
-        symbols = ["BTC-USD", "ETH-USD"]
-        # Add default strategies (Random, Volatility, MovingAverage, RSI) for each symbol
-        self.strategy_manager.add_default_strategies(symbols)
+        symbols = ["BTCUSD", "ETHUSD"]
+        # Create the historical data provider instance
+        historical_data_provider = HistoricalDataProvider()
+        # Add default strategies for each symbol, passing the provider
+        self.strategy_manager.add_default_strategies(symbols, historical_data_provider=historical_data_provider)
         self.logger.info(f"Setup default strategies for {len(symbols)} symbols")
 
     def _on_live_price_update(self, live_prices: Dict[str, Dict]):
