@@ -163,6 +163,12 @@ Examples:
     )
     
     parser.add_argument(
+        "--emailoff",
+        action="store_true",
+        help="Disable email notifications (only store in database)"
+    )
+    
+    parser.add_argument(
         "--health-check",
         action="store_true",
         help="Perform health check and exit"
@@ -302,6 +308,7 @@ async def main():
     logger.info(f"📊 Log Level: {final_log_level} {'(DEBUG MODE)' if args.debug else ''}")
     logger.info(f"🔌 WebSocket Port: {args.websocket_port}")
     logger.info(f"💾 Live Save: {'Enabled' if args.liveSave else 'Disabled'}")
+    logger.info(f"📧 Email Notifications: {'Disabled' if args.emailoff else 'Enabled'}")
     logger.info(f"🆕 Fresh Start: {'Yes' if args.new else 'No'}")
     logger.info(f"🐛 Debug Mode: {'Enabled' if args.debug else 'Disabled'}")
     logger.info("=" * 80)
@@ -318,7 +325,8 @@ async def main():
         logger.info("🔧 Initializing trading system...")
         trading_system = TradingSystem(
             live_save=args.liveSave,
-            websocket_port=args.websocket_port
+            websocket_port=args.websocket_port,
+            email_enabled=not args.emailoff
         )
         
         # Setup graceful shutdown handling

@@ -338,9 +338,10 @@ class EmailNotifier:
 class NotificationManager:
     """Advanced notification manager with async support and multiple channels"""
     
-    def __init__(self):
+    def __init__(self, email_enabled: bool = True):
         self.settings = get_settings()
         self.logger = logging.getLogger("notifications.manager")
+        self.email_enabled = email_enabled
         
         # Initialize notification channels
         self.email_notifier = EmailNotifier()
@@ -357,6 +358,11 @@ class NotificationManager:
             "emails_failed": 0,
             "last_notification": None
         }
+        
+        if self.email_enabled:
+            self.logger.info("✅ Email notifications enabled")
+        else:
+            self.logger.info("📧 Email notifications disabled (--emailoff mode)")
     
     async def start(self):
         """Start notification manager"""
@@ -565,12 +571,17 @@ class NotificationManager:
             self.logger.info(f"Processing notification: {event.type.value} - {event.title}")
             
             # Send email notification and log to database
-            if await self.email_notifier.send_notification_email(event):
-                self._stats["emails_sent"] += 1
-                self.logger.info(f"Email notification sent successfully: {event.title}")
+            if self.email_enabled:
+                if await self.email_notifier.send_notification_email(event):
+                    self._stats["emails_sent"] += 1
+                    self.logger.info(f"Email notification sent successfully: {event.title}")
+                else:
+                    self._stats["emails_failed"] += 1
+                    self.logger.warning(f"Email notification failed: {event.title}")
             else:
-                self._stats["emails_failed"] += 1
-                self.logger.warning(f"Email notification failed: {event.title}")
+                # Only log to database when email is disabled
+                self.logger.info(f"Email disabled - storing notification in database only: {event.title}")
+                await self.email_notifier._log_notification_to_db(event, "stored_no_email", "Email disabled by --emailoff")
             
         except Exception as e:
             self.logger.error(f"Error processing notification {event.type.value}: {e}")

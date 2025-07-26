@@ -84,7 +84,7 @@ class CircuitBreaker:
 class TradingSystem:
     """Professional trading system with WebSocket server integration"""
     
-    def __init__(self, live_save: bool = False, websocket_port: int = 8765):
+    def __init__(self, live_save: bool = False, websocket_port: int = 8765, email_enabled: bool = True):
         """Initialize the trading system with all components"""
         self.settings = get_settings()
         self.dummy_settings = get_dummy_settings()
@@ -100,7 +100,7 @@ class TradingSystem:
         try:
             self.broker = AsyncBroker()
             self.risk_manager = AsyncRiskManager(self.broker)
-            self.notification_manager = NotificationManager()
+            self.notification_manager = NotificationManager(email_enabled=email_enabled)
             self.strategy_manager = StrategyManager(max_workers=4)
             
             # WebSocket server for real-time data broadcasting

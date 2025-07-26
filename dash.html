@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Trading Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .connection-status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .status-connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status-connecting {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title .icon {
+            font-size: 1.5rem;
+        }
+
+        .price-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .price-item:last-child {
+            border-bottom: none;
+        }
+
+        .symbol {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .price {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .change {
+            font-size: 0.9rem;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .change.positive {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .change.negative {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .position-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid #10b981;
+        }
+
+        .position-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .position-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            font-size: 0.9rem;
+        }
+
+        .detail-item {
+            text-align: center;
+        }
+
+        .detail-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .signal-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .signal-type {
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .signal-buy {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .signal-sell {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .signal-hold {
+            background: rgba(107, 114, 128, 0.2);
+            color: #9ca3af;
+        }
+
+        .notification-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .notification-time {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 4px;
+        }
+
+        .notification-message {
+            font-weight: 500;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .account-summary {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .balance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .balance-label {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .balance-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .position-details,
+            .detail-item {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🚀 Crypto Trading Dashboard</h1>
+            <div id="connectionStatus" class="connection-status status-connecting">
+                <span class="loading"></span> Connecting to WebSocket...
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Live Prices Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">📊</span>
+                    Live Prices
+                </div>
+                <div id="livePrices">
+                    <div class="empty-state">Waiting for price data...</div>
+                </div>
+            </div>
+
+            <!-- Account Summary Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">💰</span>
+                    Account Summary
+                </div>
+                <div id="accountSummary">
+                    <div class="empty-state">Loading account data...</div>
+                </div>
+            </div>
+
+            <!-- Open Positions Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">📈</span>
+                    Open Positions
+                </div>
+                <div id="openPositions">
+                    <div class="empty-state">No open positions</div>
+                </div>
+            </div>
+
+            <!-- Strategy Signals Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">🎯</span>
+                    Latest Signals
+                </div>
+                <div id="strategySignals">
+                    <div class="empty-state">Waiting for signals...</div>
+                </div>
+            </div>
+
+            <!-- System Status Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">⚡</span>
+                    System Status
+                </div>
+                <div id="systemStatus">
+                    <div class="empty-state">Loading system status...</div>
+                </div>
+            </div>
+
+            <!-- Notifications Card -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">🔔</span>
+                    Recent Notifications
+                </div>
+                <div id="notifications">
+                    <div class="empty-state">No recent notifications</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TradingDashboard {
+            constructor() {
+                this.ws = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                this.reconnectDelay = 1000;
+                this.isConnected = false;
+                
+                // Data storage
+                this.data = {
+                    livePrices: {},
+                    positions: {},
+                    signals: [],
+                    notifications: [],
+                    accountSummary: {},
+                    systemStatus: {}
+                };
+                
+                this.init();
+            }
+            
+            init() {
+                this.connectWebSocket();
+                this.setupEventListeners();
+            }
+            
+            connectWebSocket() {
+                try {
+                    // Try to connect to WebSocket server
+                    const wsUrl = `ws://${window.location.hostname}:8765`;
+                    console.log(`Connecting to WebSocket: ${wsUrl}`);
+                    
+                    this.ws = new WebSocket(wsUrl);
+                    
+                    this.ws.onopen = () => {
+                        console.log('WebSocket connected');
+                        this.isConnected = true;
+                        this.reconnectAttempts = 0;
+                        this.updateConnectionStatus('connected');
+                        this.subscribeToChannels();
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const message = JSON.parse(event.data);
+                            this.handleMessage(message);
+                        } catch (error) {
+                            console.error('Error parsing WebSocket message:', error);
+                        }
+                    };
+                    
+                    this.ws.onclose = () => {
+                        console.log('WebSocket disconnected');
+                        this.isConnected = false;
+                        this.updateConnectionStatus('disconnected');
+                        this.scheduleReconnect();
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateConnectionStatus('disconnected');
+                    };
+                    
+                } catch (error) {
+                    console.error('Failed to create WebSocket connection:', error);
+                    this.updateConnectionStatus('disconnected');
+                    this.scheduleReconnect();
+                }
+            }
+            
+            subscribeToChannels() {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    // Subscribe to all available channels
+                    const subscribeMessage = {
+                        type: 'subscribe',
+                        channels: [
+                            'live_prices',
+                            'positions', 
+                            'notifications',
+                            'strategy_signals',
+                            'account_summary',
+                            'system_status',
+                            'heartbeat'
+                        ]
+                    };
+                    
+                    this.ws.send(JSON.stringify(subscribeMessage));
+                    console.log('Subscribed to all channels');
+                }
+            }
+            
+            handleMessage(message) {
+                console.log('Received message:', message.type, message.data);
+                
+                switch (message.type) {
+                    case 'live_prices':
+                        this.updateLivePrices(message.data);
+                        break;
+                    case 'positions':
+                        this.updatePositions(message.data);
+                        break;
+                    case 'strategy_signals':
+                        this.addStrategySignal(message.data);
+                        break;
+                    case 'notifications':
+                        this.addNotification(message.data);
+                        break;
+                    case 'account_summary':
+                        this.updateAccountSummary(message.data);
+                        break;
+                    case 'system_status':
+                        this.updateSystemStatus(message.data);
+                        break;
+                    case 'heartbeat':
+                        // Handle heartbeat - connection is alive
+                        break;
+                    default:
+                        console.log('Unknown message type:', message.type);
+                }
+            }
+            
+            updateLivePrices(prices) {
+                this.data.livePrices = { ...this.data.livePrices, ...prices };
+                this.renderLivePrices();
+            }
+            
+            updatePositions(positions) {
+                this.data.positions = positions;
+                this.renderPositions();
+            }
+            
+            addStrategySignal(signal) {
+                this.data.signals.unshift(signal);
+                // Keep only last 10 signals
+                this.data.signals = this.data.signals.slice(0, 10);
+                this.renderStrategySignals();
+            }
+            
+            addNotification(notification) {
+                this.data.notifications.unshift(notification);
+                // Keep only last 15 notifications
+                this.data.notifications = this.data.notifications.slice(0, 15);
+                this.renderNotifications();
+            }
+            
+            updateAccountSummary(summary) {
+                this.data.accountSummary = summary;
+                this.renderAccountSummary();
+            }
+            
+            updateSystemStatus(status) {
+                this.data.systemStatus = status;
+                this.renderSystemStatus();
+            }
+            
+            renderLivePrices() {
+                const container = document.getElementById('livePrices');
+                const prices = this.data.livePrices;
+                
+                if (Object.keys(prices).length === 0) {
+                    container.innerHTML = '<div class="empty-state">Waiting for price data...</div>';
+                    return;
+                }
+                
+                container.innerHTML = Object.entries(prices).map(([symbol, data]) => {
+                    const price = parseFloat(data.price || 0);
+                    const change = parseFloat(data.change_24h || 0);
+                    const changeClass = change >= 0 ? 'positive' : 'negative';
+                    const changeSymbol = change >= 0 ? '+' : '';
+                    
+                    return `
+                        <div class="price-item">
+                            <div>
+                                <div class="symbol">${symbol}</div>
+                                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">
+                                    Vol: ${this.formatNumber(data.volume || 0)}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="price">$${this.formatPrice(price)}</div>
+                                <div class="change ${changeClass}">
+                                    ${changeSymbol}${change.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            renderPositions() {
+                const container = document.getElementById('openPositions');
+                const positions = this.data.positions;
+                
+                if (!positions || Object.keys(positions).length === 0) {
+                    container.innerHTML = '<div class="empty-state">No open positions</div>';
+                    return;
+                }
+                
+                container.innerHTML = Object.entries(positions).map(([id, position]) => {
+                    const pnl = parseFloat(position.pnl || 0);
+                    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                    const pnlSymbol = pnl >= 0 ? '+' : '';
+                    
+                    return `
+                        <div class="position-item">
+                            <div class="position-header">
+                                <div>
+                                    <strong>${position.symbol}</strong>
+                                    <span style="margin-left: 8px; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; background: rgba(16,185,129,0.2); color: #10b981;">
+                                        ${position.side}
+                                    </span>
+                                </div>
+                                <div class="change ${pnlClass}">
+                                    ${pnlSymbol}$${Math.abs(pnl).toFixed(2)}
+                                </div>
+                            </div>
+                            <div class="position-details">
+                                <div class="detail-item">
+                                    <div class="detail-label">Size</div>
+                                    <div class="detail-value">${position.size}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Entry Price</div>
+                                    <div class="detail-value">$${this.formatPrice(position.entry_price)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Current Price</div>
+                                    <div class="detail-value">$${this.formatPrice(position.current_price)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">PnL %</div>
+                                    <div class="detail-value change ${pnlClass}">
+                                        ${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            renderStrategySignals() {
+                const container = document.getElementById('strategySignals');
+                const signals = this.data.signals;
+                
+                if (signals.length === 0) {
+                    container.innerHTML = '<div class="empty-state">Waiting for signals...</div>';
+                    return;
+                }
+                
+                container.innerHTML = signals.map(signal => {
+                    const signalClass = signal.signal?.toLowerCase() || 'hold';
+                    const time = new Date(signal.timestamp).toLocaleTimeString();
+                    
+                    return `
+                        <div class="signal-item">
+                            <div class="signal-header">
+                                <div>
+                                    <strong>${signal.symbol}</strong>
+                                    <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7); margin-top: 2px;">
+                                        ${signal.strategy_name} • ${time}
+                                    </div>
+                                </div>
+                                <div class="signal-type signal-${signalClass}">
+                                    ${signal.signal}
+                                </div>
+                            </div>
+                            <div style="font-size: 0.9rem; color: rgba(255,255,255,0.8);">
+                                Confidence: ${signal.confidence}%
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            renderNotifications() {
+                const container = document.getElementById('notifications');
+                const notifications = this.data.notifications;
+                
+                if (notifications.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No recent notifications</div>';
+                    return;
+                }
+                
+                container.innerHTML = notifications.map(notification => {
+                    const time = new Date(notification.timestamp).toLocaleTimeString();
+                    
+                    return `
+                        <div class="notification-item">
+                            <div class="notification-time">${time}</div>
+                            <div class="notification-message">
+                                <strong>${notification.level?.toUpperCase()}</strong>: ${notification.message}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            renderAccountSummary() {
+                const container = document.getElementById('accountSummary');
+                const summary = this.data.accountSummary;
+                
+                if (!summary || Object.keys(summary).length === 0) {
+                    container.innerHTML = '<div class="empty-state">Loading account data...</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="account-summary">
+                        <div class="balance-item">
+                            <span class="balance-label">Total Balance</span>
+                            <span class="balance-value">$${this.formatNumber(summary.total_balance || 0)}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Available Balance</span>
+                            <span class="balance-value">$${this.formatNumber(summary.available_balance || 0)}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Total PnL</span>
+                            <span class="balance-value change ${(summary.total_pnl || 0) >= 0 ? 'positive' : 'negative'}">
+                                ${(summary.total_pnl || 0) >= 0 ? '+' : ''}$${Math.abs(summary.total_pnl || 0).toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Open Positions</span>
+                            <span class="balance-value">${summary.open_positions || 0}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderSystemStatus() {
+                const container = document.getElementById('systemStatus');
+                const status = this.data.systemStatus;
+                
+                if (!status || Object.keys(status).length === 0) {
+                    container.innerHTML = '<div class="empty-state">Loading system status...</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div style="display: grid; gap: 12px;">
+                        <div class="balance-item">
+                            <span class="balance-label">Status</span>
+                            <span class="balance-value" style="color: #10b981;">${status.status || 'Unknown'}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Uptime</span>
+                            <span class="balance-value">${this.formatUptime(status.uptime || 0)}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Connected Clients</span>
+                            <span class="balance-value">${status.connected_clients || 0}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Messages Sent</span>
+                            <span class="balance-value">${this.formatNumber(status.messages_sent || 0)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            updateConnectionStatus(status) {
+                const statusElement = document.getElementById('connectionStatus');
+                statusElement.className = `connection-status status-${status}`;
+                
+                switch (status) {
+                    case 'connected':
+                        statusElement.innerHTML = '🟢 Connected';
+                        statusElement.classList.add('pulse');
+                        break;
+                    case 'connecting':
+                        statusElement.innerHTML = '<span class="loading"></span> Connecting...';
+                        statusElement.classList.remove('pulse');
+                        break;
+                    case 'disconnected':
+                        statusElement.innerHTML = '🔴 Disconnected';
+                        statusElement.classList.remove('pulse');
+                        break;
+                }
+            }
+            
+            scheduleReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+                    
+                    setTimeout(() => {
+                        this.updateConnectionStatus('connecting');
+                        this.connectWebSocket();
+                    }, this.reconnectDelay * this.reconnectAttempts);
+                } else {
+                    console.log('Max reconnection attempts reached');
+                    this.updateConnectionStatus('disconnected');
+                }
+            }
+            
+            setupEventListeners() {
+                // Add page visibility change handler to reconnect when page becomes visible
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden && !this.isConnected) {
+                        this.reconnectAttempts = 0;
+                        this.connectWebSocket();
+                    }
+                });
+                
+                // Add window focus handler
+                window.addEventListener('focus', () => {
+                    if (!this.isConnected) {
+                        this.reconnectAttempts = 0;
+                        this.connectWebSocket();
+                    }
+                });
+            }
+            
+            formatPrice(price) {
+                return parseFloat(price).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 6
+                });
+            }
+            
+            formatNumber(num) {
+                return parseFloat(num).toLocaleString('en-US', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
+                });
+            }
+            
+            formatUptime(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${hours}h ${minutes}m ${secs}s`;
+            }
+        }
+        
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing Trading Dashboard...');
+            window.dashboard = new TradingDashboard();
+        });
+    </script>
+</body>
+</html>
