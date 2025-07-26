@@ -54,9 +54,9 @@ class Settings(BaseSettings):
     EMAIL_TO: str = Field(default="", description="To email address")
     
     # FastAPI-Mail Settings
-    FASTAPI_MAIL_USERNAME: str = Field(default="developer.jay19@gmail.com", description="FastAPI-Mail email username")
-    FASTAPI_MAIL_PASSWORD: str = Field(default="j@y1999", description="FastAPI-Mail email password")
-    FASTAPI_MAIL_FROM: str = Field(default="developer.jay19@gmail.com", description="FastAPI-Mail from email address")
+    FASTAPI_MAIL_USERNAME: str = Field(default="", description="FastAPI-Mail email username")
+    FASTAPI_MAIL_PASSWORD: str = Field(default="", description="FastAPI-Mail email password")
+    FASTAPI_MAIL_FROM: str = Field(default="", description="FastAPI-Mail from email address")
     FASTAPI_MAIL_FROM_NAME: str = Field(default="Trading Bot", description="FastAPI-Mail from name")
     FASTAPI_MAIL_PORT: int = Field(default=587, description="FastAPI-Mail SMTP port")
     FASTAPI_MAIL_SERVER: str = Field(default="smtp.gmail.com", description="FastAPI-Mail SMTP server")
