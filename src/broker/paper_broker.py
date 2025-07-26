@@ -313,58 +313,129 @@ class AsyncBroker:
             self.logger.error(f"Error updating prices: {e}")
     
     async def get_account_summary_async(self) -> Dict[str, Any]:
-        """Get account summary asynchronously"""
+        """Get account summary asynchronously with live PnL calculations"""
         if not self.account:
             return {}
+        
+        # Calculate live unrealized PnL from open positions
+        open_positions = [p for p in self.positions.values() if p.status == PositionStatus.OPEN]
+        total_unrealized_pnl = 0.0
+        
+        # Update PnL with latest prices for each open position
+        for position in open_positions:
+            if position.symbol in self._price_cache:
+                current_price = self._price_cache[position.symbol].get("price", 0.0)
+                if current_price > 0:
+                    position.calculate_pnl(current_price)
+            total_unrealized_pnl += position.pnl
+        
+        # Calculate total portfolio value (balance + unrealized PnL)
+        total_portfolio_value = self.account.current_balance + total_unrealized_pnl
+        
+        # Calculate total PnL (realized + unrealized)
+        total_pnl = self.account.realized_pnl + total_unrealized_pnl
+        
+        # Calculate total return percentage
+        total_return_pct = 0.0
+        if self.account.initial_balance > 0:
+            total_return_pct = ((total_portfolio_value - self.account.initial_balance) / self.account.initial_balance) * 100
         
         summary = {
             "account_id": self.account.id,
             "name": self.account.name,
             "initial_balance": self.account.initial_balance,
             "current_balance": self.account.current_balance,
+            "available_balance": self.account.current_balance,  # For frontend compatibility
+            "total_balance": total_portfolio_value,  # Balance + unrealized PnL
             "total_trades": self.account.total_trades,
             "profitable_trades": self.account.profitable_trades,
             "losing_trades": self.account.losing_trades,
             "win_rate": self.account.win_rate,
             "realized_pnl": self.account.realized_pnl,
+            "unrealized_pnl": total_unrealized_pnl,
+            "total_pnl": total_pnl,  # Realized + Unrealized
+            "total_return_percentage": total_return_pct,
             "daily_trades_count": self.account.daily_trades_count,
             "daily_trades_limit": self.account.daily_trades_limit,
             "total_margin_used": self.account.total_margin_used,
             "brokerage_charges": self.account.brokerage_charges,
-            "open_positions_count": len([p for p in self.positions.values() if p.status == PositionStatus.OPEN]),
-            "total_unrealized_pnl": sum(p.pnl for p in self.positions.values() if p.status == PositionStatus.OPEN),
+            "open_positions": len(open_positions),  # Frontend compatible
+            "open_positions_count": len(open_positions),
             "last_updated": datetime.now(timezone.utc).isoformat()
         }
         
         return summary
     
     async def get_positions_summary_async(self) -> Dict[str, Any]:
-        """Get positions summary asynchronously"""
+        """Get positions summary asynchronously with enhanced position data"""
         open_positions = []
         closed_positions = []
+        total_unrealized_pnl = 0.0
         
         for position in self.positions.values():
             pos_data = position.to_dict()
+            
+            # Add current price and recalculate PnL for live positions
             if position.symbol in self._price_cache:
-                pos_data["current_price"] = self._price_cache[position.symbol].get("price", 0.0)
+                current_price = self._price_cache[position.symbol].get("price", 0.0)
+                pos_data["current_price"] = current_price
+                
+                # Recalculate PnL with current price for open positions
+                if position.status == PositionStatus.OPEN and current_price > 0:
+                    position.calculate_pnl(current_price)
+                    pos_data["pnl"] = position.pnl
+                    pos_data["pnl_percentage"] = position.pnl_percentage
+                    total_unrealized_pnl += position.pnl
+            else:
+                pos_data["current_price"] = position.exit_price if position.exit_price else position.entry_price
+            
+            # Enhanced position data for frontend
+            pos_data.update({
+                "open_price": position.entry_price,  # Frontend compatibility
+                "close_price": position.exit_price,  # Will be None for open positions
+                "side": position.position_type.value,  # LONG/SHORT for frontend
+                "size": position.quantity,  # Frontend compatibility
+                "open_time": position.entry_time.isoformat() if position.entry_time else None,
+                "exit_time": position.exit_time.isoformat() if position.exit_time else None,
+                "running_time": self._calculate_running_time(position) if position.status == PositionStatus.OPEN else None,
+                "margin_usage_pct": position.calculate_margin_usage(pos_data["current_price"]) if position.status == PositionStatus.OPEN else 0.0
+            })
             
             if position.status == PositionStatus.OPEN:
                 open_positions.append(pos_data)
             else:
                 closed_positions.append(pos_data)
         
-        # Sort closed positions by exit time
-        closed_positions.sort(
-            key=lambda x: x.get("exit_time", ""), reverse=True
-        )
+        # Sort positions
+        open_positions.sort(key=lambda x: x.get("entry_time", ""), reverse=True)
+        closed_positions.sort(key=lambda x: x.get("exit_time", ""), reverse=True)
         
         return {
             "open_positions": open_positions,
             "closed_positions": closed_positions[:10],  # Last 10
             "total_open": len(open_positions),
             "total_closed": len(closed_positions),
-            "total_unrealized_pnl": sum(p.pnl for p in self.positions.values() if p.status == PositionStatus.OPEN)
+            "total_unrealized_pnl": total_unrealized_pnl
         }
+    
+    def _calculate_running_time(self, position: Position) -> str:
+        """Calculate how long a position has been running"""
+        if not position.entry_time:
+            return "Unknown"
+        
+        now = datetime.now(timezone.utc)
+        delta = now - position.entry_time
+        
+        days = delta.days
+        hours, remainder = divmod(delta.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
     
     async def delete_all_data(self) -> bool:
         """Delete all trading data from MongoDB"""

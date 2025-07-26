@@ -36,6 +36,14 @@
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        .connection-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
         .connection-status {
             display: inline-block;
             padding: 8px 16px;
@@ -43,6 +51,42 @@
             font-size: 0.9rem;
             font-weight: 600;
             transition: all 0.3s ease;
+        }
+
+        .connection-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .connection-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .connection-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-connect {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .btn-disconnect {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+            color: #ef4444;
         }
 
         .status-connected {
@@ -74,6 +118,7 @@
             padding: 24px;
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
         }
 
         .card:hover {
@@ -299,14 +344,44 @@
                 box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
             }
         }
+
+        .update-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .update-indicator.flash {
+            opacity: 1;
+            animation: flash 0.5s ease-in-out;
+        }
+
+        @keyframes flash {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <div class="dashboard">
         <div class="header">
             <h1>🚀 Crypto Trading Dashboard</h1>
-            <div id="connectionStatus" class="connection-status status-connecting">
-                <span class="loading"></span> Connecting to WebSocket...
+            <div class="connection-controls">
+                <div id="connectionStatus" class="connection-status status-connecting">
+                    <span class="loading"></span> Connecting to WebSocket...
+                </div>
+                <button id="connectBtn" class="connection-button btn-connect" onclick="dashboard.connect()" disabled>
+                    🔌 Connect
+                </button>
+                <button id="disconnectBtn" class="connection-button btn-disconnect" onclick="dashboard.disconnect()" disabled>
+                    🔌 Disconnect
+                </button>
             </div>
         </div>
 
@@ -324,6 +399,7 @@
 
             <!-- Account Summary Card -->
             <div class="card">
+                <div class="update-indicator" id="accountUpdateIndicator"></div>
                 <div class="card-title">
                     <span class="icon">💰</span>
                     Account Summary
@@ -335,6 +411,7 @@
 
             <!-- Open Positions Card -->
             <div class="card">
+                <div class="update-indicator" id="positionsUpdateIndicator"></div>
                 <div class="card-title">
                     <span class="icon">📈</span>
                     Open Positions
@@ -502,13 +579,23 @@
             }
             
             updateLivePrices(prices) {
+                console.log('🔄 Live prices updated:', prices);
                 this.data.livePrices = { ...this.data.livePrices, ...prices };
                 this.renderLivePrices();
             }
             
-            updatePositions(positions) {
-                this.data.positions = positions;
+            updatePositions(positionsData) {
+                console.log('📈 Positions updated:', positionsData);
+                // Handle the positions data structure from backend
+                if (positionsData && positionsData.open_positions) {
+                    this.data.positions = positionsData.open_positions;
+                } else if (Array.isArray(positionsData)) {
+                    this.data.positions = positionsData;
+                } else {
+                    this.data.positions = [];
+                }
                 this.renderPositions();
+                this.flashUpdateIndicator('positionsUpdateIndicator');
             }
             
             addStrategySignal(signal) {
@@ -526,8 +613,10 @@
             }
             
             updateAccountSummary(summary) {
+                console.log('💰 Account summary updated:', summary);
                 this.data.accountSummary = summary;
                 this.renderAccountSummary();
+                this.flashUpdateIndicator('accountUpdateIndicator');
             }
             
             updateSystemStatus(status) {
@@ -573,23 +662,33 @@
                 const container = document.getElementById('openPositions');
                 const positions = this.data.positions;
                 
-                if (!positions || Object.keys(positions).length === 0) {
+                if (!positions || !Array.isArray(positions) || positions.length === 0) {
                     container.innerHTML = '<div class="empty-state">No open positions</div>';
                     return;
                 }
                 
-                container.innerHTML = Object.entries(positions).map(([id, position]) => {
+                container.innerHTML = positions.map(position => {
                     const pnl = parseFloat(position.pnl || 0);
                     const pnlClass = pnl >= 0 ? 'positive' : 'negative';
                     const pnlSymbol = pnl >= 0 ? '+' : '';
+                    const sideClass = position.side === 'LONG' ? 'positive' : 'negative';
+                    
+                    // Format times
+                    const openTime = position.open_time ? new Date(position.open_time).toLocaleString() : 'N/A';
+                    const exitTime = position.exit_time ? new Date(position.exit_time).toLocaleString() : 'Open';
+                    const runningTime = position.running_time || 'N/A';
                     
                     return `
                         <div class="position-item">
                             <div class="position-header">
                                 <div>
                                     <strong>${position.symbol}</strong>
-                                    <span style="margin-left: 8px; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; background: rgba(16,185,129,0.2); color: #10b981;">
+                                    <span style="margin-left: 8px; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;" 
+                                          class="change ${sideClass}">
                                         ${position.side}
+                                    </span>
+                                    <span style="margin-left: 8px; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; background: rgba(59,130,246,0.2); color: #3b82f6;">
+                                        ${position.status}
                                     </span>
                                 </div>
                                 <div class="change ${pnlClass}">
@@ -599,21 +698,37 @@
                             <div class="position-details">
                                 <div class="detail-item">
                                     <div class="detail-label">Size</div>
-                                    <div class="detail-value">${position.size}</div>
+                                    <div class="detail-value">${position.size || position.quantity || 0}</div>
                                 </div>
                                 <div class="detail-item">
-                                    <div class="detail-label">Entry Price</div>
-                                    <div class="detail-value">$${this.formatPrice(position.entry_price)}</div>
+                                    <div class="detail-label">Open Price</div>
+                                    <div class="detail-value">$${this.formatPrice(position.open_price || position.entry_price)}</div>
                                 </div>
                                 <div class="detail-item">
                                     <div class="detail-label">Current Price</div>
                                     <div class="detail-value">$${this.formatPrice(position.current_price)}</div>
                                 </div>
                                 <div class="detail-item">
+                                    <div class="detail-label">Close Price</div>
+                                    <div class="detail-value">${position.close_price ? '$' + this.formatPrice(position.close_price) : 'Open'}</div>
+                                </div>
+                                <div class="detail-item">
                                     <div class="detail-label">PnL %</div>
                                     <div class="detail-value change ${pnlClass}">
                                         ${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%
                                     </div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Open Time</div>
+                                    <div class="detail-value" style="font-size: 0.8rem;">${openTime}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Exit Time</div>
+                                    <div class="detail-value" style="font-size: 0.8rem;">${exitTime}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Running Time</div>
+                                    <div class="detail-value" style="font-size: 0.8rem;">${runningTime}</div>
                                 </div>
                             </div>
                         </div>
@@ -687,25 +802,53 @@
                     return;
                 }
                 
+                // Calculate additional display values
+                const totalPnl = summary.total_pnl || 0;
+                const unrealizedPnl = summary.unrealized_pnl || 0;
+                const realizedPnl = summary.realized_pnl || 0;
+                const totalReturnPct = summary.total_return_percentage || 0;
+                
                 container.innerHTML = `
                     <div class="account-summary">
                         <div class="balance-item">
-                            <span class="balance-label">Total Balance</span>
+                            <span class="balance-label">Total Portfolio Value</span>
                             <span class="balance-value">$${this.formatNumber(summary.total_balance || 0)}</span>
                         </div>
                         <div class="balance-item">
                             <span class="balance-label">Available Balance</span>
-                            <span class="balance-value">$${this.formatNumber(summary.available_balance || 0)}</span>
+                            <span class="balance-value">$${this.formatNumber(summary.available_balance || summary.current_balance || 0)}</span>
                         </div>
                         <div class="balance-item">
                             <span class="balance-label">Total PnL</span>
-                            <span class="balance-value change ${(summary.total_pnl || 0) >= 0 ? 'positive' : 'negative'}">
-                                ${(summary.total_pnl || 0) >= 0 ? '+' : ''}$${Math.abs(summary.total_pnl || 0).toFixed(2)}
+                            <span class="balance-value change ${totalPnl >= 0 ? 'positive' : 'negative'}">
+                                ${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Unrealized PnL</span>
+                            <span class="balance-value change ${unrealizedPnl >= 0 ? 'positive' : 'negative'}">
+                                ${unrealizedPnl >= 0 ? '+' : ''}$${Math.abs(unrealizedPnl).toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Realized PnL</span>
+                            <span class="balance-value change ${realizedPnl >= 0 ? 'positive' : 'negative'}">
+                                ${realizedPnl >= 0 ? '+' : ''}$${Math.abs(realizedPnl).toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Total Return</span>
+                            <span class="balance-value change ${totalReturnPct >= 0 ? 'positive' : 'negative'}">
+                                ${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(2)}%
                             </span>
                         </div>
                         <div class="balance-item">
                             <span class="balance-label">Open Positions</span>
-                            <span class="balance-value">${summary.open_positions || 0}</span>
+                            <span class="balance-value">${summary.open_positions || summary.open_positions_count || 0}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Win Rate</span>
+                            <span class="balance-value">${(summary.win_rate || 0).toFixed(1)}%</span>
                         </div>
                     </div>
                 `;
@@ -744,21 +887,49 @@
             
             updateConnectionStatus(status) {
                 const statusElement = document.getElementById('connectionStatus');
+                const connectBtn = document.getElementById('connectBtn');
+                const disconnectBtn = document.getElementById('disconnectBtn');
+                
                 statusElement.className = `connection-status status-${status}`;
                 
                 switch (status) {
                     case 'connected':
                         statusElement.innerHTML = '🟢 Connected';
                         statusElement.classList.add('pulse');
+                        connectBtn.disabled = true;
+                        disconnectBtn.disabled = false;
                         break;
                     case 'connecting':
                         statusElement.innerHTML = '<span class="loading"></span> Connecting...';
                         statusElement.classList.remove('pulse');
+                        connectBtn.disabled = true;
+                        disconnectBtn.disabled = true;
                         break;
                     case 'disconnected':
                         statusElement.innerHTML = '🔴 Disconnected';
                         statusElement.classList.remove('pulse');
+                        connectBtn.disabled = false;
+                        disconnectBtn.disabled = true;
                         break;
+                }
+            }
+            
+            connect() {
+                if (!this.isConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
+                    console.log('Manual connect requested');
+                    this.reconnectAttempts = 0; // Reset attempts for manual connection
+                    this.updateConnectionStatus('connecting');
+                    this.connectWebSocket();
+                }
+            }
+            
+            disconnect() {
+                if (this.isConnected && this.ws) {
+                    console.log('Manual disconnect requested');
+                    this.isConnected = false;
+                    this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
+                    this.ws.close();
+                    this.updateConnectionStatus('disconnected');
                 }
             }
             
@@ -814,6 +985,16 @@
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const secs = Math.floor(seconds % 60);
                 return `${hours}h ${minutes}m ${secs}s`;
+            }
+            
+            flashUpdateIndicator(indicatorId) {
+                const indicator = document.getElementById(indicatorId);
+                if (indicator) {
+                    indicator.classList.add('flash');
+                    setTimeout(() => {
+                        indicator.classList.remove('flash');
+                    }, 500);
+                }
             }
         }
         

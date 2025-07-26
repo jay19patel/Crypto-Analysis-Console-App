@@ -443,6 +443,10 @@ class WebSocketServer:
         """Broadcast account summary to all subscribed clients"""
         await self._broadcast_to_subscribers(MessageType.ACCOUNT_SUMMARY, account_summary)
 
+    async def broadcast_positions_update(self, positions: List[Dict]):
+        """Broadcast positions update to all subscribed clients"""
+        await self._broadcast_to_subscribers(MessageType.POSITIONS, positions)
+
     async def _broadcast_to_subscribers(self, message_type: MessageType, data: Dict[str, Any]):
         """Broadcast message to all clients subscribed to the message type"""
         if not self.clients:

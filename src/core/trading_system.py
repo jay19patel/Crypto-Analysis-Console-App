@@ -158,6 +158,10 @@ class TradingSystem:
         self.live_save = live_save
         self._last_live_save_time: Dict[str, float] = {}
         
+        # Real-time broadcast throttling (prevent spam but allow immediate updates)
+        self._last_broadcast_time = 0.0
+        self._broadcast_cooldown = 1.0  # Minimum 1 second between broadcasts
+        
         # Setup strategies
         self._setup_strategies()
         
@@ -253,6 +257,9 @@ class TradingSystem:
                     # Broadcast to WebSocket clients
                     self._broadcast_price_update_safe(live_prices)
                     
+                    # Immediately broadcast updated account and position data
+                    self._broadcast_account_and_positions_safe()
+                    
                 except Exception as e:
                     self.logger.error(f"❌ Error processing price update for {symbol}: {e}")
                     self._record_error(str(e))
@@ -336,6 +343,49 @@ class TradingSystem:
             
         except Exception as e:
             self.logger.warning(f"⚠️ WebSocket broadcast failed (circuit breaker): {e}")
+
+    def _broadcast_account_and_positions_safe(self):
+        """Broadcast account and position updates with smart throttling"""
+        try:
+            current_time = time.time()
+            
+            # Smart throttling: allow immediate updates but prevent spam
+            if current_time - self._last_broadcast_time >= self._broadcast_cooldown:
+                self._last_broadcast_time = current_time
+                
+                def broadcast():
+                    if self._main_loop is not None:
+                        return asyncio.run_coroutine_threadsafe(
+                            self._broadcast_live_updates(),
+                            self._main_loop
+                        )
+                
+                self.circuit_breakers["websocket"].call(broadcast)
+                self.logger.debug(f"📡 Broadcasting live updates triggered by price change")
+            else:
+                self.logger.debug(f"⏱️ Broadcast throttled (cooldown: {self._broadcast_cooldown}s)")
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Account/positions broadcast failed (circuit breaker): {e}")
+
+    async def _broadcast_live_updates(self):
+        """Broadcast live account and position updates"""
+        try:
+            # Get fresh account summary with live PnL
+            account_summary = await self.broker.get_account_summary_async()
+            
+            # Get fresh positions with live prices
+            positions_summary = await self.broker.get_positions_summary_async()
+            open_positions = positions_summary.get("open_positions", [])
+            
+            # Broadcast both updates immediately
+            await self.websocket_server.broadcast_account_summary(account_summary)
+            await self.websocket_server.broadcast_positions_update(open_positions)
+            
+            self.logger.debug(f"📡 Real-time update: {len(open_positions)} positions, balance: ${account_summary.get('current_balance', 0):.2f}")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error broadcasting live updates: {e}")
 
     def _check_memory_management(self):
         """Check and perform memory management if needed"""
@@ -834,16 +884,19 @@ class TradingSystem:
                     "success"
                 )
                 
-                # Broadcast updated positions
+                # Immediately broadcast updated positions and account (bypass throttling for trades)
+                self._last_broadcast_time = 0.0  # Reset throttling for immediate update
                 positions_summary = await self.broker.get_positions_summary_async()
                 open_positions = positions_summary.get("open_positions", [])
+                account_summary = await self.broker.get_account_summary_async()
                 
-                self.logger.info(f"📊 Broadcasting position updates: {len(open_positions)} open positions")
+                self.logger.info(f"📊 Broadcasting immediate updates after trade: {len(open_positions)} open positions")
                 for pos in open_positions:
                     self.logger.info(f"   📈 {pos['symbol']}: {pos['position_type']} "
                                    f"qty={pos['quantity']} pnl=${pos['pnl']:.2f}")
                 
                 await self.websocket_server.broadcast_positions_update(open_positions)
+                await self.websocket_server.broadcast_account_summary(account_summary)
                 
             else:
                 self._stats["trades_failed"] += 1
@@ -1019,11 +1072,13 @@ class TradingSystem:
             current_time = time.time()
             uptime = current_time - self._start_time
             
-            # Log periodic summary
+            # Log periodic summary and broadcast data
             if int(uptime) % 300 == 0:  # Every 5 minutes
                 self.logger.info("📊 Generating 5-minute system summary...")
                 await self._log_system_summary()
                 self.logger.debug("✅ System summary completed")
+            
+            # Removed periodic broadcasting - now using real-time updates in price callback
             
             # Check for memory leaks (every hour)
             if int(uptime) % 3600 == 0:
@@ -1053,6 +1108,7 @@ class TradingSystem:
             
         except Exception as e:
             self.logger.error(f"❌ Error during data cleanup: {e}")
+
 
     def get_system_stats(self) -> Dict[str, Any]:
         """Get comprehensive system statistics"""
