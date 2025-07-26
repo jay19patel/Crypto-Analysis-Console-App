@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Professional Algorithmic Trading System - Main Application
 Features:
@@ -9,10 +8,12 @@ Features:
 - Production-ready architecture
 
 Usage:
-    python main.py                          # Start trading system
+    python main.py                          # Start trading system (INFO level)
     python main.py --new                    # Start with fresh data
     python main.py --liveSave               # Enable live price saving
     python main.py --websocket-port 8765    # Custom WebSocket port
+    python main.py --log-level DEBUG        # Debug mode with detailed logs
+    python main.py --debug                  # Full debug mode with traceback
     python main.py --help                   # Show help
 """
 
@@ -22,6 +23,7 @@ import signal
 import sys
 import argparse
 import os
+import traceback
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -32,49 +34,75 @@ from src.config import get_settings
 # Create logs directory
 os.makedirs('logs', exist_ok=True)
 
-# Configure enhanced logging
-def setup_logging(log_level: str = "INFO"):
-    """Setup enhanced logging configuration"""
+# Configure enhanced logging with debug support
+def setup_logging(log_level: str = "INFO", debug_mode: bool = False):
+    """Setup enhanced logging configuration with debug mode support"""
     
-    # Create formatter
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # File handler with rotation
-    file_handler = logging.FileHandler('logs/trading.log', encoding='utf-8')
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    
-    # Console handler with colors
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(getattr(logging, log_level.upper()))
-    
-    # Enhanced console formatter
-    console_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%H:%M:%S'
-    )
-    console_handler.setFormatter(console_formatter)
-    
-    # Root logger configuration
+    # Clear any existing handlers
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    root_logger.addHandler(file_handler)
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Set log level
+    numeric_level = getattr(logging, log_level.upper())
+    root_logger.setLevel(logging.DEBUG if debug_mode else numeric_level)
+    
+    # Create formatters
+    if debug_mode:
+        # Debug mode - detailed formatting with file/line info
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - [%(name)s:%(filename)s:%(lineno)d] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        console_formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s',
+            datefmt='%H:%M:%S'
+        )
+    else:
+        # Production mode - clean formatting
+        formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - [%(name)s:%(lineno)d] %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        console_formatter = logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%H:%M:%S'
+        )
+    
+    # File handler (always DEBUG level for complete logs)
+    if not debug_mode:
+        file_handler = logging.FileHandler('logs/trading.log', encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG if debug_mode else numeric_level)
+    console_handler.setFormatter(console_formatter)
     root_logger.addHandler(console_handler)
     
-    # Reduce noise from external libraries
-    external_loggers = [
-        'websockets',
-        'motor',
-        'pymongo',
-        'asyncio',
-        'websocket'
-    ]
+    # Reduce noise from external libraries (unless debug mode)
+    if not debug_mode:
+        external_loggers = [
+            'websockets',
+            'motor', 
+            'pymongo',
+            'asyncio',
+            'websocket'
+        ]
+        
+        for logger_name in external_loggers:
+            logging.getLogger(logger_name).setLevel(logging.WARNING)
     
-    for logger_name in external_loggers:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
+    # Log setup info
+    if debug_mode:
+        logging.info("🐛 DEBUG MODE ENABLED - Detailed logging active")
+        logging.info(f"📋 Console log level: DEBUG")
+        logging.info(f"📁 File logging: DISABLED (debug mode)")
+    else:
+        logging.info(f"📋 Console log level: {log_level}")
+        logging.info(f"📁 File log level: DEBUG (logs/trading.log)")
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -84,11 +112,13 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python main.py                          # Start with default settings
+    python main.py                          # Start with default settings (INFO level)
     python main.py --new                    # Fresh start (delete all data)
     python main.py --liveSave               # Enable live price saving
     python main.py --websocket-port 8080    # Use port 8080 for WebSocket
-    python main.py --log-level DEBUG        # Enable debug logging
+    python main.py --log-level DEBUG        # Enable debug logging with file save
+    python main.py --debug                  # Full debug mode (console only, detailed traces)
+    python main.py --debug --new            # Debug mode with fresh start
     python main.py --config production      # Use production config
         """
     )
@@ -117,6 +147,12 @@ Examples:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="INFO",
         help="Set logging level (default: INFO)"
+    )
+    
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable full debug mode with detailed tracebacks and console-only logging"
     )
     
     parser.add_argument(
@@ -242,19 +278,32 @@ async def main():
     # Parse command line arguments
     args = parse_arguments()
     
+    # Determine final log level (debug flag overrides log-level)
+    final_log_level = "DEBUG" if args.debug else args.log_level
+    
     # Setup logging
-    setup_logging(args.log_level)
+    setup_logging(final_log_level, debug_mode=args.debug)
     logger = logging.getLogger("main")
+    
+    # Debug mode banner
+    if args.debug:
+        logger.info("🐛" * 30)
+        logger.info("🐛 DEBUG MODE ACTIVATED")
+        logger.info("🐛 Detailed tracebacks enabled")
+        logger.info("🐛 Console-only logging active")
+        logger.info("🐛 All component logs visible")
+        logger.info("🐛" * 30)
     
     # Print startup banner
     logger.info("=" * 80)
     logger.info("🚀 PROFESSIONAL ALGORITHMIC TRADING SYSTEM v2.0.0")
     logger.info("=" * 80)
     logger.info(f"⚙️  Configuration: {args.config}")
-    logger.info(f"📊 Log Level: {args.log_level}")
+    logger.info(f"📊 Log Level: {final_log_level} {'(DEBUG MODE)' if args.debug else ''}")
     logger.info(f"🔌 WebSocket Port: {args.websocket_port}")
     logger.info(f"💾 Live Save: {'Enabled' if args.liveSave else 'Disabled'}")
     logger.info(f"🆕 Fresh Start: {'Yes' if args.new else 'No'}")
+    logger.info(f"🐛 Debug Mode: {'Enabled' if args.debug else 'Disabled'}")
     logger.info("=" * 80)
     
     # Perform health check if requested
@@ -309,7 +358,13 @@ async def main():
         logger.info("🛑 Received keyboard interrupt")
         return 0
     except Exception as e:
-        logger.error(f"❌ Fatal error in main application: {e}", exc_info=True)
+        if args.debug:
+            logger.error(f"❌ FATAL ERROR: {e}")
+            logger.error(f"❌ Error Type: {type(e).__name__}")
+            logger.error("❌ Full Traceback:")
+            traceback.print_exc()
+        else:
+            logger.error(f"❌ Fatal error in main application: {e}", exc_info=True)
         return 1
     finally:
         # Ensure proper shutdown
@@ -334,11 +389,17 @@ async def main():
                 logger.info("✅ Shutdown completed successfully")
                 
             except Exception as e:
-                logger.error(f"❌ Error during shutdown: {e}")
+                if hasattr(args, 'debug') and args.debug:
+                    logger.error(f"❌ SHUTDOWN ERROR: {e}")
+                    logger.error(f"❌ Error Type: {type(e).__name__}")
+                    logger.error("❌ Shutdown Traceback:")
+                    traceback.print_exc()
+                else:
+                    logger.error(f"❌ Error during shutdown: {e}")
 
 
 if __name__ == "__main__":
-    """Entry point for the application"""
+    """Entry point for the application with enhanced error handling"""
     try:
         # Run the main application
         exit_code = asyncio.run(main())
@@ -346,6 +407,21 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n🛑 Interrupted by user")
         sys.exit(0)
+    except ImportError as e:
+        print(f"❌ Import Error: {e}")
+        print("💡 Solution: Check if all dependencies are installed")
+        print("📋 Run: pip install -r requirements.txt")
+        sys.exit(1)
     except Exception as e:
-        print(f"❌ Critical error: {e}")
+        # Check if debug mode was requested
+        debug_mode = '--debug' in sys.argv
+        
+        if debug_mode:
+            print(f"❌ CRITICAL ERROR: {e}")
+            print(f"❌ Error Type: {type(e).__name__}")
+            print("❌ Full Traceback:")
+            traceback.print_exc()
+        else:
+            print(f"❌ Critical error: {e}")
+            print("💡 Run with --debug for detailed error information")
         sys.exit(1)

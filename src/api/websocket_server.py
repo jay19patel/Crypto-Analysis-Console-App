@@ -63,7 +63,28 @@ class ClientConnection:
 
     def is_alive(self) -> bool:
         """Check if connection is still alive"""
-        return not self.websocket.closed and (time.time() - self.last_heartbeat) < 60
+        try:
+            # Check if websocket has closed attribute
+            if hasattr(self.websocket, 'closed'):
+                websocket_alive = not self.websocket.closed
+            elif hasattr(self.websocket, 'open'):
+                # Fallback for different websocket types  
+                websocket_alive = self.websocket.open
+            else:
+                # If neither closed nor open attribute exists, check connection state
+                websocket_alive = True
+            
+            # Check heartbeat timeout (increase timeout to 120 seconds for better stability)
+            heartbeat_alive = (time.time() - self.last_heartbeat) < 120
+            
+            return websocket_alive and heartbeat_alive
+            
+        except (AttributeError, Exception) as e:
+            # Log the specific error for debugging
+            logger = logging.getLogger("websocket_server")
+            logger.debug(f"Connection check failed for websocket {type(self.websocket)}: {e}")
+            # If any error occurs, consider connection dead
+            return False
 
 
 class WebSocketServer:
@@ -164,7 +185,7 @@ class WebSocketServer:
         except Exception as e:
             self.logger.error(f"❌ Error stopping WebSocket server: {e}")
 
-    async def _handle_client_connection(self, websocket: WebSocketServerProtocol, path: str):
+    async def _handle_client_connection(self, websocket: WebSocketServerProtocol, path: str = "/"):
         """Handle new client connection"""
         client_id = str(uuid.uuid4())
         client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
@@ -310,8 +331,16 @@ class WebSocketServer:
         """Send message to specific client"""
         try:
             client = self.clients.get(client_id)
-            if not client or client.websocket.closed:
+            if not client:
                 return False
+            
+            # Check if websocket is closed safely
+            try:
+                if hasattr(client.websocket, 'closed') and client.websocket.closed:
+                    return False
+            except AttributeError:
+                # Websocket object doesn't have closed attribute, assume it's alive for now
+                pass
             
             # Check if client is subscribed to this message type
             if message_type.value not in client.subscriptions and message_type not in [
@@ -510,10 +539,14 @@ class WebSocketServer:
             if client_id in self.clients:
                 client = self.clients[client_id]
                 try:
-                    if not client.websocket.closed:
+                    # Check if websocket has closed attribute before accessing it
+                    if hasattr(client.websocket, 'closed') and not client.websocket.closed:
                         await client.websocket.close()
-                except:
-                    pass
+                    elif hasattr(client.websocket, 'close'):
+                        # Try to close regardless if we can't check status
+                        await client.websocket.close()
+                except Exception as e:
+                    self.logger.debug(f"Error closing websocket for client {client_id}: {e}")
                 
                 del self.clients[client_id]
                 self.stats["active_connections"] = max(0, self.stats["active_connections"] - 1)

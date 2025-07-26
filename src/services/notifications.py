@@ -360,16 +360,23 @@ class NotificationManager:
     
     async def start(self):
         """Start notification manager"""
-        if self._running:
-            self.logger.info("Notification manager already running")
-            return
-        
-        self._running = True
-        
-        # Start async notification processor
-        self._notification_task = asyncio.create_task(self._process_notifications())
-        
-        self.logger.info("Notification manager started successfully")
+        try:
+            if self._running:
+                self.logger.info("Notification manager already running")
+                return True
+            
+            self._running = True
+            
+            # Start async notification processor
+            self._notification_task = asyncio.create_task(self._process_notifications())
+            
+            self.logger.info("Notification manager started successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to start notification manager: {e}")
+            self._running = False
+            return False
     
     async def stop(self):
         """Stop notification manager"""

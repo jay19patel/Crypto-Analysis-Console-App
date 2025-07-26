@@ -9,11 +9,14 @@ import json
 import logging
 import threading
 import time
-import websocket
 from datetime import datetime, timezone
 from typing import Dict, Optional, Callable, List
 import random
 import os
+
+# Import websocket-client library
+import websocket
+from websocket import WebSocketApp
 
 from src.config import get_settings
 
@@ -145,7 +148,7 @@ class RealTimeMarketData:
                 
                 # Initialize WebSocket connection with proper error handling
                 websocket.enableTrace(False)  # Disable debug tracing
-                self.ws = websocket.WebSocketApp(
+                self.ws = WebSocketApp(
                     "wss://socket.india.delta.exchange",  # Delta Exchange WebSocket URL
                     on_open=self._on_websocket_open,
                     on_message=self._on_websocket_message,
@@ -185,7 +188,7 @@ class RealTimeMarketData:
                 self.logger.error(f"ERROR - [MarketData] WebSocket | Connection error: {str(e)}")
                 time.sleep(self.reconnect_delay)
     
-    def _on_websocket_open(self, ws: websocket.WebSocketApp) -> None:
+    def _on_websocket_open(self, ws: WebSocketApp) -> None:
         """Handle WebSocket connection open"""
         try:
             start_time = time.time()
@@ -211,12 +214,13 @@ class RealTimeMarketData:
                 }
             }
             
+            self.logger.info(f"INFO - [MarketData] WebSocket | Sending subscription message: {json.dumps(subscribe_msg)}")
             ws.send(json.dumps(subscribe_msg))
             self.is_connected = True
             
             execution_time = time.time() - start_time
             self.logger.info(
-                f"INFO - [MarketData] WebSocket | Subscribed to market data "
+                f"INFO - [MarketData] WebSocket | Subscribed to market data for ['BTCUSD', 'ETHUSD'] "
                 f"(Time: {execution_time:.3f}s)"
             )
                 
@@ -224,7 +228,7 @@ class RealTimeMarketData:
             self.logger.error(f"ERROR - [MarketData] WebSocket | Subscription failed: {str(e)}")
             ws.close()
     
-    def _on_websocket_message(self, ws: websocket.WebSocketApp, message: str) -> None:
+    def _on_websocket_message(self, ws: WebSocketApp, message: str) -> None:
         """Handle incoming WebSocket messages"""
         try:
             data = json.loads(message)
@@ -237,7 +241,9 @@ class RealTimeMarketData:
             
             # Process market data (Delta Exchange format)
             if "type" in data and data["type"] == "v2/ticker":
-                symbol = data["symbol"].replace("USD", "-USD")  # Convert to our format
+                # Keep the original symbol format (BTCUSD, ETHUSD) to match strategy expectations
+                symbol = data["symbol"]  # Use original format from Delta Exchange
+                self.logger.info(f"📊 Received ticker data for {symbol} - Price: {data.get('mark_price', 'N/A')}")
                 with self.price_lock:
                     # Extract all available fields from the message
                     price_update = {
@@ -306,9 +312,17 @@ class RealTimeMarketData:
                     self.live_prices[symbol] = price_update
                     self._update_count += 1
                     
+                    self.logger.debug(f"✅ Price update stored for {symbol}: ${price_update['price']:.2f}")
+                    
                     # Notify callback with current prices
                     if self.price_callback:
-                        self.price_callback(self.live_prices)
+                        try:
+                            self.price_callback(self.live_prices)
+                            self.logger.debug(f"📡 Price callback executed successfully for {symbol}")
+                        except Exception as callback_error:
+                            self.logger.error(f"❌ Error in price callback: {callback_error}")
+                    else:
+                        self.logger.warning("⚠️ No price callback registered")
                 
         except json.JSONDecodeError as e:
             self.logger.warning(f"WARN - [MarketData] WebSocket | Invalid message format: {str(e)}")
@@ -317,20 +331,20 @@ class RealTimeMarketData:
             # Add more detailed error information
             self.logger.error(f"ERROR - [MarketData] WebSocket | Message content: {message[:200]}...")
     
-    def _on_websocket_error(self, ws: websocket.WebSocketApp, error: Exception) -> None:
+    def _on_websocket_error(self, ws: WebSocketApp, error: Exception) -> None:
         """Handle WebSocket errors"""
         self.logger.error(f"ERROR - [MarketData] WebSocket | Error occurred: {str(error)}")
         
-    def _on_websocket_close(self, ws: websocket.WebSocketApp, close_status_code: int, close_msg: str) -> None:
+    def _on_websocket_close(self, ws: WebSocketApp, close_status_code: int, close_msg: str) -> None:
         """Handle WebSocket connection close"""
         self.logger.warning(f"WARN - [MarketData] WebSocket | Connection closed: {close_status_code} - {close_msg}")
         self.is_connected = False
         
-    def _on_websocket_ping(self, ws: websocket.WebSocketApp, message: bytes) -> None:
+    def _on_websocket_ping(self, ws: WebSocketApp, message: bytes) -> None:
         """Handle WebSocket ping"""
         self._last_heartbeat = time.time()
         
-    def _on_websocket_pong(self, ws: websocket.WebSocketApp, message: bytes) -> None:
+    def _on_websocket_pong(self, ws: WebSocketApp, message: bytes) -> None:
         """Handle WebSocket pong"""
         self._last_heartbeat = time.time()
 

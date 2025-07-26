@@ -100,8 +100,8 @@ class AsyncRiskManager:
         try:
             self.logger.info("Starting simplified async risk management system")
             
-            # Start notification manager
-            await self.notification_manager.start()
+            # Note: Notification manager is started by main trading system
+            # Don't start it here to avoid conflicts
             
             self.logger.info("Simplified async risk management system started")
             return True
@@ -114,8 +114,7 @@ class AsyncRiskManager:
         """Stop async risk management system"""
         self.logger.info("Stopping simplified async risk management system")
         
-        # Stop notification manager
-        await self.notification_manager.stop()
+        # Note: Notification manager is stopped by main trading system
         
         self.logger.info("Simplified async risk management system stopped")
     

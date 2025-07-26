@@ -110,8 +110,8 @@ class AsyncBroker:
             # Load positions
             await self._load_positions()
             
-            # Start notification manager
-            await self.notification_manager.start()
+            # Note: Notification manager is started by main trading system
+            # Don't start it here to avoid conflicts
             
             self.logger.info("Simplified async broker system started successfully")
             return True
@@ -124,8 +124,7 @@ class AsyncBroker:
         """Stop async broker system"""
         self.logger.info("Stopping simplified async broker system")
         
-        # Stop notification manager
-        await self.notification_manager.stop()
+        # Note: Notification manager is stopped by main trading system
         
         # Disconnect from MongoDB
         await self.mongodb_client.disconnect()

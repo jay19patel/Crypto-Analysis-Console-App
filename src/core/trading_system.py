@@ -194,6 +194,11 @@ class TradingSystem:
             # Process each price update
             for symbol, price_data in live_prices.items():
                 try:
+                    # Log raw price data for debugging
+                    self.logger.debug(f"📊 Processing live price update for {symbol}")
+                    self.logger.debug(f"   💰 Price: {price_data.get('price', 'N/A')}")
+                    self.logger.debug(f"   📈 Data keys: {list(price_data.keys())}")
+                    
                     # Convert WebSocket data to MarketData format
                     market_data = MarketData(
                         symbol=symbol,
@@ -233,6 +238,8 @@ class TradingSystem:
                     # Thread-safe update of market data
                     with self.market_data_lock:
                         self.current_market_data[symbol] = market_data
+                        self.logger.debug(f"✅ Market data stored for {symbol} - Price: ${market_data.price:.2f}")
+                        self.logger.debug(f"   📊 Current market data symbols: {list(self.current_market_data.keys())}")
                     
                     # Live save logic with circuit breaker
                     if self.live_save:
@@ -364,70 +371,119 @@ class TradingSystem:
         """Start the trading system with comprehensive error handling"""
         try:
             self.logger.info("🚀 Starting Professional Trading System")
+            self.logger.info("📋 STEP 1: System Setup & Configuration")
             
             # Store the main event loop
             self._main_loop = asyncio.get_running_loop()
+            self.logger.info("✅ STEP 1.1: Event loop configured")
+            
+            self.logger.info("📋 STEP 2: Initializing WebSocket Infrastructure")
             
             # Start WebSocket server first
+            self.logger.info("🔄 STEP 2.1: Starting WebSocket server...")
             if not await self.websocket_server.start():
-                self.logger.error("❌ Failed to start WebSocket server")
+                self.logger.error("❌ STEP 2.1 FAILED: WebSocket server startup failed")
                 return False
+            self.logger.info("✅ STEP 2.1: WebSocket server started successfully")
             
+            self.logger.info("📋 STEP 3: Starting Live Market Data System") 
             # Start WebSocket live price system
+            self.logger.info("🔄 STEP 3.1: Connecting to live price WebSocket...")
             if not self.live_price_system.start():
-                self.logger.error("❌ Failed to start WebSocket live price system")
+                self.logger.error("❌ STEP 3.1 FAILED: Live price WebSocket connection failed")
                 await self.websocket_server.stop()
                 return False
+            self.logger.info("✅ STEP 3.1: Live price WebSocket connected successfully")
             
-            # Start all async components with error handling
+            self.logger.info("📋 STEP 4: Starting Core Trading Components")
+            # Start all async components with detailed error handling
             components = [
                 ("broker", self.broker.start()),
                 ("risk_manager", self.risk_manager.start()),
                 ("notification_manager", self.notification_manager.start())
             ]
             
-            for name, coro in components:
+            for i, (name, coro) in enumerate(components, 1):
                 try:
-                    if not await coro:
-                        self.logger.error(f"❌ Failed to start {name}")
+                    self.logger.info(f"🔄 STEP 4.{i}: Starting {name}...")
+                    result = await coro
+                    
+                    self.logger.info(f"📋 STEP 4.{i}: Component {name} returned: {result} (type: {type(result)})")
+                    
+                    if result is False:
+                        self.logger.error(f"❌ STEP 4.{i} FAILED: {name} returned False - Component failed to start")
+                        self.logger.error(f"❌ LOCATION: Component startup failure in {name}")
+                        self.logger.error(f"❌ ACTION: System will shutdown due to {name} failure")
                         await self.stop()
                         return False
+                    elif result is None:
+                        self.logger.error(f"❌ STEP 4.{i} FAILED: {name} returned None - Invalid return value")
+                        self.logger.error(f"❌ LOCATION: Component {name} start() method should return True/False")
+                        self.logger.error(f"❌ ACTION: System will shutdown due to {name} invalid return")
+                        await self.stop()
+                        return False
+                    else:
+                        self.logger.info(f"✅ STEP 4.{i}: {name} started successfully")
+                        
                 except Exception as e:
-                    self.logger.error(f"❌ Error starting {name}: {e}")
+                    self.logger.error(f"❌ STEP 4.{i} EXCEPTION in {name}:")
+                    self.logger.error(f"❌ ERROR MESSAGE: {str(e)}")
+                    self.logger.error(f"❌ ERROR TYPE: {type(e).__name__}")
+                    self.logger.error(f"❌ LOCATION: Exception occurred while starting {name}")
+                    
+                    # Print full traceback
+                    import traceback
+                    tb_lines = traceback.format_exc().split('\n')
+                    for j, line in enumerate(tb_lines):
+                        if line.strip():
+                            self.logger.error(f"❌ TRACEBACK[{j:02d}]: {line}")
+                    
+                    self.logger.error(f"❌ ACTION: System will shutdown due to {name} exception")
                     await self.stop()
                     return False
             
+            self.logger.info("📋 STEP 5: Starting Background Processing Threads")
             # Start threading components
             self._running = True
             
+            self.logger.info("🔄 STEP 5.1: Starting strategy execution thread...")
             self.strategy_thread = threading.Thread(
                 target=self._strategy_execution_loop, 
                 daemon=True,
                 name="StrategyThread"
             )
             self.strategy_thread.start()
+            self.logger.info("✅ STEP 5.1: Strategy execution thread started")
             
+            self.logger.info("🔄 STEP 5.2: Starting monitoring thread...")
             self.monitoring_thread = threading.Thread(
                 target=self._monitoring_loop,
                 daemon=True,
                 name="MonitoringThread"
             )
             self.monitoring_thread.start()
+            self.logger.info("✅ STEP 5.2: Monitoring thread started")
+            
+            self.logger.info("📋 STEP 6: Finalizing System Startup")
             
             # Send startup notification
+            self.logger.info("🔄 STEP 6.1: Sending startup notification...")
             await self.notification_manager.notify_system_error(
                 error_message="Professional trading system started successfully",
                 component="TradingSystem"
             )
+            self.logger.info("✅ STEP 6.1: Startup notification sent")
             
             # Broadcast system status
+            self.logger.info("🔄 STEP 6.2: Broadcasting system status to WebSocket clients...")
             await self.websocket_server.broadcast_notification(
                 "system_startup",
                 "Trading system started successfully",
                 "info"
             )
+            self.logger.info("✅ STEP 6.2: System status broadcasted")
             
-            self.logger.info("✅ Trading system started successfully")
+            self.logger.info("🎉 ALL STEPS COMPLETED: Trading system started successfully")
             return True
             
         except Exception as e:
@@ -474,25 +530,42 @@ class TradingSystem:
             self.logger.error(f"❌ Error during shutdown: {e}")
 
     def _strategy_execution_loop(self):
-        """Enhanced strategy execution loop with error handling"""
+        """Enhanced strategy execution loop with comprehensive logging"""
         self.logger.info("🎯 Starting strategy execution loop (30s interval)")
         
+        loop_count = 0
         while self._running and not self._shutdown_event.is_set():
+            loop_count += 1
             execution_start = time.time()
             
             try:
                 symbols = self.strategy_manager.get_all_symbols()
+                self.logger.info(f"🔄 Strategy Loop #{loop_count} - Processing {len(symbols)} symbols: {symbols}")
                 
                 for symbol in symbols:
                     if self._shutdown_event.is_set():
                         break
                     
                     try:
+                        # Get market data
                         with self.market_data_lock:
                             market_data = self.current_market_data.get(symbol)
+                            available_symbols = list(self.current_market_data.keys())
                         
                         if market_data:
+                            self.logger.info(f"📊 Processing {symbol} - Price: ${market_data.price:.2f}")
                             self._execute_strategies_for_symbol(symbol, market_data)
+                        else:
+                            self.logger.warning(f"⚠️ No market data available for {symbol}")
+                            self.logger.warning(f"   📋 Available symbols: {available_symbols}")
+                            self.logger.warning(f"   🔍 Requested symbol: '{symbol}' (type: {type(symbol)})")
+                            
+                            # Check if symbol exists with different case/format
+                            for avail_symbol in available_symbols:
+                                if avail_symbol.upper() == symbol.upper():
+                                    self.logger.warning(f"   ⚠️ Found symbol with different case: '{avail_symbol}'")
+                                elif symbol in avail_symbol or avail_symbol in symbol:
+                                    self.logger.warning(f"   ⚠️ Found similar symbol: '{avail_symbol}'")
                             
                     except Exception as e:
                         self.logger.error(f"❌ Error executing strategies for {symbol}: {e}")
@@ -504,14 +577,17 @@ class TradingSystem:
                 self.strategy_execution_times.append(execution_time)
                 self._stats["strategies_executed"] += 1
                 
+                self.logger.info(f"✅ Strategy Loop #{loop_count} completed in {execution_time:.3f}s")
+                
                 # Wait for next execution or shutdown
+                self.logger.info("⏱️ Waiting 30 seconds for next strategy execution...")
                 if not self._shutdown_event.wait(30):
                     continue
                 else:
                     break
                     
             except Exception as e:
-                self.logger.error(f"❌ Critical error in strategy execution loop: {e}")
+                self.logger.error(f"❌ Critical error in strategy execution loop #{loop_count}: {e}")
                 self._record_error(str(e))
                 
                 if not self._shutdown_event.wait(30):
@@ -522,18 +598,39 @@ class TradingSystem:
         self.logger.info("🎯 Strategy execution loop stopped")
 
     def _execute_strategies_for_symbol(self, symbol: str, market_data: MarketData):
-        """Execute strategies for a specific symbol with error handling"""
+        """Execute strategies for a specific symbol with comprehensive logging"""
+        strategy_start_time = time.time()
         try:
+            self.logger.info(f"🎯 Executing strategies for {symbol} at price ${market_data.price:.2f}")
+            
             # Execute all strategies in parallel and get the best signal
+            execution_start = time.time()
             strategy_result = self.strategy_manager.execute_strategies_parallel(symbol, market_data)
+            execution_time = time.time() - execution_start
             selected_signal = strategy_result.selected_signal
             
-            self.logger.info(f"[Strategy] {symbol}: {selected_signal.signal} "
+            self.logger.info(f"⏱️ Strategy execution time for {symbol}: {execution_time:.3f}s")
+            
+            # Log all strategy results
+            successful_strategies = sum(1 for result in strategy_result.strategy_results if result.success)
+            total_strategies = len(strategy_result.strategy_results)
+            self.logger.info(f"📈 Strategy Results for {symbol} ({successful_strategies}/{total_strategies} successful):")
+            
+            for result in strategy_result.strategy_results:
+                if result.success:
+                    self.logger.info(f"   ✅ {result.strategy_name}: {result.signal.signal} "
+                                   f"(confidence: {result.signal.confidence:.1f}%, execution: {result.execution_time:.3f}s)")
+                else:
+                    self.logger.warning(f"   ❌ {result.strategy_name}: Failed - {result.error_message}")
+            
+            # Log selected signal
+            self.logger.info(f"🎯 Selected Signal for {symbol}: {selected_signal.signal} "
                            f"from {selected_signal.strategy_name} "
                            f"(confidence: {selected_signal.confidence:.1f}%)")
             
             # Broadcast strategy signal to WebSocket clients
             if self._main_loop is not None:
+                self.logger.debug(f"📡 Broadcasting strategy signal for {symbol}")
                 asyncio.run_coroutine_threadsafe(
                     self.websocket_server.broadcast_strategy_signal(selected_signal),
                     self._main_loop
@@ -541,6 +638,7 @@ class TradingSystem:
             
             # Execute trade if signal is actionable
             if selected_signal.signal in (SignalType.BUY, SignalType.SELL):
+                self.logger.info(f"💰 Actionable signal detected for {symbol}: {selected_signal.signal}")
                 if self._main_loop is not None:
                     asyncio.run_coroutine_threadsafe(
                         self._execute_signal(selected_signal),
@@ -548,6 +646,8 @@ class TradingSystem:
                     )
                 else:
                     self.logger.error("❌ Main event loop not available for trade execution")
+            else:
+                self.logger.info(f"⏸️ No actionable signal for {symbol} (signal: {selected_signal.signal})")
             
             self._stats["signals_generated"] += 1
             
@@ -662,8 +762,9 @@ class TradingSystem:
             }
             
             # Broadcast to WebSocket clients
+            from src.api.websocket_server import MessageType
             await self.websocket_server._broadcast_to_subscribers(
-                self.websocket_server.MessageType.SYSTEM_STATUS,
+                MessageType.SYSTEM_STATUS,
                 status_data
             )
             
@@ -735,9 +836,14 @@ class TradingSystem:
                 
                 # Broadcast updated positions
                 positions_summary = await self.broker.get_positions_summary_async()
-                await self.websocket_server.broadcast_positions_update(
-                    positions_summary.get("open_positions", [])
-                )
+                open_positions = positions_summary.get("open_positions", [])
+                
+                self.logger.info(f"📊 Broadcasting position updates: {len(open_positions)} open positions")
+                for pos in open_positions:
+                    self.logger.info(f"   📈 {pos['symbol']}: {pos['position_type']} "
+                                   f"qty={pos['quantity']} pnl=${pos['pnl']:.2f}")
+                
+                await self.websocket_server.broadcast_positions_update(open_positions)
                 
             else:
                 self._stats["trades_failed"] += 1
@@ -871,36 +977,62 @@ class TradingSystem:
     async def run_main_loop(self):
         """Main monitoring loop with enhanced error handling"""
         self.logger.info("🔄 Starting main monitoring loop")
+        self.logger.info("📋 MAIN LOOP FLOW:")
+        self.logger.info("   1. Live price data collection (WebSocket)")
+        self.logger.info("   2. Strategy execution every 30s")
+        self.logger.info("   3. Risk management checks")
+        self.logger.info("   4. Performance monitoring")
+        self.logger.info("   5. WebSocket broadcasts")
+        self.logger.info("   6. System maintenance every 60s")
         
+        loop_iteration = 0
         while self._running and not self._shutdown_event.is_set():
             try:
+                loop_iteration += 1
+                loop_start = time.time()
+                self.logger.debug(f"🔄 Main monitoring loop iteration #{loop_iteration}")
+                
                 # Perform periodic tasks
                 await self._periodic_maintenance()
+                
+                loop_duration = time.time() - loop_start
+                self.logger.debug(f"✅ Main loop iteration #{loop_iteration} completed in {loop_duration:.3f}s")
                 
                 # Sleep for 60 seconds or until shutdown
                 await asyncio.sleep(60)
                 
             except asyncio.CancelledError:
+                self.logger.info("🛑 Main monitoring loop cancelled")
                 break
             except Exception as e:
-                self.logger.error(f"❌ Error in main loop: {e}")
+                self.logger.error(f"❌ Error in main loop iteration #{loop_iteration}: {e}")
                 self._record_error(str(e))
                 await asyncio.sleep(10)
 
     async def _periodic_maintenance(self):
         """Perform periodic maintenance tasks"""
         try:
+            maintenance_start = time.time()
+            self.logger.debug("🔧 Starting periodic maintenance tasks")
+            
             # Update system statistics
             current_time = time.time()
             uptime = current_time - self._start_time
             
             # Log periodic summary
             if int(uptime) % 300 == 0:  # Every 5 minutes
+                self.logger.info("📊 Generating 5-minute system summary...")
                 await self._log_system_summary()
+                self.logger.debug("✅ System summary completed")
             
             # Check for memory leaks (every hour)
             if int(uptime) % 3600 == 0:
+                self.logger.info("🧹 Running hourly memory management check...")
                 self._check_memory_management()
+                self.logger.debug("✅ Memory management check completed")
+                
+            maintenance_duration = time.time() - maintenance_start
+            self.logger.debug(f"✅ Periodic maintenance completed in {maintenance_duration:.3f}s")
             
             # Cleanup old data (daily)
             if int(uptime) % 86400 == 0:
