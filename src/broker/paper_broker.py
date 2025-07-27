@@ -212,11 +212,13 @@ class AsyncBroker:
             # Validate trade request
             if not self._validate_trade_request(trade_request):
                 trade_request.status = ExecutionStatus.FAILED
+                self.logger.error(f"❌ Trade validation failed: {trade_request.error_message}")
                 return False
             
             # Check risk limits
             if not self._check_risk_limits(trade_request):
                 trade_request.status = ExecutionStatus.FAILED
+                self.logger.error(f"❌ Risk limits check failed: {trade_request.error_message}")
                 return False
             
             # Execute trade with dummy data
@@ -504,8 +506,10 @@ class AsyncBroker:
     # Private methods
     def _validate_trade_request(self, trade_request: TradeRequest) -> bool:
         """Validate trade request"""
+        self.logger.info(f"📋 Validating trade: signal={trade_request.signal}, price={trade_request.price}, qty={trade_request.quantity}, conf={trade_request.confidence}%")
+        
         if trade_request.signal not in ['BUY', 'SELL']:
-            trade_request.error_message = f"Invalid signal: {trade_request.signal}"
+            trade_request.error_message = f"Invalid signal: {trade_request.signal} (expected 'BUY' or 'SELL')"
             return False
         
         if trade_request.price <= 0:
@@ -516,10 +520,12 @@ class AsyncBroker:
             trade_request.error_message = f"Invalid quantity: {trade_request.quantity}"
             return False
         
-        if trade_request.confidence < self.trading_config["min_confidence"]:
-            trade_request.error_message = f"Low confidence: {trade_request.confidence}%"
+        min_conf = self.trading_config["min_confidence"]
+        if trade_request.confidence < min_conf:
+            trade_request.error_message = f"Low confidence: {trade_request.confidence}% (minimum: {min_conf}%)"
             return False
         
+        self.logger.info(f"✅ Trade validation passed")
         return True
     
     def _check_risk_limits(self, trade_request: TradeRequest) -> bool:

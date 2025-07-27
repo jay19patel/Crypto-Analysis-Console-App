@@ -675,8 +675,11 @@ class TradingSystem:
                 
                 # CRITICAL: Wait for email to be processed and sent
                 self.logger.info("⏱️ Waiting for email delivery...")
-                await asyncio.sleep(10)  # Wait 3 seconds for email processing
+                await asyncio.sleep(5)  # Wait 5 seconds for email processing
                 self.logger.info("✅ Email delivery wait completed")
+                
+                # Cancel any pending notification tasks
+                await self._cleanup_pending_tasks()
                 
             except Exception as e:
                 self.logger.error(f"❌ Failed to send shutdown notification: {e}")
@@ -1336,6 +1339,41 @@ class TradingSystem:
     def get_health_status(self) -> SystemHealth:
         """Get current system health status"""
         return self._perform_health_check()
+    
+    async def _cleanup_pending_tasks(self):
+        """Clean up any pending async tasks to prevent 'Task was destroyed' warnings"""
+        try:
+            self.logger.info("🧹 Cleaning up pending async tasks...")
+            
+            # Get all pending tasks
+            pending_tasks = [task for task in asyncio.all_tasks() if not task.done()]
+            
+            if pending_tasks:
+                self.logger.info(f"📋 Found {len(pending_tasks)} pending tasks")
+                
+                # Cancel notification manager tasks first
+                if hasattr(self.notification_manager, '_notification_task') and self.notification_manager._notification_task:
+                    self.notification_manager._notification_task.cancel()
+                    try:
+                        await asyncio.wait_for(self.notification_manager._notification_task, timeout=2.0)
+                    except (asyncio.CancelledError, asyncio.TimeoutError):
+                        pass
+                
+                # Cancel other pending tasks with timeout
+                for task in pending_tasks:
+                    if not task.done() and task != asyncio.current_task():
+                        task.cancel()
+                
+                # Wait for cancellation with timeout
+                if pending_tasks:
+                    await asyncio.wait(pending_tasks, timeout=3.0, return_when=asyncio.ALL_COMPLETED)
+                
+                self.logger.info("✅ Async task cleanup completed")
+            else:
+                self.logger.info("✅ No pending tasks to clean up")
+                
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error during task cleanup: {e}")
 
 
 # Legacy compatibility

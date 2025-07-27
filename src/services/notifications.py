@@ -351,10 +351,10 @@ class EmailNotifier:
         # Color scheme for system events
         if event.type == NotificationType.SYSTEM_STARTUP:
             header_color = "#28a745"  # Green for startup
-            title_emoji = "🚀"
+            title_emoji = ""
         else:
             header_color = "#6c757d"  # Gray for shutdown
-            title_emoji = "🛑"
+            title_emoji = ""
         
         # Extract system data
         system_config = event.data.get('system_config', {})
@@ -371,12 +371,12 @@ class EmailNotifier:
         if system_config:
             config_html = f"""
             <div class="section">
-                <h3>📊 SYSTEM CONFIGURATION</h3>
+                <h3>SYSTEM CONFIGURATION</h3>
                 <table class="config-table">
-                    <tr><td>🎯 Strategy Execution Interval</td><td>{system_config.get('strategy_execution_interval', 'N/A')}</td></tr>
-                    <tr><td>📈 Historical Data Update</td><td>{system_config.get('historical_data_update', 'N/A')}</td></tr>
-                    <tr><td>📡 Live Price Updates</td><td>{system_config.get('live_price_updates', 'N/A')}</td></tr>
-                    <tr><td>🛡️ Risk Check Interval</td><td>{system_config.get('risk_check_interval', 'N/A')}</td></tr>
+                    <tr><td>Strategy Execution Interval</td><td>{system_config.get('strategy_execution_interval', 'N/A')}</td></tr>
+                    <tr><td>Historical Data Update</td><td>{system_config.get('historical_data_update', 'N/A')}</td></tr>
+                    <tr><td>Live Price Updates</td><td>{system_config.get('live_price_updates', 'N/A')}</td></tr>
+                    <tr><td>Risk Check Interval</td><td>{system_config.get('risk_check_interval', 'N/A')}</td></tr>
                 </table>
             </div>
             """
@@ -385,24 +385,24 @@ class EmailNotifier:
         if trading_params:
             trading_html = f"""
             <div class="section">
-                <h3>💰 TRADING PARAMETERS</h3>
+                <h3>TRADING PARAMETERS</h3>
                 <table class="config-table">
-                    <tr><td>💵 Initial Balance</td><td>{trading_params.get('initial_balance', 'N/A')}</td></tr>
-                    <tr><td>⚠️ Risk Per Trade</td><td>{trading_params.get('risk_per_trade', 'N/A')}</td></tr>
-                    <tr><td>🛑 Stop Loss</td><td>{trading_params.get('stop_loss', 'N/A')}</td></tr>
-                    <tr><td>🎯 Target Profit</td><td>{trading_params.get('target_profit', 'N/A')}</td></tr>
-                    <tr><td>📊 Min Confidence</td><td>{trading_params.get('min_confidence', 'N/A')}</td></tr>
-                    <tr><td>🔢 Daily Trade Limit</td><td>{trading_params.get('daily_trade_limit', 'N/A')}</td></tr>
+                    <tr><td>Initial Balance</td><td>{trading_params.get('initial_balance', 'N/A')}</td></tr>
+                    <tr><td>Risk Per Trade</td><td>{trading_params.get('risk_per_trade', 'N/A')}</td></tr>
+                    <tr><td>Stop Loss</td><td>{trading_params.get('stop_loss', 'N/A')}</td></tr>
+                    <tr><td>Target Profit</td><td>{trading_params.get('target_profit', 'N/A')}</td></tr>
+                    <tr><td>Min Confidence</td><td>{trading_params.get('min_confidence', 'N/A')}</td></tr>
+                    <tr><td>Daily Trade Limit</td><td>{trading_params.get('daily_trade_limit', 'N/A')}</td></tr>
                 </table>
             </div>
             """
         
         strategies_html = ""
         if active_strategies:
-            strategy_list = ''.join([f"<tr><td>✅ {strategy}</td></tr>" for strategy in active_strategies])
+            strategy_list = ''.join([f"<tr><td>{strategy}</td></tr>" for strategy in active_strategies])
             strategies_html = f"""
             <div class="section">
-                <h3>🧠 ACTIVE STRATEGIES</h3>
+                <h3>ACTIVE STRATEGIES</h3>
                 <table class="config-table">
                     {strategy_list}
                 </table>
@@ -411,10 +411,10 @@ class EmailNotifier:
         
         symbols_html = ""
         if trading_symbols:
-            symbol_list = ''.join([f"<tr><td>📈 {symbol}</td></tr>" for symbol in trading_symbols])
+            symbol_list = ''.join([f"<tr><td>{symbol}</td></tr>" for symbol in trading_symbols])
             symbols_html = f"""
             <div class="section">
-                <h3>💱 TRADING SYMBOLS</h3>
+                <h3>TRADING SYMBOLS</h3>
                 <table class="config-table">
                     {symbol_list}
                 </table>
@@ -425,11 +425,11 @@ class EmailNotifier:
         if system_status:
             status_html = f"""
             <div class="section">
-                <h3>⚙️ SYSTEM STATUS</h3>
+                <h3>SYSTEM STATUS</h3>
                 <table class="config-table">
-                    <tr><td>🔌 WebSocket Port</td><td>{system_status.get('websocket_port', 'N/A')}</td></tr>
-                    <tr><td>📧 Email Notifications</td><td>{system_status.get('email_notifications', 'N/A')}</td></tr>
-                    <tr><td>📊 Log Level</td><td>{system_status.get('log_level', 'N/A')}</td></tr>
+                    <tr><td>WebSocket Port</td><td>{system_status.get('websocket_port', 'N/A')}</td></tr>
+                    <tr><td>Email Notifications</td><td>{system_status.get('email_notifications', 'N/A')}</td></tr>
+                    <tr><td>Log Level</td><td>{system_status.get('log_level', 'N/A')}</td></tr>
                 </table>
             </div>
             """
@@ -438,16 +438,16 @@ class EmailNotifier:
         if statistics:
             stats_html = f"""
             <div class="section">
-                <h3>📊 FINAL SYSTEM STATISTICS</h3>
+                <h3>FINAL SYSTEM STATISTICS</h3>
                 <table class="config-table">
-                    <tr><td>⏱️ Uptime</td><td>{statistics.get('uptime', 'N/A')}</td></tr>
-                    <tr><td>📊 Trades Executed</td><td>{statistics.get('trades_executed', 'N/A')}</td></tr>
-                    <tr><td>✅ Successful Trades</td><td>{statistics.get('successful_trades', 'N/A')}</td></tr>
-                    <tr><td>❌ Failed Trades</td><td>{statistics.get('failed_trades', 'N/A')}</td></tr>
-                    <tr><td>🎯 Signals Generated</td><td>{statistics.get('signals_generated', 'N/A')}</td></tr>
-                    <tr><td>📡 WebSocket Updates</td><td>{statistics.get('websocket_updates', 'N/A')}</td></tr>
-                    <tr><td>🧠 Strategy Executions</td><td>{statistics.get('strategy_executions', 'N/A')}</td></tr>
-                    <tr><td>❌ Total Errors</td><td>{statistics.get('total_errors', 'N/A')}</td></tr>
+                    <tr><td>Uptime</td><td>{statistics.get('uptime', 'N/A')}</td></tr>
+                    <tr><td>Trades Executed</td><td>{statistics.get('trades_executed', 'N/A')}</td></tr>
+                    <tr><td>Successful Trades</td><td>{statistics.get('successful_trades', 'N/A')}</td></tr>
+                    <tr><td>Failed Trades</td><td>{statistics.get('failed_trades', 'N/A')}</td></tr>
+                    <tr><td>Signals Generated</td><td>{statistics.get('signals_generated', 'N/A')}</td></tr>
+                    <tr><td>WebSocket Updates</td><td>{statistics.get('websocket_updates', 'N/A')}</td></tr>
+                    <tr><td>Strategy Executions</td><td>{statistics.get('strategy_executions', 'N/A')}</td></tr>
+                    <tr><td>Total Errors</td><td>{statistics.get('total_errors', 'N/A')}</td></tr>
                 </table>
             </div>
             """
@@ -456,14 +456,14 @@ class EmailNotifier:
         if account_summary:
             account_html = f"""
             <div class="section">
-                <h3>💰 ACCOUNT SUMMARY AT STARTUP</h3>
+                <h3>ACCOUNT SUMMARY AT STARTUP</h3>
                 <table class="config-table">
-                    <tr><td>💵 Current Balance</td><td>{account_summary.get('current_balance', 'N/A')}</td></tr>
-                    <tr><td>📈 Total P&L</td><td><span style="color: {'green' if str(account_summary.get('total_pnl', '0')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0' and not str(account_summary.get('total_pnl', '0')).startswith('-') else 'red'}">{account_summary.get('total_pnl', 'N/A')}</span></td></tr>
-                    <tr><td>📊 Open Positions</td><td>{account_summary.get('open_positions', 'N/A')}</td></tr>
-                    <tr><td>🎯 Win Rate</td><td>{account_summary.get('win_rate', 'N/A')}</td></tr>
-                    <tr><td>📈 Daily Trades</td><td>{account_summary.get('daily_trades', 'N/A')}</td></tr>
-                    <tr><td>📊 Total Trades</td><td>{account_summary.get('total_trades', 'N/A')}</td></tr>
+                    <tr><td>Current Balance</td><td>{account_summary.get('current_balance', 'N/A')}</td></tr>
+                    <tr><td>Total P&L</td><td><span style="color: {'green' if str(account_summary.get('total_pnl', '0')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0' and not str(account_summary.get('total_pnl', '0')).startswith('-') else 'red'}">{account_summary.get('total_pnl', 'N/A')}</span></td></tr>
+                    <tr><td>Open Positions</td><td>{account_summary.get('open_positions', 'N/A')}</td></tr>
+                    <tr><td>Win Rate</td><td>{account_summary.get('win_rate', 'N/A')}</td></tr>
+                    <tr><td>Daily Trades</td><td>{account_summary.get('daily_trades', 'N/A')}</td></tr>
+                    <tr><td>Total Trades</td><td>{account_summary.get('total_trades', 'N/A')}</td></tr>
                 </table>
             </div>
             """
@@ -472,11 +472,11 @@ class EmailNotifier:
         if positions_summary:
             positions_html = f"""
             <div class="section">
-                <h3>📊 POSITIONS SUMMARY AT STARTUP</h3>
+                <h3>POSITIONS SUMMARY AT STARTUP</h3>
                 <table class="config-table">
-                    <tr><td>📈 Total Open Positions</td><td>{positions_summary.get('total_open', 'N/A')}</td></tr>
-                    <tr><td>📊 Total Closed Positions</td><td>{positions_summary.get('total_closed', 'N/A')}</td></tr>
-                    <tr><td>💰 Total Unrealized P&L</td><td><span style="color: {'green' if str(positions_summary.get('total_unrealized_pnl', '$0.00')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0.00' and not str(positions_summary.get('total_unrealized_pnl', '$0.00')).startswith('$-') else 'red'}">{positions_summary.get('total_unrealized_pnl', 'N/A')}</span></td></tr>
+                    <tr><td>Total Open Positions</td><td>{positions_summary.get('total_open', 'N/A')}</td></tr>
+                    <tr><td>Total Closed Positions</td><td>{positions_summary.get('total_closed', 'N/A')}</td></tr>
+                    <tr><td>Total Unrealized P&L</td><td><span style="color: {'green' if str(positions_summary.get('total_unrealized_pnl', '$0.00')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0.00' and not str(positions_summary.get('total_unrealized_pnl', '$0.00')).startswith('$-') else 'red'}">{positions_summary.get('total_unrealized_pnl', 'N/A')}</span></td></tr>
                 </table>
             </div>
             """
@@ -595,7 +595,7 @@ class EmailNotifier:
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>{title_emoji} {event.title}</h1>
+                    <h1>{event.title}</h1>
                     <p>Professional Trading System</p>
                     <span class="status-badge {'status-success' if event.type == NotificationType.SYSTEM_STARTUP else 'status-info'}">
                         {event.type.value.replace('_', ' ').title()}
@@ -604,7 +604,7 @@ class EmailNotifier:
                 
                 <div class="content">
                     <div class="message-box">
-                        <h3>📋 System Message</h3>
+                        <h3>System Message</h3>
                         <p style="margin: 0; font-size: 16px; color: #495057;">{event.message}</p>
                     </div>
                     
@@ -619,7 +619,7 @@ class EmailNotifier:
                 </div>
                 
                 <div class="footer">
-                    <p><strong>📅 Timestamp:</strong> {timestamp}</p>
+                    <p><strong>Timestamp:</strong> {timestamp}</p>
                     <p>This is an automated notification from your Professional Trading System.</p>
                     <p>Please do not reply to this email as it is sent from an unmonitored address.</p>
                 </div>
@@ -877,7 +877,7 @@ class NotificationManager:
             event = NotificationEvent(
                 type=NotificationType.SYSTEM_STARTUP,
                 priority=NotificationPriority.HIGH,
-                title="🚀 Trading System Started Successfully",
+                title="Trading System Started Successfully",
                 message="Your Professional Trading System has been started and is now running with the configuration and account status shown below.",
                 user_id=user_id,
                 data={
@@ -945,7 +945,7 @@ class NotificationManager:
             event = NotificationEvent(
                 type=NotificationType.SYSTEM_SHUTDOWN,
                 priority=NotificationPriority.MEDIUM,
-                title="🛑 Trading System Shutdown Complete",
+                title="Trading System Shutdown Complete",
                 message=f"Your Professional Trading System has been shutdown after running for {uptime_str}. Below is the summary of system performance and final statistics.",
                 user_id=user_id,
                 data={
