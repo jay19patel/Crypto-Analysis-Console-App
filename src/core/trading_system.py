@@ -515,16 +515,14 @@ class TradingSystem:
             self.monitoring_thread.start()
             self.logger.info("✅ STEP 5.2: Monitoring thread started")
             
-            self.logger.info("📋 STEP 6: Finalizing System Startup")
+            self.logger.info("📋 STEP 6: Finalizing System Startup & Sending Notifications")
             
-            # Send startup notification
-            self.logger.info("🔄 STEP 6.1: Sending startup notification...")
-            await self.notification_manager.notify_startup(
-                error_message="Professional trading system started successfully",
-                component="TradingSystem",
+            # Send comprehensive startup notification
+            self.logger.info("🔄 STEP 6.1: Sending comprehensive startup notification...")
+            await self.notification_manager.notify_system_startup(
                 user_id="system"
             )
-            self.logger.info("✅ STEP 6.1: Startup notification sent")
+            self.logger.info("✅ STEP 6.1: Comprehensive startup notification sent")
             
             # Broadcast system status
             self.logger.info("🔄 STEP 6.2: Broadcasting system status to WebSocket clients...")
@@ -535,7 +533,27 @@ class TradingSystem:
             )
             self.logger.info("✅ STEP 6.2: System status broadcasted")
             
+            # Log current position status for transparency
+            self.logger.info("📊 STEP 6.3: Checking existing positions...")
+            try:
+                position_counts = self.broker.get_open_positions_count_by_symbol()
+                if position_counts:
+                    self.logger.info(f"📊 Existing open positions: {position_counts}")
+                    for symbol, count in position_counts.items():
+                        existing_pos = self.broker.get_open_position_for_symbol(symbol)
+                        if existing_pos:
+                            self.logger.info(f"   📈 {symbol}: {existing_pos.position_type.value} "
+                                           f"qty={existing_pos.quantity} entry=${existing_pos.entry_price:.2f}")
+                else:
+                    self.logger.info("📊 No existing open positions found")
+                self.logger.info("💡 IMPORTANT: Only ONE position per symbol allowed")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error checking existing positions: {e}")
+            
             self.logger.info("🎉 ALL STEPS COMPLETED: Trading system started successfully")
+            self.logger.info("📧 Startup notification email sent with complete system configuration")
+            self.logger.info("🔔 System will send shutdown notification with final statistics when stopped")
+            self.logger.info("🚨 POSITION LIMIT: Only ONE position per symbol is allowed")
             return True
             
         except Exception as e:
@@ -545,15 +563,100 @@ class TradingSystem:
             return False
 
     async def stop(self):
-        """Stop the trading system with proper cleanup"""
+        """Stop the trading system with proper cleanup and comprehensive shutdown notification"""
         if not self._running:
             return
         
         self.logger.info("🛑 Stopping Trading System")
-        self._running = False
-        self._shutdown_event.set()
+        shutdown_start_time = time.time()
+        
+        # Calculate uptime
+        uptime_seconds = time.time() - self._start_time
         
         try:
+            # Collect final statistics before shutdown
+            self.logger.info("📊 Collecting final system statistics...")
+            
+            # Get final account summary
+            try:
+                account_summary = await self.broker.get_account_summary_async()
+                formatted_account = {
+                    "current_balance": f"${account_summary.get('current_balance', 0):,.2f}",
+                    "total_pnl": f"${account_summary.get('total_pnl', 0):,.2f}",
+                    "open_positions": str(account_summary.get('open_positions', 0)),
+                    "win_rate": f"{account_summary.get('win_rate', 0):.1f}%",
+                    "daily_trades": str(account_summary.get('daily_trades', 0))
+                }
+            except Exception as e:
+                self.logger.warning(f"Could not get final account summary: {e}")
+                formatted_account = {
+                    "current_balance": "$0.00",
+                    "total_pnl": "$0.00",
+                    "open_positions": "0",
+                    "win_rate": "0.0%",
+                    "daily_trades": "0"
+                }
+            
+            # Get final positions
+            try:
+                positions_summary = await self.broker.get_positions_summary_async()
+                final_positions = positions_summary.get("open_positions", [])
+            except Exception as e:
+                self.logger.warning(f"Could not get final positions: {e}")
+                final_positions = []
+            
+            # Format final statistics
+            hours = int(uptime_seconds // 3600)
+            minutes = int((uptime_seconds % 3600) // 60)
+            seconds_remainder = int(uptime_seconds % 60)
+            
+            if hours > 0:
+                uptime_str = f"{hours}h {minutes}m {seconds_remainder}s"
+            elif minutes > 0:
+                uptime_str = f"{minutes}m {seconds_remainder}s"
+            else:
+                uptime_str = f"{uptime_seconds:.1f} seconds"
+            
+            final_statistics = {
+                "uptime": uptime_str,
+                "trades_executed": str(self._stats.get('trades_executed', 0)),
+                "successful_trades": str(self._stats.get('trades_successful', 0)),
+                "failed_trades": str(self._stats.get('trades_failed', 0)),
+                "signals_generated": str(self._stats.get('signals_generated', 0)),
+                "websocket_updates": str(self._stats.get('websocket_updates', 0)),
+                "strategy_executions": str(self._stats.get('strategies_executed', 0)),
+                "total_errors": str(self.error_count)
+            }
+            
+            # Log final statistics
+            self.logger.info("📊 Final System Statistics:")
+            self.logger.info(f"   ⏱️  Uptime: {uptime_str}")
+            self.logger.info(f"   📊 Trades Executed: {self._stats.get('trades_executed', 0)}")
+            self.logger.info(f"   ✅ Successful Trades: {self._stats.get('trades_successful', 0)}")
+            self.logger.info(f"   ❌ Failed Trades: {self._stats.get('trades_failed', 0)}")
+            self.logger.info(f"   🎯 Signals Generated: {self._stats.get('signals_generated', 0)}")
+            self.logger.info(f"   📡 WebSocket Updates: {self._stats.get('websocket_updates', 0)}")
+            self.logger.info(f"   🧠 Strategy Executions: {self._stats.get('strategies_executed', 0)}")
+            self.logger.info(f"   ❌ Total Errors: {self.error_count}")
+            
+            # Send comprehensive shutdown notification before stopping components
+            self.logger.info("📧 Sending comprehensive shutdown notification...")
+            try:
+                await self.notification_manager.notify_system_shutdown(
+                    uptime_seconds=uptime_seconds,
+                    statistics=final_statistics,
+                    account_summary=formatted_account,
+                    final_positions=final_positions,
+                    user_id="system"
+                )
+                self.logger.info("✅ Shutdown notification sent successfully")
+            except Exception as e:
+                self.logger.error(f"❌ Failed to send shutdown notification: {e}")
+            
+            # Now proceed with normal shutdown
+            self._running = False
+            self._shutdown_event.set()
+            
             # Stop WebSocket server
             await self.websocket_server.stop()
             
@@ -576,7 +679,8 @@ class TradingSystem:
             await self.risk_manager.stop()
             await self.notification_manager.stop()
             
-            self.logger.info("✅ Trading system stopped successfully")
+            shutdown_duration = time.time() - shutdown_start_time
+            self.logger.info(f"✅ Trading system stopped successfully (shutdown took {shutdown_duration:.2f}s)")
             
         except Exception as e:
             self.logger.error(f"❌ Error during shutdown: {e}")
@@ -586,6 +690,7 @@ class TradingSystem:
         strategy_interval = self.intervals['strategy_execution']
         minutes = strategy_interval // 60
         self.logger.info(f"🎯 Starting strategy execution loop ({strategy_interval}s / {minutes} minutes interval)")
+        self.logger.info(f"🚨 POSITION RULE: Maximum ONE position per symbol")
         
         loop_count = 0
         while self._running and not self._shutdown_event.is_set():
@@ -692,14 +797,23 @@ class TradingSystem:
             
             # Execute trade if signal is actionable
             if selected_signal.signal in (SignalType.BUY, SignalType.SELL):
-                self.logger.info(f"💰 Actionable signal detected for {symbol}: {selected_signal.signal}")
-                if self._main_loop is not None:
-                    asyncio.run_coroutine_threadsafe(
-                        self._execute_signal(selected_signal),
-                        self._main_loop
-                    )
+                # Check if position already exists before attempting trade
+                has_open_position = self.broker.has_open_position_for_symbol(symbol)
+                if has_open_position:
+                    existing_position = self.broker.get_open_position_for_symbol(symbol)
+                    self.logger.info(f"⏸️ Signal SKIPPED for {symbol}: {selected_signal.signal}")
+                    self.logger.info(f"   📊 Reason: Position already open ({existing_position.position_type.value})")
+                    self.logger.info(f"   💰 Existing: {existing_position.quantity} units at ${existing_position.entry_price:.2f}")
+                    self.logger.info(f"   🎯 New Signal: {selected_signal.signal.value} at ${selected_signal.price:.2f}")
                 else:
-                    self.logger.error("❌ Main event loop not available for trade execution")
+                    self.logger.info(f"💰 Actionable signal detected for {symbol}: {selected_signal.signal}")
+                    if self._main_loop is not None:
+                        asyncio.run_coroutine_threadsafe(
+                            self._execute_signal(selected_signal),
+                            self._main_loop
+                        )
+                    else:
+                        self.logger.error("❌ Main event loop not available for trade execution")
             else:
                 self.logger.info(f"⏸️ No actionable signal for {symbol} (signal: {selected_signal.signal})")
             
@@ -832,6 +946,30 @@ class TradingSystem:
                            f"from {signal.strategy_name} (confidence: {signal.confidence:.1f}%)")
             
             if signal.signal == SignalType.WAIT:
+                return
+            
+            # CRITICAL CHECK: Only one position per symbol allowed
+            has_open_position = self.broker.has_open_position_for_symbol(signal.symbol)
+            if has_open_position:
+                existing_position = self.broker.get_open_position_for_symbol(signal.symbol)
+                
+                self.logger.warning(f"🚫 Trade REJECTED: {signal.symbol} already has an open position")
+                self.logger.warning(f"   📊 Existing Position: {existing_position.position_type.value} "
+                                  f"qty={existing_position.quantity} entry=${existing_position.entry_price:.2f}")
+                self.logger.warning(f"   🎯 New Signal: {signal.signal.value} at ${signal.price:.2f}")
+                self.logger.warning(f"   💡 Reason: Only one position per symbol allowed")
+                
+                # Broadcast rejection notification
+                await self.websocket_server.broadcast_notification(
+                    "trade_rejected",
+                    f"Trade rejected: {signal.symbol} already has an open position ({existing_position.position_type.value})",
+                    "warning"
+                )
+                
+                # Show position counts for debugging
+                position_counts = self.broker.get_open_positions_count_by_symbol()
+                self.logger.info(f"📊 Current open positions by symbol: {position_counts}")
+                
                 return
             
             from src.broker.paper_broker import TradeRequest
@@ -1056,15 +1194,33 @@ class TradingSystem:
                 self.logger.debug(f"✅ Main loop iteration #{loop_iteration} completed in {loop_duration:.3f}s")
                 
                 # Sleep for 60 seconds or until shutdown
-                await asyncio.sleep(60)
+                try:
+                    await asyncio.wait_for(asyncio.sleep(60), timeout=60)
+                except asyncio.TimeoutError:
+                    # Normal timeout, continue loop
+                    pass
+                
+                # Check shutdown event
+                if self._shutdown_event.is_set():
+                    self.logger.info("🛑 Shutdown event detected, exiting main loop")
+                    break
                 
             except asyncio.CancelledError:
                 self.logger.info("🛑 Main monitoring loop cancelled")
+                break
+            except KeyboardInterrupt:
+                self.logger.info("🛑 Keyboard interrupt in main loop")
+                self._shutdown_event.set()
                 break
             except Exception as e:
                 self.logger.error(f"❌ Error in main loop iteration #{loop_iteration}: {e}")
                 self._record_error(str(e))
                 await asyncio.sleep(10)
+        
+        self.logger.info("🔄 Main monitoring loop ended, initiating shutdown...")
+        # Ensure shutdown is called
+        if self._running:
+            await self.stop()
 
     async def _periodic_maintenance(self):
         """Perform periodic maintenance tasks"""

@@ -359,10 +359,11 @@ class AsyncRiskManager:
                 reason = f"Position size {position_risk:.1%} would exceed {self.max_position_risk:.1%} limit"
                 return False, reason
             
-            # Check correlation (simplified - check if same symbol already open)
+            # CRITICAL: Check if position already exists for symbol (One position per symbol rule)
             for pos in self.broker.positions.values():
                 if pos.symbol == symbol and pos.status == PositionStatus.OPEN:
-                    reason = f"Position already open for {symbol}"
+                    reason = f"Position already open for {symbol} ({pos.position_type.value}, qty={pos.quantity}, entry=${pos.entry_price:.2f})"
+                    self.logger.warning(f"🚫 Risk Manager: {reason}")
                     return False, reason
             
             return True, "Position approved"

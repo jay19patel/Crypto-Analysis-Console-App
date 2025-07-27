@@ -437,6 +437,41 @@ class AsyncBroker:
         else:
             return f"{minutes}m"
     
+    def has_open_position_for_symbol(self, symbol: str) -> bool:
+        """Check if there's already an open position for the given symbol"""
+        try:
+            for position in self.positions.values():
+                if position.symbol == symbol and position.status == PositionStatus.OPEN:
+                    return True
+            return False
+        except Exception as e:
+            self.logger.error(f"Error checking open position for {symbol}: {e}")
+            return False
+    
+    def get_open_position_for_symbol(self, symbol: str) -> Optional[Position]:
+        """Get the open position for a specific symbol if it exists"""
+        try:
+            for position in self.positions.values():
+                if position.symbol == symbol and position.status == PositionStatus.OPEN:
+                    return position
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting open position for {symbol}: {e}")
+            return None
+    
+    def get_open_positions_count_by_symbol(self) -> Dict[str, int]:
+        """Get count of open positions grouped by symbol"""
+        try:
+            symbol_counts = {}
+            for position in self.positions.values():
+                if position.status == PositionStatus.OPEN:
+                    symbol = position.symbol
+                    symbol_counts[symbol] = symbol_counts.get(symbol, 0) + 1
+            return symbol_counts
+        except Exception as e:
+            self.logger.error(f"Error getting position counts by symbol: {e}")
+            return {}
+    
     async def delete_all_data(self) -> bool:
         """Delete all trading data from MongoDB"""
         try:

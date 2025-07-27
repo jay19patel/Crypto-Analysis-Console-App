@@ -206,9 +206,34 @@ class GracefulShutdownHandler:
             
             # Set shutdown event to stop threads
             self.trading_system._shutdown_event.set()
+            
+            # Schedule async shutdown
+            try:
+                import asyncio
+                loop = asyncio.get_running_loop()
+                if loop and not loop.is_closed():
+                    # Schedule the shutdown coroutine
+                    asyncio.create_task(self._async_shutdown())
+            except Exception as e:
+                self.logger.error(f"Failed to schedule async shutdown: {e}")
+                # Fallback to immediate shutdown
+                self.trading_system._shutdown_event.set()
         else:
             self.logger.warning(f"⚠️ Received {signal_name} again - Forcing immediate shutdown...")
             sys.exit(1)
+    
+    async def _async_shutdown(self):
+        """Perform async shutdown operations"""
+        try:
+            self.logger.info("🔄 Starting async shutdown sequence...")
+            await self.trading_system.stop()
+            self.logger.info("✅ Async shutdown completed")
+        except Exception as e:
+            self.logger.error(f"❌ Error during async shutdown: {e}")
+        finally:
+            # Exit the event loop
+            loop = asyncio.get_running_loop()
+            loop.stop()
     
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
@@ -382,7 +407,10 @@ async def main():
         logger.info("💡 Press Ctrl+C to stop the system gracefully")
         
         # Run main monitoring loop
-        await trading_system.run_main_loop()
+        try:
+            await trading_system.run_main_loop()
+        except KeyboardInterrupt:
+            logger.info("🛑 Main loop interrupted by KeyboardInterrupt")
         
         return 0
         

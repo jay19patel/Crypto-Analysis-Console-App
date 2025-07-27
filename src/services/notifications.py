@@ -39,12 +39,13 @@ class NotificationType(Enum):
     POSITION_CLOSE = "position_close"
     RISK_ALERT = "risk_alert"
     SYSTEM_ERROR = "system_error"
-    STARTUP = "startup"
     ACCOUNT_UPDATE = "account_update"
     PROFIT_ALERT = "profit_alert"
     LOSS_ALERT = "loss_alert"
     MARGIN_CALL = "margin_call"
     STRATEGY_SIGNAL = "strategy_signal"
+    SYSTEM_STARTUP = "system_startup"
+    SYSTEM_SHUTDOWN = "system_shutdown"
 
 
 class NotificationPriority(Enum):
@@ -252,6 +253,8 @@ class EmailNotifier:
             NotificationType.LOSS_ALERT: True,
             NotificationType.MARGIN_CALL: True,
             NotificationType.STRATEGY_SIGNAL: True,
+            NotificationType.SYSTEM_STARTUP: True,
+            NotificationType.SYSTEM_SHUTDOWN: True,
         }
         
         return event_settings.get(event.type, True)
@@ -269,7 +272,11 @@ class EmailNotifier:
         return f"{emoji} Trading Bot - {event.title}"
     
     def _create_email_body(self, event: NotificationEvent) -> str:
-        """Create HTML email body"""
+        """Create HTML email body with special handling for startup/shutdown"""
+        # Special handling for startup and shutdown emails
+        if event.type in [NotificationType.SYSTEM_STARTUP, NotificationType.SYSTEM_SHUTDOWN]:
+            return self._create_system_email_body(event)
+        
         timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
         
         # Color coding based on priority
@@ -330,6 +337,276 @@ class EmailNotifier:
                 <p><strong>Timestamp:</strong> {timestamp}</p>
                 <p>This is an automated notification from your Trading Bot system.</p>
                 <p>Please do not reply to this email as it is sent from an unmonitored address.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return html_body
+    
+    def _create_system_email_body(self, event: NotificationEvent) -> str:
+        """Create enhanced HTML email body for system startup/shutdown events"""
+        timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        # Color scheme for system events
+        if event.type == NotificationType.SYSTEM_STARTUP:
+            header_color = "#28a745"  # Green for startup
+            title_emoji = "🚀"
+        else:
+            header_color = "#6c757d"  # Gray for shutdown
+            title_emoji = "🛑"
+        
+        # Extract system data
+        system_config = event.data.get('system_config', {})
+        trading_params = event.data.get('trading_params', {})
+        active_strategies = event.data.get('active_strategies', [])
+        trading_symbols = event.data.get('trading_symbols', [])
+        system_status = event.data.get('system_status', {})
+        statistics = event.data.get('statistics', {})
+        account_summary = event.data.get('account_summary', {})
+        
+        # Build HTML sections
+        config_html = ""
+        if system_config:
+            config_html = f"""
+            <div class="section">
+                <h3>📊 SYSTEM CONFIGURATION</h3>
+                <table class="config-table">
+                    <tr><td>🎯 Strategy Execution Interval</td><td>{system_config.get('strategy_execution_interval', 'N/A')}</td></tr>
+                    <tr><td>📈 Historical Data Update</td><td>{system_config.get('historical_data_update', 'N/A')}</td></tr>
+                    <tr><td>📡 Live Price Updates</td><td>{system_config.get('live_price_updates', 'N/A')}</td></tr>
+                    <tr><td>🛡️ Risk Check Interval</td><td>{system_config.get('risk_check_interval', 'N/A')}</td></tr>
+                </table>
+            </div>
+            """
+        
+        trading_html = ""
+        if trading_params:
+            trading_html = f"""
+            <div class="section">
+                <h3>💰 TRADING PARAMETERS</h3>
+                <table class="config-table">
+                    <tr><td>💵 Initial Balance</td><td>{trading_params.get('initial_balance', 'N/A')}</td></tr>
+                    <tr><td>⚠️ Risk Per Trade</td><td>{trading_params.get('risk_per_trade', 'N/A')}</td></tr>
+                    <tr><td>🛑 Stop Loss</td><td>{trading_params.get('stop_loss', 'N/A')}</td></tr>
+                    <tr><td>🎯 Target Profit</td><td>{trading_params.get('target_profit', 'N/A')}</td></tr>
+                    <tr><td>📊 Min Confidence</td><td>{trading_params.get('min_confidence', 'N/A')}</td></tr>
+                    <tr><td>🔢 Daily Trade Limit</td><td>{trading_params.get('daily_trade_limit', 'N/A')}</td></tr>
+                </table>
+            </div>
+            """
+        
+        strategies_html = ""
+        if active_strategies:
+            strategy_list = ''.join([f"<tr><td>✅ {strategy}</td></tr>" for strategy in active_strategies])
+            strategies_html = f"""
+            <div class="section">
+                <h3>🧠 ACTIVE STRATEGIES</h3>
+                <table class="config-table">
+                    {strategy_list}
+                </table>
+            </div>
+            """
+        
+        symbols_html = ""
+        if trading_symbols:
+            symbol_list = ''.join([f"<tr><td>📈 {symbol}</td></tr>" for symbol in trading_symbols])
+            symbols_html = f"""
+            <div class="section">
+                <h3>💱 TRADING SYMBOLS</h3>
+                <table class="config-table">
+                    {symbol_list}
+                </table>
+            </div>
+            """
+        
+        status_html = ""
+        if system_status:
+            status_html = f"""
+            <div class="section">
+                <h3>⚙️ SYSTEM STATUS</h3>
+                <table class="config-table">
+                    <tr><td>🔌 WebSocket Port</td><td>{system_status.get('websocket_port', 'N/A')}</td></tr>
+                    <tr><td>📧 Email Notifications</td><td>{system_status.get('email_notifications', 'N/A')}</td></tr>
+                    <tr><td>📊 Log Level</td><td>{system_status.get('log_level', 'N/A')}</td></tr>
+                </table>
+            </div>
+            """
+        
+        stats_html = ""
+        if statistics:
+            stats_html = f"""
+            <div class="section">
+                <h3>📊 FINAL SYSTEM STATISTICS</h3>
+                <table class="config-table">
+                    <tr><td>⏱️ Uptime</td><td>{statistics.get('uptime', 'N/A')}</td></tr>
+                    <tr><td>📊 Trades Executed</td><td>{statistics.get('trades_executed', 'N/A')}</td></tr>
+                    <tr><td>✅ Successful Trades</td><td>{statistics.get('successful_trades', 'N/A')}</td></tr>
+                    <tr><td>❌ Failed Trades</td><td>{statistics.get('failed_trades', 'N/A')}</td></tr>
+                    <tr><td>🎯 Signals Generated</td><td>{statistics.get('signals_generated', 'N/A')}</td></tr>
+                    <tr><td>📡 WebSocket Updates</td><td>{statistics.get('websocket_updates', 'N/A')}</td></tr>
+                    <tr><td>🧠 Strategy Executions</td><td>{statistics.get('strategy_executions', 'N/A')}</td></tr>
+                    <tr><td>❌ Total Errors</td><td>{statistics.get('total_errors', 'N/A')}</td></tr>
+                </table>
+            </div>
+            """
+        
+        account_html = ""
+        if account_summary:
+            account_html = f"""
+            <div class="section">
+                <h3>💰 ACCOUNT SUMMARY</h3>
+                <table class="config-table">
+                    <tr><td>💵 Current Balance</td><td>{account_summary.get('current_balance', 'N/A')}</td></tr>
+                    <tr><td>📈 Total P&L</td><td><span style="color: {'green' if str(account_summary.get('total_pnl', '0')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0' and not str(account_summary.get('total_pnl', '0')).startswith('-') else 'red'}">{account_summary.get('total_pnl', 'N/A')}</span></td></tr>
+                    <tr><td>📊 Open Positions</td><td>{account_summary.get('open_positions', 'N/A')}</td></tr>
+                    <tr><td>🎯 Win Rate</td><td>{account_summary.get('win_rate', 'N/A')}</td></tr>
+                    <tr><td>📈 Daily Trades</td><td>{account_summary.get('daily_trades', 'N/A')}</td></tr>
+                </table>
+            </div>
+            """
+        
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                    margin: 0; 
+                    padding: 20px; 
+                    line-height: 1.6; 
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    max-width: 800px;
+                    margin: 0 auto;
+                    background-color: white;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    overflow: hidden;
+                }}
+                .header {{ 
+                    background: linear-gradient(135deg, {header_color} 0%, {header_color}dd 100%);
+                    color: white; 
+                    padding: 30px; 
+                    text-align: center;
+                }}
+                .header h1 {{
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 300;
+                }}
+                .header p {{
+                    margin: 10px 0 0 0;
+                    opacity: 0.9;
+                    font-size: 16px;
+                }}
+                .content {{ 
+                    padding: 30px; 
+                }}
+                .section {{
+                    margin-bottom: 30px;
+                    padding: 20px;
+                    background-color: #f8f9fa;
+                    border-radius: 8px;
+                    border-left: 4px solid {header_color};
+                }}
+                .section h3 {{
+                    margin: 0 0 15px 0;
+                    color: #333;
+                    font-size: 18px;
+                    font-weight: 600;
+                }}
+                .config-table {{ 
+                    width: 100%; 
+                    border-collapse: collapse; 
+                    background-color: white;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                }}
+                .config-table td {{ 
+                    padding: 12px 16px; 
+                    border-bottom: 1px solid #e9ecef;
+                    vertical-align: middle;
+                }}
+                .config-table td:first-child {{
+                    background-color: #f8f9fa;
+                    font-weight: 600;
+                    color: #495057;
+                    width: 50%;
+                }}
+                .config-table td:last-child {{
+                    font-family: 'Courier New', monospace;
+                    color: #212529;
+                }}
+                .config-table tr:last-child td {{
+                    border-bottom: none;
+                }}
+                .footer {{ 
+                    background-color: #f8f9fa;
+                    padding: 20px 30px;
+                    border-top: 1px solid #dee2e6;
+                    text-align: center;
+                    color: #6c757d; 
+                    font-size: 14px; 
+                }}
+                .message-box {{
+                    background-color: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    border: 1px solid #dee2e6;
+                    margin-bottom: 20px;
+                }}
+                .status-badge {{
+                    display: inline-block;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }}
+                .status-success {{
+                    background-color: #d4edda;
+                    color: #155724;
+                }}
+                .status-info {{
+                    background-color: #cce7ff;
+                    color: #004085;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>{title_emoji} {event.title}</h1>
+                    <p>Professional Trading System</p>
+                    <span class="status-badge {'status-success' if event.type == NotificationType.SYSTEM_STARTUP else 'status-info'}">
+                        {event.type.value.replace('_', ' ').title()}
+                    </span>
+                </div>
+                
+                <div class="content">
+                    <div class="message-box">
+                        <h3>📋 System Message</h3>
+                        <p style="margin: 0; font-size: 16px; color: #495057;">{event.message}</p>
+                    </div>
+                    
+                    {config_html}
+                    {trading_html}
+                    {strategies_html}
+                    {symbols_html}
+                    {status_html}
+                    {stats_html}
+                    {account_html}
+                </div>
+                
+                <div class="footer">
+                    <p><strong>📅 Timestamp:</strong> {timestamp}</p>
+                    <p>This is an automated notification from your Professional Trading System.</p>
+                    <p>Please do not reply to this email as it is sent from an unmonitored address.</p>
+                </div>
             </div>
         </body>
         </html>
@@ -510,23 +787,140 @@ class NotificationManager:
         )
         return await self.send_notification(event)
     
-    async def notify_startup(self, error_message: str, component: str, 
-                                 user_id: str = None) -> bool:
-        """Notify about startup"""
-        event = NotificationEvent(
-            type=NotificationType.STARTUP,
-            priority=NotificationPriority.HIGH,
-            title=f"Startup: {component}",
-            message=f"Startup in {component}: {error_message}",
-            user_id=user_id,
-            data={
-                "startup_message": error_message,
-                "component": component,
-                "startup_time": datetime.now(timezone.utc).isoformat(),
-                "severity": "high"
-            }
-        )
-        return await self.send_notification(event)
+    async def notify_system_startup(self, system_config: dict = None, 
+                                  trading_params: dict = None,
+                                  active_strategies: list = None,
+                                  trading_symbols: list = None,
+                                  system_status: dict = None,
+                                  user_id: str = None) -> bool:
+        """Send comprehensive system startup notification email"""
+        try:
+            from src.config import get_settings, get_trading_config, get_system_intervals
+            
+            # Get system configuration if not provided
+            if not system_config:
+                settings = get_settings()
+                intervals = get_system_intervals()
+                system_config = {
+                    "strategy_execution_interval": f"{intervals['strategy_execution']}s ({intervals['strategy_execution']//60} minutes)",
+                    "historical_data_update": f"{intervals['historical_data_update']}s ({intervals['historical_data_update']//60} minutes)",
+                    "live_price_updates": intervals['live_price_update'],
+                    "risk_check_interval": f"{intervals['risk_check']}s"
+                }
+            
+            if not trading_params:
+                trading_config = get_trading_config()
+                trading_params = {
+                    "initial_balance": f"${trading_config['initial_balance']:,.2f}",
+                    "risk_per_trade": f"{trading_config['risk_per_trade']*100:.1f}%",
+                    "stop_loss": f"{trading_config['stop_loss_pct']*100:.1f}%",
+                    "target_profit": f"{trading_config['target_pct']*100:.1f}%",
+                    "min_confidence": f"{trading_config['min_confidence']:.1f}%",
+                    "daily_trade_limit": str(trading_config['daily_trades_limit'])
+                }
+            
+            if not active_strategies:
+                settings = get_settings()
+                active_strategies = settings.STRATEGY_CLASSES
+            
+            if not trading_symbols:
+                settings = get_settings()
+                trading_symbols = settings.TRADING_SYMBOLS
+            
+            if not system_status:
+                settings = get_settings()
+                system_status = {
+                    "websocket_port": str(settings.WEBSOCKET_PORT),
+                    "email_notifications": "Enabled" if settings.EMAIL_NOTIFICATIONS_ENABLED else "Disabled",
+                    "log_level": settings.LOG_LEVEL
+                }
+            
+            event = NotificationEvent(
+                type=NotificationType.SYSTEM_STARTUP,
+                priority=NotificationPriority.HIGH,
+                title="🚀 Trading System Started Successfully",
+                message="Your Professional Trading System has been started and is now running with the configuration shown below.",
+                user_id=user_id,
+                data={
+                    "system_config": system_config,
+                    "trading_params": trading_params,
+                    "active_strategies": active_strategies,
+                    "trading_symbols": trading_symbols,
+                    "system_status": system_status,
+                    "startup_time": datetime.now(timezone.utc).isoformat()
+                }
+            )
+            
+            return await self.send_notification(event)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to send system startup notification: {e}")
+            return False
+    
+    async def notify_system_shutdown(self, uptime_seconds: float = 0,
+                                   statistics: dict = None,
+                                   account_summary: dict = None,
+                                   final_positions: list = None,
+                                   user_id: str = None) -> bool:
+        """Send comprehensive system shutdown notification email"""
+        try:
+            # Format uptime
+            hours = int(uptime_seconds // 3600)
+            minutes = int((uptime_seconds % 3600) // 60)
+            seconds = int(uptime_seconds % 60)
+            
+            if hours > 0:
+                uptime_str = f"{hours}h {minutes}m {seconds}s"
+            elif minutes > 0:
+                uptime_str = f"{minutes}m {seconds}s"
+            else:
+                uptime_str = f"{seconds:.1f} seconds"
+            
+            # Default statistics if not provided
+            if not statistics:
+                statistics = {
+                    "uptime": uptime_str,
+                    "trades_executed": "0",
+                    "successful_trades": "0",
+                    "failed_trades": "0",
+                    "signals_generated": "0",
+                    "websocket_updates": "0",
+                    "strategy_executions": "0",
+                    "total_errors": "0"
+                }
+            else:
+                statistics["uptime"] = uptime_str
+            
+            # Default account summary if not provided
+            if not account_summary:
+                account_summary = {
+                    "current_balance": "$0.00",
+                    "total_pnl": "$0.00",
+                    "open_positions": "0",
+                    "win_rate": "0.0%",
+                    "daily_trades": "0"
+                }
+            
+            event = NotificationEvent(
+                type=NotificationType.SYSTEM_SHUTDOWN,
+                priority=NotificationPriority.MEDIUM,
+                title="🛑 Trading System Shutdown Complete",
+                message=f"Your Professional Trading System has been shutdown after running for {uptime_str}. Below is the summary of system performance and final statistics.",
+                user_id=user_id,
+                data={
+                    "statistics": statistics,
+                    "account_summary": account_summary,
+                    "final_positions": final_positions or [],
+                    "shutdown_time": datetime.now(timezone.utc).isoformat(),
+                    "uptime_seconds": uptime_seconds
+                }
+            )
+            
+            return await self.send_notification(event)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to send system shutdown notification: {e}")
+            return False
     
     async def notify_profit_alert(self, symbol: str, pnl: float, 
                                  profit_percentage: float, user_id: str = None) -> bool:
