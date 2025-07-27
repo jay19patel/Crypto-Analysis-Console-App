@@ -13,7 +13,7 @@ from enum import Enum
 from collections import OrderedDict
 
 from src.broker.models import Account, Position, PositionType, PositionStatus
-from src.config import get_settings, get_broker_settings
+from src.config import get_settings, get_trading_config
 from src.services.notifications import NotificationManager
 from src.database.mongodb_client import AsyncMongoDBClient
 
@@ -67,7 +67,7 @@ class AsyncBroker:
     def __init__(self):
         """Initialize async broker"""
         self.settings = get_settings()
-        self.broker_settings = get_broker_settings()
+        self.trading_config = get_trading_config()
         self.logger = logging.getLogger("broker.async_broker")
         
         # Dummy data storage
@@ -145,12 +145,12 @@ class AsyncBroker:
                 self.account = Account()
                 self.account.id = "main"
                 self.account.name = "Trading Account Main"
-                self.account.initial_balance = self.broker_settings["initial_balance"]
-                self.account.current_balance = self.broker_settings["initial_balance"]
-                self.account.daily_trades_limit = self.broker_settings["daily_trades_limit"]
-                self.account.max_position_size = self.broker_settings["max_position_size"]
-                self.account.risk_per_trade = self.broker_settings["risk_per_trade"]
-                self.account.max_leverage = self.broker_settings["max_leverage"]
+                self.account.initial_balance = self.trading_config["initial_balance"]
+                self.account.current_balance = self.trading_config["initial_balance"]
+                self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
+                self.account.max_position_size = 1000.0  # Default value
+                self.account.risk_per_trade = self.trading_config["risk_per_trade"]
+                self.account.max_leverage = 5.0  # Default value
                 self.account.total_trades = 0
                 self.account.profitable_trades = 0
                 self.account.losing_trades = 0
@@ -176,12 +176,12 @@ class AsyncBroker:
         self.account = Account()
         self.account.id = "main"
         self.account.name = "Trading Account Main"
-        self.account.initial_balance = self.broker_settings["initial_balance"]
-        self.account.current_balance = self.broker_settings["initial_balance"]
-        self.account.daily_trades_limit = self.broker_settings["daily_trades_limit"]
-        self.account.max_position_size = self.broker_settings["max_position_size"]
-        self.account.risk_per_trade = self.broker_settings["risk_per_trade"]
-        self.account.max_leverage = self.broker_settings["max_leverage"]
+        self.account.initial_balance = self.trading_config["initial_balance"]
+        self.account.current_balance = self.trading_config["initial_balance"]
+        self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
+        self.account.max_position_size = 1000.0  # Default value
+        self.account.risk_per_trade = self.trading_config["risk_per_trade"]
+        self.account.max_leverage = 5.0  # Default value
         self.account.last_trade_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
     async def _load_positions(self):
@@ -481,7 +481,7 @@ class AsyncBroker:
             trade_request.error_message = f"Invalid quantity: {trade_request.quantity}"
             return False
         
-        if trade_request.confidence < self.broker_settings["min_confidence"]:
+        if trade_request.confidence < self.trading_config["min_confidence"]:
             trade_request.error_message = f"Low confidence: {trade_request.confidence}%"
             return False
         
@@ -523,7 +523,7 @@ class AsyncBroker:
             # Calculate position details
             position_value = trade_request.price * trade_request.quantity
             margin_required = position_value / trade_request.leverage
-            trading_fee = margin_required * self.broker_settings["trading_fee_pct"]
+            trading_fee = margin_required * 0.001  # 0.1% default trading fee
             
             # Check if we have enough balance
             total_required = margin_required + trading_fee
@@ -545,11 +545,11 @@ class AsyncBroker:
             
             # Calculate risk levels using config settings
             if position.position_type == PositionType.LONG:
-                position.stop_loss = trade_request.price * (1 - self.broker_settings["stop_loss_pct"])
-                position.target = trade_request.price * (1 + self.broker_settings["target_pct"])
+                position.stop_loss = trade_request.price * (1 - self.trading_config["stop_loss_pct"])
+                position.target = trade_request.price * (1 + self.trading_config["target_pct"])
             else:
-                position.stop_loss = trade_request.price * (1 + self.broker_settings["stop_loss_pct"])
-                position.target = trade_request.price * (1 - self.broker_settings["target_pct"])
+                position.stop_loss = trade_request.price * (1 + self.trading_config["stop_loss_pct"])
+                position.target = trade_request.price * (1 - self.trading_config["target_pct"])
             
             # Calculate initial PnL
             position.calculate_pnl(trade_request.price)

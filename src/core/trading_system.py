@@ -28,7 +28,7 @@ import gc
 from src.broker.paper_broker import AsyncBroker
 from src.services.risk_manager import AsyncRiskManager
 from src.services.notifications import NotificationManager
-from src.config import get_settings, get_dummy_settings
+from src.config import get_settings, get_trading_config, get_system_intervals
 from src.services.live_price_ws import RealTimeMarketData
 from src.strategies.strategy_manager import StrategyManager
 from src.database.schemas import TradingSignal, MarketData, SignalType
@@ -87,7 +87,8 @@ class TradingSystem:
     def __init__(self, live_save: bool = False, websocket_port: int = 8765, email_enabled: bool = True):
         """Initialize the trading system with all components"""
         self.settings = get_settings()
-        self.dummy_settings = get_dummy_settings()
+        self.trading_config = get_trading_config()
+        self.intervals = get_system_intervals()
         self.logger = logging.getLogger("trading_system")
         
         # System state
@@ -174,7 +175,7 @@ class TradingSystem:
     def _setup_strategies(self):
         """Setup trading strategies for different symbols with error handling"""
         try:
-            symbols = ["BTCUSD", "ETHUSD"]
+            symbols = self.settings.TRADING_SYMBOLS
             historical_data_provider = HistoricalDataProvider()
             
             self.strategy_manager.add_default_strategies(
@@ -182,7 +183,7 @@ class TradingSystem:
                 historical_data_provider=historical_data_provider
             )
             
-            self.logger.info(f"✅ Setup strategies for {len(symbols)} symbols")
+            self.logger.info(f"✅ Setup strategies for {len(symbols)} symbols: {symbols}")
             
         except Exception as e:
             self.logger.error(f"❌ Failed to setup strategies: {e}")
@@ -518,9 +519,10 @@ class TradingSystem:
             
             # Send startup notification
             self.logger.info("🔄 STEP 6.1: Sending startup notification...")
-            await self.notification_manager.notify_system_error(
+            await self.notification_manager.notify_startup(
                 error_message="Professional trading system started successfully",
-                component="TradingSystem"
+                component="TradingSystem",
+                user_id="system"
             )
             self.logger.info("✅ STEP 6.1: Startup notification sent")
             
@@ -580,8 +582,10 @@ class TradingSystem:
             self.logger.error(f"❌ Error during shutdown: {e}")
 
     def _strategy_execution_loop(self):
-        """Enhanced strategy execution loop with comprehensive logging"""
-        self.logger.info("🎯 Starting strategy execution loop (30s interval)")
+        """Enhanced strategy execution loop with configurable interval"""
+        strategy_interval = self.intervals['strategy_execution']
+        minutes = strategy_interval // 60
+        self.logger.info(f"🎯 Starting strategy execution loop ({strategy_interval}s / {minutes} minutes interval)")
         
         loop_count = 0
         while self._running and not self._shutdown_event.is_set():
@@ -630,8 +634,8 @@ class TradingSystem:
                 self.logger.info(f"✅ Strategy Loop #{loop_count} completed in {execution_time:.3f}s")
                 
                 # Wait for next execution or shutdown
-                self.logger.info("⏱️ Waiting 30 seconds for next strategy execution...")
-                if not self._shutdown_event.wait(30):
+                self.logger.info(f"⏱️ Waiting {strategy_interval} seconds ({minutes} minutes) for next strategy execution...")
+                if not self._shutdown_event.wait(strategy_interval):
                     continue
                 else:
                     break
@@ -640,7 +644,7 @@ class TradingSystem:
                 self.logger.error(f"❌ Critical error in strategy execution loop #{loop_count}: {e}")
                 self._record_error(str(e))
                 
-                if not self._shutdown_event.wait(30):
+                if not self._shutdown_event.wait(strategy_interval):
                     continue
                 else:
                     break

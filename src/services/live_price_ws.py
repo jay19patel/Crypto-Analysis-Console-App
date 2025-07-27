@@ -38,8 +38,8 @@ class RealTimeMarketData:
         self.ws = None
         self.is_connected = False
         self.connection_attempts = 0
-        self.max_connection_attempts = self.settings.WEBSOCKET_MAX_RETRIES
-        self.reconnect_delay = self.settings.WEBSOCKET_RECONNECT_DELAY
+        self.max_connection_attempts = 5  # Default retry attempts
+        self.reconnect_delay = 5  # Default reconnect delay in seconds
         self.connection_timeout = self.settings.WEBSOCKET_TIMEOUT
         
         # Threading control

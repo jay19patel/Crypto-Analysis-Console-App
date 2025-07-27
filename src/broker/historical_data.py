@@ -7,7 +7,7 @@ from typing import Dict, Tuple, Optional
 import httpx
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-from src.config import get_settings
+from src.config import get_settings, get_system_intervals
 
 class HistoricalDataProvider:
     def __init__(self, refresh_buffer_seconds: int = 5, cache_dir: str = "./cache"):
@@ -15,15 +15,18 @@ class HistoricalDataProvider:
         self.cache_expiry: Dict[Tuple[str, str], float] = {}
         self.lock = threading.Lock()
         self.settings = get_settings()
+        self.intervals = get_system_intervals()
         self.refresh_buffer_seconds = refresh_buffer_seconds
         self.cache_dir = cache_dir
         os.makedirs(self.cache_dir, exist_ok=True)
         self.refresh_threads: Dict[Tuple[str, str], threading.Thread] = {}
         self.logger = logging.getLogger("historical_data")
         
+        update_interval_minutes = self.intervals['historical_data_update'] // 60
         self.logger.info("📈 Historical Data Provider initialized")
         self.logger.info(f"   📁 Cache directory: {cache_dir}")
         self.logger.info(f"   ⏱️ Refresh buffer: {refresh_buffer_seconds}s")
+        self.logger.info(f"   🔄 Auto-update interval: {update_interval_minutes} minutes")
 
     def get_historical_data(self, symbol: str, timeframe: str) -> pd.DataFrame:
         """Get historical data with comprehensive logging and error handling"""
@@ -75,15 +78,22 @@ class HistoricalDataProvider:
         return df
 
     def _auto_refresh(self, symbol: str, timeframe: str):
+        """Auto-refresh historical data based on configured interval"""
         key = (symbol, timeframe)
+        refresh_interval = self.intervals['historical_data_update']
+        
+        self.logger.debug(f"🔄 Auto-refresh thread started for {symbol} ({timeframe}) - {refresh_interval}s interval")
+        
         while True:
-            now = time.time()
-            with self.lock:
-                expiry = self.cache_expiry.get(key, 0)
-            sleep_time = max(0, expiry - now + self.refresh_buffer_seconds)
-            time.sleep(sleep_time)
-            with self.lock:
-                self._fetch_and_cache(symbol, timeframe)
+            time.sleep(refresh_interval)
+            try:
+                self.logger.info(f"🔄 Auto-refreshing historical data for {symbol} ({timeframe})")
+                with self.lock:
+                    self._fetch_and_cache(symbol, timeframe)
+                self.logger.debug(f"✅ Auto-refresh completed for {symbol} ({timeframe})")
+            except Exception as e:
+                self.logger.error(f"❌ Auto-refresh failed for {symbol} ({timeframe}): {e}")
+                # Continue the loop even if refresh fails
 
     def fetch_historical_data_from_api(self, symbol: str, timeframe: str) -> pd.DataFrame:
         """Fetch historical data from Delta Exchange API with detailed logging"""

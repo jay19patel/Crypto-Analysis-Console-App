@@ -300,17 +300,41 @@ async def main():
         logger.info("🐛 All component logs visible")
         logger.info("🐛" * 30)
     
-    # Print startup banner
+    # Print startup banner with system configuration
+    from src.config import get_settings, get_trading_config, get_system_intervals
+    settings = get_settings()
+    trading_config = get_trading_config()
+    intervals = get_system_intervals()
+    
     logger.info("=" * 80)
     logger.info("🚀 PROFESSIONAL ALGORITHMIC TRADING SYSTEM v2.0.0")
     logger.info("=" * 80)
-    logger.info(f"⚙️  Configuration: {args.config}")
-    logger.info(f"📊 Log Level: {final_log_level} {'(DEBUG MODE)' if args.debug else ''}")
-    logger.info(f"🔌 WebSocket Port: {args.websocket_port}")
-    logger.info(f"💾 Live Save: {'Enabled' if args.liveSave else 'Disabled'}")
-    logger.info(f"📧 Email Notifications: {'Disabled' if args.emailoff else 'Enabled'}")
-    logger.info(f"🆕 Fresh Start: {'Yes' if args.new else 'No'}")
-    logger.info(f"🐛 Debug Mode: {'Enabled' if args.debug else 'Disabled'}")
+    logger.info("📊 SYSTEM CONFIGURATION:")
+    logger.info(f"   🎯 Strategy Execution Interval: {intervals['strategy_execution']}s ({intervals['strategy_execution']//60} minutes)")
+    logger.info(f"   📈 Historical Data Update: {intervals['historical_data_update']}s ({intervals['historical_data_update']//60} minutes)")
+    logger.info(f"   📡 Live Price Updates: {intervals['live_price_update']}")
+    logger.info(f"   🛡️  Risk Check Interval: {intervals['risk_check']}s")
+    logger.info("")
+    logger.info("💰 TRADING PARAMETERS:")
+    logger.info(f"   💵 Initial Balance: ${trading_config['initial_balance']:,.2f}")
+    logger.info(f"   ⚠️  Risk Per Trade: {trading_config['risk_per_trade']*100:.1f}%")
+    logger.info(f"   🛑 Stop Loss: {trading_config['stop_loss_pct']*100:.1f}%")
+    logger.info(f"   🎯 Target Profit: {trading_config['target_pct']*100:.1f}%")
+    logger.info(f"   📊 Min Confidence: {trading_config['min_confidence']:.1f}%")
+    logger.info(f"   🔢 Daily Trade Limit: {trading_config['daily_trades_limit']}")
+    logger.info("")
+    logger.info("🧠 ACTIVE STRATEGIES:")
+    for strategy in settings.STRATEGY_CLASSES:
+        logger.info(f"   ✅ {strategy}")
+    logger.info("")
+    logger.info("💱 TRADING SYMBOLS:")
+    for symbol in settings.TRADING_SYMBOLS:
+        logger.info(f"   📈 {symbol}")
+    logger.info("")
+    logger.info("⚙️  SYSTEM STATUS:")
+    logger.info(f"   🔌 WebSocket Port: {args.websocket_port}")
+    logger.info(f"   📧 Email Notifications: {'Enabled' if not args.emailoff else 'Disabled'}")
+    logger.info(f"   📊 Log Level: {final_log_level}")
     logger.info("=" * 80)
     
     # Perform health check if requested

@@ -39,6 +39,7 @@ class NotificationType(Enum):
     POSITION_CLOSE = "position_close"
     RISK_ALERT = "risk_alert"
     SYSTEM_ERROR = "system_error"
+    STARTUP = "startup"
     ACCOUNT_UPDATE = "account_update"
     PROFIT_ALERT = "profit_alert"
     LOSS_ALERT = "loss_alert"
@@ -136,7 +137,9 @@ class EmailNotifier:
             return False
             
         if not recipients:
-            recipients = [email.strip() for email in self.settings.EMAIL_TO.split(',') if email.strip()]
+            # Use FASTAPI_MAIL_FROM as fallback recipient if no specific recipients provided
+            if self.settings.FASTAPI_MAIL_FROM:
+                recipients = [self.settings.FASTAPI_MAIL_FROM]
             
         if not recipients:
             self.logger.warning("No email recipients configured")
@@ -503,6 +506,24 @@ class NotificationManager:
                 "component": component,
                 "error_time": datetime.now(timezone.utc).isoformat(),
                 "severity": "critical"
+            }
+        )
+        return await self.send_notification(event)
+    
+    async def notify_startup(self, error_message: str, component: str, 
+                                 user_id: str = None) -> bool:
+        """Notify about startup"""
+        event = NotificationEvent(
+            type=NotificationType.STARTUP,
+            priority=NotificationPriority.HIGH,
+            title=f"Startup: {component}",
+            message=f"Startup in {component}: {error_message}",
+            user_id=user_id,
+            data={
+                "startup_message": error_message,
+                "component": component,
+                "startup_time": datetime.now(timezone.utc).isoformat(),
+                "severity": "high"
             }
         )
         return await self.send_notification(event)
