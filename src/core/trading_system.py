@@ -517,12 +517,30 @@ class TradingSystem:
             
             self.logger.info("📋 STEP 6: Finalizing System Startup & Sending Notifications")
             
-            # Send comprehensive startup notification
+            # Send comprehensive startup notification with account summary
             self.logger.info("🔄 STEP 6.1: Sending comprehensive startup notification...")
-            await self.notification_manager.notify_system_startup(
-                user_id="system"
-            )
-            self.logger.info("✅ STEP 6.1: Comprehensive startup notification sent")
+            try:
+                # Get current account summary for startup email
+                startup_account_summary = await self.broker.get_account_summary_async()
+                startup_positions_summary = await self.broker.get_positions_summary_async()
+                
+                self.logger.info("📊 Current account status at startup:")
+                self.logger.info(f"   💰 Balance: ${startup_account_summary.get('current_balance', 0):,.2f}")
+                self.logger.info(f"   📈 Total P&L: ${startup_account_summary.get('total_pnl', 0):,.2f}")
+                self.logger.info(f"   📊 Open Positions: {startup_positions_summary.get('total_open', 0)}")
+                self.logger.info(f"   🎯 Win Rate: {startup_account_summary.get('win_rate', 0):.1f}%")
+                
+                await self.notification_manager.notify_system_startup(
+                    account_summary=startup_account_summary,
+                    positions_summary=startup_positions_summary,
+                    user_id="system"
+                )
+                self.logger.info("✅ STEP 6.1: Comprehensive startup notification sent with account summary")
+            except Exception as e:
+                self.logger.error(f"❌ Error sending startup notification: {e}")
+                # Fallback to basic startup notification
+                await self.notification_manager.notify_system_startup(user_id="system")
+                self.logger.info("✅ STEP 6.1: Basic startup notification sent")
             
             # Broadcast system status
             self.logger.info("🔄 STEP 6.2: Broadcasting system status to WebSocket clients...")
@@ -554,6 +572,10 @@ class TradingSystem:
             self.logger.info("📧 Startup notification email sent with complete system configuration")
             self.logger.info("🔔 System will send shutdown notification with final statistics when stopped")
             self.logger.info("🚨 POSITION LIMIT: Only ONE position per symbol is allowed")
+            self.logger.info("💡 EMAIL FEATURES:")
+            self.logger.info("   📧 Startup: System config + Account summary + Position status")
+            self.logger.info("   📧 Shutdown: Final statistics + Account summary + Complete session data")
+            self.logger.info("   ⏱️ Email delivery: 3-second wait for proper processing")
             return True
             
         except Exception as e:
@@ -650,8 +672,16 @@ class TradingSystem:
                     user_id="system"
                 )
                 self.logger.info("✅ Shutdown notification sent successfully")
+                
+                # CRITICAL: Wait for email to be processed and sent
+                self.logger.info("⏱️ Waiting for email delivery...")
+                await asyncio.sleep(10)  # Wait 3 seconds for email processing
+                self.logger.info("✅ Email delivery wait completed")
+                
             except Exception as e:
                 self.logger.error(f"❌ Failed to send shutdown notification: {e}")
+                # Still wait a bit in case of partial success
+                await asyncio.sleep(3)
             
             # Now proceed with normal shutdown
             self._running = False

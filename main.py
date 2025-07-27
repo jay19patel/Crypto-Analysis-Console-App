@@ -231,9 +231,17 @@ class GracefulShutdownHandler:
         except Exception as e:
             self.logger.error(f"❌ Error during async shutdown: {e}")
         finally:
-            # Exit the event loop
-            loop = asyncio.get_running_loop()
-            loop.stop()
+            # Exit the event loop gracefully
+            try:
+                loop = asyncio.get_running_loop()
+                # Give a moment for any final operations
+                await asyncio.sleep(0.5)
+                loop.stop()
+            except Exception as e:
+                self.logger.error(f"Error stopping event loop: {e}")
+                # Force exit if needed
+                import sys
+                sys.exit(0)
     
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""

@@ -364,6 +364,7 @@ class EmailNotifier:
         system_status = event.data.get('system_status', {})
         statistics = event.data.get('statistics', {})
         account_summary = event.data.get('account_summary', {})
+        positions_summary = event.data.get('positions_summary', {})
         
         # Build HTML sections
         config_html = ""
@@ -455,13 +456,27 @@ class EmailNotifier:
         if account_summary:
             account_html = f"""
             <div class="section">
-                <h3>💰 ACCOUNT SUMMARY</h3>
+                <h3>💰 ACCOUNT SUMMARY AT STARTUP</h3>
                 <table class="config-table">
                     <tr><td>💵 Current Balance</td><td>{account_summary.get('current_balance', 'N/A')}</td></tr>
                     <tr><td>📈 Total P&L</td><td><span style="color: {'green' if str(account_summary.get('total_pnl', '0')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0' and not str(account_summary.get('total_pnl', '0')).startswith('-') else 'red'}">{account_summary.get('total_pnl', 'N/A')}</span></td></tr>
                     <tr><td>📊 Open Positions</td><td>{account_summary.get('open_positions', 'N/A')}</td></tr>
                     <tr><td>🎯 Win Rate</td><td>{account_summary.get('win_rate', 'N/A')}</td></tr>
                     <tr><td>📈 Daily Trades</td><td>{account_summary.get('daily_trades', 'N/A')}</td></tr>
+                    <tr><td>📊 Total Trades</td><td>{account_summary.get('total_trades', 'N/A')}</td></tr>
+                </table>
+            </div>
+            """
+        
+        positions_html = ""
+        if positions_summary:
+            positions_html = f"""
+            <div class="section">
+                <h3>📊 POSITIONS SUMMARY AT STARTUP</h3>
+                <table class="config-table">
+                    <tr><td>📈 Total Open Positions</td><td>{positions_summary.get('total_open', 'N/A')}</td></tr>
+                    <tr><td>📊 Total Closed Positions</td><td>{positions_summary.get('total_closed', 'N/A')}</td></tr>
+                    <tr><td>💰 Total Unrealized P&L</td><td><span style="color: {'green' if str(positions_summary.get('total_unrealized_pnl', '$0.00')).replace('$', '').replace(',', '').replace('-', '').replace('+', '') != '0.00' and not str(positions_summary.get('total_unrealized_pnl', '$0.00')).startswith('$-') else 'red'}">{positions_summary.get('total_unrealized_pnl', 'N/A')}</span></td></tr>
                 </table>
             </div>
             """
@@ -600,6 +615,7 @@ class EmailNotifier:
                     {status_html}
                     {stats_html}
                     {account_html}
+                    {positions_html}
                 </div>
                 
                 <div class="footer">
@@ -792,6 +808,8 @@ class NotificationManager:
                                   active_strategies: list = None,
                                   trading_symbols: list = None,
                                   system_status: dict = None,
+                                  account_summary: dict = None,
+                                  positions_summary: dict = None,
                                   user_id: str = None) -> bool:
         """Send comprehensive system startup notification email"""
         try:
@@ -835,11 +853,32 @@ class NotificationManager:
                     "log_level": settings.LOG_LEVEL
                 }
             
+            # Format account summary for email display
+            formatted_account_summary = None
+            if account_summary:
+                formatted_account_summary = {
+                    "current_balance": f"${account_summary.get('current_balance', 0):,.2f}",
+                    "total_pnl": f"${account_summary.get('total_pnl', 0):,.2f}",
+                    "open_positions": str(account_summary.get('open_positions', 0)),
+                    "win_rate": f"{account_summary.get('win_rate', 0):.1f}%",
+                    "daily_trades": str(account_summary.get('daily_trades', 0)),
+                    "total_trades": str(account_summary.get('total_trades', 0))
+                }
+            
+            # Format positions summary
+            formatted_positions = None
+            if positions_summary:
+                formatted_positions = {
+                    "total_open": str(positions_summary.get('total_open', 0)),
+                    "total_closed": str(positions_summary.get('total_closed', 0)),
+                    "total_unrealized_pnl": f"${positions_summary.get('total_unrealized_pnl', 0):,.2f}"
+                }
+            
             event = NotificationEvent(
                 type=NotificationType.SYSTEM_STARTUP,
                 priority=NotificationPriority.HIGH,
                 title="🚀 Trading System Started Successfully",
-                message="Your Professional Trading System has been started and is now running with the configuration shown below.",
+                message="Your Professional Trading System has been started and is now running with the configuration and account status shown below.",
                 user_id=user_id,
                 data={
                     "system_config": system_config,
@@ -847,6 +886,8 @@ class NotificationManager:
                     "active_strategies": active_strategies,
                     "trading_symbols": trading_symbols,
                     "system_status": system_status,
+                    "account_summary": formatted_account_summary,
+                    "positions_summary": formatted_positions,
                     "startup_time": datetime.now(timezone.utc).isoformat()
                 }
             )
