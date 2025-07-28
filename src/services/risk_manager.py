@@ -77,8 +77,8 @@ class AsyncRiskManager:
         self.trading_config = get_trading_config()
         self.logger = logging.getLogger("risk_manager.async")
         
-        # Risk thresholds (simplified with defaults)
-        self.max_portfolio_risk = 0.15  # 15% max portfolio risk
+        # Risk thresholds (from config)
+        self.max_portfolio_risk = self.trading_config["max_portfolio_risk"]  # From config
         self.max_position_risk = self.trading_config["risk_per_trade"]  # Use risk per trade config
         self.correlation_threshold = 0.7  # Default correlation threshold
         

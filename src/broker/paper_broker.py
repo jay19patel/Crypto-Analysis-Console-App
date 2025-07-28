@@ -148,9 +148,9 @@ class AsyncBroker:
                 self.account.initial_balance = self.trading_config["initial_balance"]
                 self.account.current_balance = self.trading_config["initial_balance"]
                 self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
-                self.account.max_position_size = 1000.0  # Default value
+                self.account.max_position_size = self.trading_config["max_position_size"]
                 self.account.risk_per_trade = self.trading_config["risk_per_trade"]
-                self.account.max_leverage = 5.0  # Default value
+                self.account.max_leverage = self.trading_config["max_leverage"]
                 self.account.total_trades = 0
                 self.account.profitable_trades = 0
                 self.account.losing_trades = 0
@@ -179,9 +179,9 @@ class AsyncBroker:
         self.account.initial_balance = self.trading_config["initial_balance"]
         self.account.current_balance = self.trading_config["initial_balance"]
         self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
-        self.account.max_position_size = 1000.0  # Default value
+        self.account.max_position_size = self.trading_config["max_position_size"]
         self.account.risk_per_trade = self.trading_config["risk_per_trade"]
-        self.account.max_leverage = 5.0  # Default value
+        self.account.max_leverage = self.trading_config["max_leverage"]
         self.account.last_trade_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
     async def _load_positions(self):
@@ -564,7 +564,7 @@ class AsyncBroker:
             # Calculate position details
             position_value = trade_request.price * trade_request.quantity
             margin_required = position_value / trade_request.leverage
-            trading_fee = margin_required * 0.001  # 0.1% default trading fee
+            trading_fee = margin_required * self.trading_config["trading_fee_pct"]
             
             # Check if we have enough balance
             total_required = margin_required + trading_fee
@@ -580,7 +580,7 @@ class AsyncBroker:
             position.quantity = trade_request.quantity
             position.invested_amount = position_value
             position.strategy_name = trade_request.strategy_name
-            position.leverage = trade_request.leverage
+            position.leverage = trade_request.leverage if trade_request.leverage > 0 else self.trading_config["default_leverage"]
             position.margin_used = margin_required
             position.trading_fee = trading_fee
             
@@ -627,7 +627,7 @@ class AsyncBroker:
             position.notes = reason
             
             # Calculate exit fee
-            exit_fee = position.trading_fee * 0.5
+            exit_fee = position.trading_fee * self.trading_config["exit_fee_multiplier"]
             
             # Update account
             self.account.current_balance += position.margin_used + position.pnl - exit_fee

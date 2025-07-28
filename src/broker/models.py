@@ -30,9 +30,9 @@ class Account:
     initial_balance: float = 10000.0
     current_balance: float = 10000.0
     daily_trades_limit: int = 50
-    max_position_size: float = 1000.0
+    max_position_size: float = 1000.0  # Will be updated from config
     risk_per_trade: float = 0.02
-    max_leverage: float = 5.0
+    max_leverage: float = 5.0  # Will be updated from config
     total_trades: int = 0
     profitable_trades: int = 0
     losing_trades: int = 0
@@ -92,7 +92,7 @@ class Position:
     quantity: float = 0.0
     invested_amount: float = 0.0
     strategy_name: str = ""
-    leverage: float = 1.0
+    leverage: float = 1.0  # Will be updated from config
     margin_used: float = 0.0
     trading_fee: float = 0.0
     stop_loss: Optional[float] = None

@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     DAILY_TRADES_LIMIT: int = Field(default=50)
     MIN_CONFIDENCE: float = Field(default=50.0)
     
+    # Margin and Leverage Settings
+    MAX_LEVERAGE: float = Field(default=5.0)
+    DEFAULT_LEVERAGE: float = Field(default=1.0)
+    MAX_POSITION_SIZE: float = Field(default=1000.0)
+    
+    # Risk Management Settings
+    MAX_PORTFOLIO_RISK: float = Field(default=0.15)  # 15% max portfolio risk
+    
+    # Trading Fee Settings
+    TRADING_FEE_PCT: float = Field(default=0.001)  # 0.1% of margin
+    EXIT_FEE_MULTIPLIER: float = Field(default=0.5)  # Exit fee is 50% of entry fee
+    
     # System Intervals (in seconds)
     STRATEGY_EXECUTION_INTERVAL: int = Field(default=600)  # 10 minutes
     HISTORICAL_DATA_UPDATE_INTERVAL: int = Field(default=900)  # 15 minutes
@@ -79,7 +91,13 @@ def get_trading_config() -> dict:
         "stop_loss_pct": settings.STOP_LOSS_PCT,
         "target_pct": settings.TARGET_PCT,
         "daily_trades_limit": settings.DAILY_TRADES_LIMIT,
-        "min_confidence": settings.MIN_CONFIDENCE
+        "min_confidence": settings.MIN_CONFIDENCE,
+        "max_leverage": settings.MAX_LEVERAGE,
+        "default_leverage": settings.DEFAULT_LEVERAGE,
+        "max_position_size": settings.MAX_POSITION_SIZE,
+        "max_portfolio_risk": settings.MAX_PORTFOLIO_RISK,
+        "trading_fee_pct": settings.TRADING_FEE_PCT,
+        "exit_fee_multiplier": settings.EXIT_FEE_MULTIPLIER
     }
 
 
