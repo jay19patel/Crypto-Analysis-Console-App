@@ -1042,31 +1042,42 @@ class TradingSystem:
             
             from src.broker.paper_broker import TradeRequest
             
-            # Create trade request
+            # Calculate safe quantity using risk manager
+            safe_quantity, quantity_reason = await self.risk_manager.calculate_safe_quantity_async(
+                symbol=signal.symbol,
+                price=signal.price,
+                requested_quantity=signal.quantity,
+                leverage=signal.leverage if hasattr(signal, 'leverage') and signal.leverage > 0 else self.trading_config["default_leverage"]
+            )
+            
+            if safe_quantity <= 0:
+                self.logger.warning(f"❌ Trade rejected by risk manager: {quantity_reason}")
+                await self.websocket_server.broadcast_notification(
+                    "trade_rejected",
+                    f"Trade rejected: {quantity_reason}",
+                    "warning"
+                )
+                return
+            
+            # Log quantity adjustment if needed
+            if safe_quantity < signal.quantity:
+                self.logger.info(f"📊 Quantity adjusted: {signal.quantity:.6f} → {safe_quantity:.6f} ({quantity_reason})")
+                await self.websocket_server.broadcast_notification(
+                    "quantity_adjusted",
+                    f"Quantity adjusted from {signal.quantity:.6f} to {safe_quantity:.6f}: {quantity_reason}",
+                    "info"
+                )
+            
+            # Create trade request with safe quantity
             trade_request = TradeRequest(
                 symbol=signal.symbol,
                 signal=signal.signal.value,
                 price=signal.price,
-                quantity=signal.quantity,
-                leverage=signal.leverage,
+                quantity=safe_quantity,  # Use calculated safe quantity
+                leverage=signal.leverage if hasattr(signal, 'leverage') and signal.leverage > 0 else self.trading_config["default_leverage"],
                 strategy_name=signal.strategy_name,
                 confidence=signal.confidence
             )
-            
-            # Check risk limits
-            allowed, reason = await self.risk_manager.should_allow_new_position_async(
-                signal.symbol, 
-                signal.price * signal.quantity
-            )
-            
-            if not allowed:
-                self.logger.warning(f"❌ Trade rejected by risk manager: {reason}")
-                await self.websocket_server.broadcast_notification(
-                    "trade_rejected",
-                    f"Trade rejected: {reason}",
-                    "warning"
-                )
-                return
             
             # Execute trade
             success = await self.broker.execute_trade_async(trade_request)

@@ -336,8 +336,88 @@ class AsyncRiskManager:
             self.logger.error(f"Portfolio risk analysis failed: {e}")
             return {"status": "error", "error": str(e)}
     
+    async def calculate_safe_quantity_async(self, symbol: str, price: float, requested_quantity: float, leverage: float = 1.0) -> Tuple[float, str]:
+        """Calculate safe quantity based on risk limits, leverage, and margin requirements"""
+        try:
+            if not self.broker.account:
+                return 0.0, "No account available"
+            
+            # Step 1: Calculate available margin capacity
+            available_balance = self.broker.account.current_balance
+            used_margin = self.broker.account.total_margin_used
+            available_margin = available_balance - used_margin
+            
+            if available_margin <= 0:
+                return 0.0, f"No available margin. Balance: ₹{available_balance:.2f}, Used: ₹{used_margin:.2f}"
+            
+            # Step 2: Calculate margin required per unit
+            margin_per_unit = price / max(leverage, 1.0)  # Prevent division by zero
+            
+            # Step 3: Maximum quantity by margin limit
+            max_qty_by_margin = available_margin / margin_per_unit
+            
+            # Step 4: Maximum quantity by portfolio exposure risk limit
+            current_positions_value = sum(pos.invested_amount for pos in self.broker.positions.values() if pos.status.value == "OPEN")
+            total_capital = available_balance + used_margin
+            
+            if total_capital <= 0:
+                return 0.0, "Insufficient total capital"
+            
+            max_allowed_exposure = total_capital * self.max_portfolio_risk
+            current_exposure = current_positions_value
+            available_exposure_capacity = max_allowed_exposure - current_exposure
+            
+            if available_exposure_capacity <= 0:
+                current_risk_pct = (current_exposure / total_capital) * 100
+                return 0.0, f"Portfolio risk {current_risk_pct:.1f}% exceeds {self.max_portfolio_risk*100:.1f}% limit"
+            
+            max_qty_by_exposure = available_exposure_capacity / price
+            
+            # Step 5: Maximum quantity by position size limit
+            max_position_size = self.trading_config.get("max_position_size", 1000.0)
+            max_qty_by_position_size = max_position_size / price
+            
+            # Step 6: Check if position already exists for symbol (One position per symbol rule)
+            for pos in self.broker.positions.values():
+                if pos.symbol == symbol and pos.status.value == "OPEN":
+                    return 0.0, f"Position already open for {symbol} ({pos.position_type.value}, qty={pos.quantity}, entry=₹{pos.entry_price:.2f})"
+            
+            # Step 7: Take minimum of all limits
+            safe_quantity = min(
+                requested_quantity,
+                max_qty_by_margin,
+                max_qty_by_exposure,
+                max_qty_by_position_size
+            )
+            
+            # Step 8: Ensure positive quantity
+            final_quantity = max(safe_quantity, 0.0)
+            
+            # Step 9: Generate detailed message
+            if final_quantity <= 0:
+                return 0.0, "No safe quantity available after applying all risk limits"
+            
+            elif final_quantity < requested_quantity:
+                reduction_reason = []
+                if final_quantity == max_qty_by_margin:
+                    reduction_reason.append(f"margin limit (available: ₹{available_margin:.2f})")
+                if final_quantity == max_qty_by_exposure:
+                    reduction_reason.append(f"portfolio risk limit ({self.max_portfolio_risk*100:.1f}%)")
+                if final_quantity == max_qty_by_position_size:
+                    reduction_reason.append(f"position size limit (₹{max_position_size:.2f})")
+                
+                reason_text = ", ".join(reduction_reason) if reduction_reason else "risk management"
+                return final_quantity, f"Quantity reduced from {requested_quantity:.6f} to {final_quantity:.6f} due to {reason_text}"
+            
+            else:
+                return final_quantity, f"Quantity approved: {final_quantity:.6f} units"
+                
+        except Exception as e:
+            self.logger.error(f"Error calculating safe quantity: {e}")
+            return 0.0, f"Error calculating safe quantity: {str(e)}"
+
     async def should_allow_new_position_async(self, symbol: str, position_value: float) -> Tuple[bool, str]:
-        """Check if a new position should be allowed based on risk analysis"""
+        """Check if a new position should be allowed based on risk analysis (Legacy method - use calculate_safe_quantity_async instead)"""
         try:
             if not self.broker.account:
                 return False, "No account available"

@@ -10,12 +10,14 @@ import statistics
 
 from src.database.schemas import TradingSignal, MarketData, SignalType, StrategyStats, StrategyResult
 from src.strategies.base_strategy import BaseStrategy
+from src.config import get_trading_config
 
 class EMAStrategy(BaseStrategy):
     """EMA Crossover Strategy using 9EMA and 15EMA"""
     def __init__(self, symbol: str, historical_data_provider):
         super().__init__(symbol, name=f"EMA_{symbol}")
         self.historical_data_provider = historical_data_provider
+        self.trading_config = get_trading_config()
 
     def generate_signal(self, market_data: MarketData) -> TradingSignal:
         df = self.historical_data_provider.get_historical_data(self.symbol, "15m")
@@ -48,5 +50,6 @@ class EMAStrategy(BaseStrategy):
             confidence=confidence,
             strategy_name=self.name,
             price=market_data.price,
-            quantity=1.0  # Set proper quantity for testing
+            quantity=1.0,  # Will be calculated by risk manager
+            leverage=self.trading_config["default_leverage"]  # Use default leverage from config
         ) 
