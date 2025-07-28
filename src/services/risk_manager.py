@@ -77,10 +77,7 @@ class AsyncRiskManager:
         self.trading_config = get_trading_config()
         self.logger = logging.getLogger("risk_manager.async")
         
-        # Risk thresholds (from config)
-        self.max_portfolio_risk = self.trading_config["max_portfolio_risk"]  # From config
-        self.max_position_risk = self.trading_config["risk_per_trade"]  # Use risk per trade config
-        self.correlation_threshold = 0.7  # Default correlation threshold
+        # Simplified configuration - no complex risk thresholds needed
         
         # Risk tracking
         self._risk_metrics: Dict[str, RiskMetrics] = {}
@@ -336,121 +333,75 @@ class AsyncRiskManager:
             self.logger.error(f"Portfolio risk analysis failed: {e}")
             return {"status": "error", "error": str(e)}
     
-    async def calculate_safe_quantity_async(self, symbol: str, price: float, requested_quantity: float, leverage: float = 1.0) -> Tuple[float, str]:
-        """Calculate safe quantity based on risk limits, leverage, and margin requirements"""
+    async def calculate_safe_quantity_async(self, symbol: str, price: float, requested_quantity: float, leverage: float = None) -> Tuple[float, str]:
+        """Calculate safe quantity with proper position sizing and liquidation protection"""
         try:
             if not self.broker.account:
                 return 0.0, "No account available"
             
-            # Step 1: Calculate available margin capacity
-            available_balance = self.broker.account.current_balance
-            used_margin = self.broker.account.total_margin_used
-            available_margin = available_balance - used_margin
-            
-            if available_margin <= 0:
-                return 0.0, f"No available margin. Balance: ₹{available_balance:.2f}, Used: ₹{used_margin:.2f}"
-            
-            # Step 2: Calculate margin required per unit
-            margin_per_unit = price / max(leverage, 1.0)  # Prevent division by zero
-            
-            # Step 3: Maximum quantity by margin limit
-            max_qty_by_margin = available_margin / margin_per_unit
-            
-            # Step 4: Maximum quantity by portfolio exposure risk limit
-            current_positions_value = sum(pos.invested_amount for pos in self.broker.positions.values() if pos.status.value == "OPEN")
-            total_capital = available_balance + used_margin
-            
-            if total_capital <= 0:
-                return 0.0, "Insufficient total capital"
-            
-            max_allowed_exposure = total_capital * self.max_portfolio_risk
-            current_exposure = current_positions_value
-            available_exposure_capacity = max_allowed_exposure - current_exposure
-            
-            if available_exposure_capacity <= 0:
-                current_risk_pct = (current_exposure / total_capital) * 100
-                return 0.0, f"Portfolio risk {current_risk_pct:.1f}% exceeds {self.max_portfolio_risk*100:.1f}% limit"
-            
-            max_qty_by_exposure = available_exposure_capacity / price
-            
-            # Step 5: Maximum quantity by position size limit
-            max_position_size = self.trading_config.get("max_position_size", 1000.0)
-            max_qty_by_position_size = max_position_size / price
-            
-            # Step 6: Check if position already exists for symbol (One position per symbol rule)
+            # Step 1: Check if position already exists for symbol (One position per symbol rule)
             for pos in self.broker.positions.values():
                 if pos.symbol == symbol and pos.status.value == "OPEN":
                     return 0.0, f"Position already open for {symbol} ({pos.position_type.value}, qty={pos.quantity}, entry=₹{pos.entry_price:.2f})"
             
-            # Step 7: Take minimum of all limits
-            safe_quantity = min(
-                requested_quantity,
-                max_qty_by_margin,
-                max_qty_by_exposure,
-                max_qty_by_position_size
-            )
+            # Step 2: Get current available balance
+            available_balance = self.broker.account.current_balance
+            if available_balance <= 0:
+                return 0.0, f"No available balance. Current balance: ₹{available_balance:.2f}"
             
-            # Step 8: Ensure positive quantity
-            final_quantity = max(safe_quantity, 0.0)
+            # Step 3: Use default leverage if not provided
+            if leverage is None:
+                leverage = self.trading_config.get("default_leverage", 50.0)
             
-            # Step 9: Generate detailed message
-            if final_quantity <= 0:
-                return 0.0, "No safe quantity available after applying all risk limits"
+            # Step 4: Calculate position sizing (% of balance)
+            balance_per_trade_pct = self.trading_config.get("balance_per_trade_pct", 0.20)  # 20%
+            margin_to_use = available_balance * balance_per_trade_pct
             
-            elif final_quantity < requested_quantity:
-                reduction_reason = []
-                if final_quantity == max_qty_by_margin:
-                    reduction_reason.append(f"margin limit (available: ₹{available_margin:.2f})")
-                if final_quantity == max_qty_by_exposure:
-                    reduction_reason.append(f"portfolio risk limit ({self.max_portfolio_risk*100:.1f}%)")
-                if final_quantity == max_qty_by_position_size:
-                    reduction_reason.append(f"position size limit (₹{max_position_size:.2f})")
-                
-                reason_text = ", ".join(reduction_reason) if reduction_reason else "risk management"
-                return final_quantity, f"Quantity reduced from {requested_quantity:.6f} to {final_quantity:.6f} due to {reason_text}"
+            # Step 5: Calculate position value with leverage
+            position_value = margin_to_use * leverage
             
+            # Step 6: Calculate quantity from position value  
+            calculated_quantity = position_value / price
+            
+            # Step 7: Apply liquidation protection
+            liquidation_buffer = self.trading_config.get("liquidation_buffer_pct", 0.10)  # 10% buffer
+            safe_quantity = calculated_quantity * (1 - liquidation_buffer)
+            
+            # Step 8: Take minimum of requested and safe quantity
+            final_quantity = min(requested_quantity, safe_quantity)
+            
+            # Step 9: Ensure minimum viable trade size
+            min_trade_size = 0.001  
+            if final_quantity < min_trade_size:
+                return 0.0, f"Calculated quantity {final_quantity:.6f} below minimum trade size {min_trade_size}"
+            
+            # Step 10: Calculate final costs and validations
+            final_position_value = final_quantity * price
+            final_margin = final_position_value / leverage
+            trading_fee = final_margin * self.trading_config["trading_fee_pct"]
+            total_cost = final_margin + trading_fee
+            
+            # Step 11: Final balance validation
+            if total_cost > available_balance:
+                return 0.0, f"Insufficient balance. Need ₹{total_cost:.2f}, have ₹{available_balance:.2f}"
+            
+            # Step 12: Calculate liquidation price for safety check
+            liquidation_distance = (final_margin / final_position_value) * 100  # % from entry
+            
+            # Step 13: Generate detailed response
+            balance_usage_pct = (final_margin / available_balance) * 100
+            position_size_pct = (final_position_value / available_balance) * 100
+            
+            if final_quantity < requested_quantity:
+                reason = "liquidation protection" if final_quantity == safe_quantity else "balance limit"
+                return final_quantity, f"Qty: {final_quantity:.6f} (adjusted for {reason}). Position: ₹{final_position_value:.0f} ({position_size_pct:.1f}% of balance), Margin: ₹{final_margin:.0f} ({balance_usage_pct:.1f}%), Liquidation risk: {liquidation_distance:.1f}% from entry"
             else:
-                return final_quantity, f"Quantity approved: {final_quantity:.6f} units"
+                return final_quantity, f"Qty: {final_quantity:.6f} approved. Position: ₹{final_position_value:.0f} ({position_size_pct:.1f}% of balance), Margin: ₹{final_margin:.0f} ({balance_usage_pct:.1f}%), Liquidation risk: {liquidation_distance:.1f}% from entry"
                 
         except Exception as e:
             self.logger.error(f"Error calculating safe quantity: {e}")
             return 0.0, f"Error calculating safe quantity: {str(e)}"
 
-    async def should_allow_new_position_async(self, symbol: str, position_value: float) -> Tuple[bool, str]:
-        """Check if a new position should be allowed based on risk analysis (Legacy method - use calculate_safe_quantity_async instead)"""
-        try:
-            if not self.broker.account:
-                return False, "No account available"
-            
-            # Check portfolio risk
-            current_portfolio_value = sum(pos.invested_amount for pos in self.broker.positions.values())
-            total_portfolio_value = self.broker.account.current_balance + current_portfolio_value
-            
-            new_portfolio_risk = (current_portfolio_value + position_value) / total_portfolio_value
-            
-            if new_portfolio_risk > self.max_portfolio_risk:
-                reason = f"Portfolio risk {new_portfolio_risk:.1%} would exceed {self.max_portfolio_risk:.1%} limit"
-                return False, reason
-            
-            # Check position size risk
-            position_risk = position_value / total_portfolio_value
-            
-            if position_risk > self.max_position_risk:
-                reason = f"Position size {position_risk:.1%} would exceed {self.max_position_risk:.1%} limit"
-                return False, reason
-            
-            # CRITICAL: Check if position already exists for symbol (One position per symbol rule)
-            for pos in self.broker.positions.values():
-                if pos.symbol == symbol and pos.status == PositionStatus.OPEN:
-                    reason = f"Position already open for {symbol} ({pos.position_type.value}, qty={pos.quantity}, entry=${pos.entry_price:.2f})"
-                    self.logger.warning(f"🚫 Risk Manager: {reason}")
-                    return False, reason
-            
-            return True, "Position approved"
-            
-        except Exception as e:
-            error_msg = f"Risk check failed: {str(e)}"
-            return False, error_msg
     
     async def monitor_positions_async(self) -> List[str]:
         """Monitor all open positions and execute risk management actions"""
@@ -499,25 +450,25 @@ class AsyncRiskManager:
     # Private methods
     def _determine_risk_level(self, margin_usage: float, pnl_percentage: float, 
                             holding_time_hours: float, volatility_score: float) -> RiskLevel:
-        """Determine risk level based on multiple factors"""
-        # Critical conditions
-        if (margin_usage > 95 or 
-            pnl_percentage < -10 or 
-            holding_time_hours > 48):  # 48 hours max holding time
+        """Determine risk level based on multiple factors - More conservative for algo trading"""
+        # Critical conditions - More tolerant for 50x leverage trading
+        if (margin_usage > 98 or 
+            pnl_percentage < -20 or 
+            holding_time_hours > 168):  # 7 days max holding time
             return RiskLevel.CRITICAL
         
-        # High risk conditions
-        if (margin_usage > 80 or 
-            pnl_percentage < -5 or 
-            volatility_score > 80 or
-            holding_time_hours > 36):
+        # High risk conditions - Adjusted for high leverage
+        if (margin_usage > 95 or 
+            pnl_percentage < -15 or 
+            volatility_score > 90 or
+            holding_time_hours > 120):  # 5 days
             return RiskLevel.HIGH
         
-        # Medium risk conditions
-        if (margin_usage > 60 or 
-            pnl_percentage < -2 or 
-            volatility_score > 60 or
-            holding_time_hours > 24):
+        # Medium risk conditions - More lenient
+        if (margin_usage > 90 or 
+            pnl_percentage < -10 or 
+            volatility_score > 80 or
+            holding_time_hours > 72):  # 3 days
             return RiskLevel.MEDIUM
         
         return RiskLevel.LOW
@@ -525,16 +476,16 @@ class AsyncRiskManager:
     def _generate_risk_recommendation(self, position: Position, risk_level: RiskLevel, 
                                     pnl_percentage: float, holding_time_hours: float, 
                                     margin_usage: float) -> RiskAction:
-        """Generate risk management recommendation"""
+        """Generate risk management recommendation - Conservative for algo trading"""
         if risk_level == RiskLevel.CRITICAL:
-            if margin_usage > 95:
+            if margin_usage > 98:  # Only emergency close at 98%+ margin
                 return RiskAction.EMERGENCY_CLOSE
-            elif pnl_percentage < -10:
+            elif pnl_percentage < -20:  # More tolerant loss threshold
                 return RiskAction.CLOSE_POSITION
-            elif holding_time_hours > 48:
+            elif holding_time_hours > 168:  # 7 days
                 return RiskAction.CLOSE_POSITION
             else:
-                return RiskAction.EMERGENCY_CLOSE
+                return RiskAction.MONITOR  # Monitor instead of emergency close
         
         elif risk_level == RiskLevel.HIGH:
             if pnl_percentage < -5:
@@ -724,8 +675,7 @@ class AsyncRiskManager:
                 "monitoring_status": "active",
                 "last_check": datetime.now(timezone.utc).isoformat(),
                 "execution_times": self._execution_times,
-                "max_portfolio_risk": self.max_portfolio_risk,
-                "max_position_risk": self.max_position_risk
+                "balance_per_trade_pct": self.trading_config.get("balance_per_trade_pct", 0.20)
             }
             
         except Exception as e:

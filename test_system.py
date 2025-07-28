@@ -145,7 +145,8 @@ class TradingSystemTester:
                 },
                 trading_params={
                     "initial_balance": f"${self.trading_config['initial_balance']:,.2f}",
-                    "risk_per_trade": f"{self.trading_config['risk_per_trade']*100:.1f}%",
+                    "balance_per_trade": f"{self.trading_config['balance_per_trade_pct']*100:.0f}%",
+                    "default_leverage": f"{self.trading_config['default_leverage']:.0f}x",
                     "stop_loss": f"{self.trading_config['stop_loss_pct']*100:.1f}%",
                     "target_profit": f"{self.trading_config['target_pct']*100:.1f}%",
                     "min_confidence": f"{self.trading_config['min_confidence']:.1f}%",
@@ -646,7 +647,7 @@ class TradingSystemTester:
         """Calculate safe quantity for testing"""
         try:
             account_balance = self.broker.account.current_balance if self.broker.account else 10000.0
-            risk_amount = account_balance * self.trading_config["risk_per_trade"]
+            risk_amount = account_balance * self.trading_config["balance_per_trade_pct"]
             position_value = risk_amount * leverage
             quantity = position_value / price
             return round(quantity, 6)

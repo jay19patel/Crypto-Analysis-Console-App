@@ -16,21 +16,18 @@ class Settings(BaseSettings):
     DATABASE_NAME: str = Field(default="trading_system")
     MONGODB_TIMEOUT: int = Field(default=5)
     
-    # Trading Settings
+    # Core Trading Settings
     INITIAL_BALANCE: float = Field(default=10000.0)
-    RISK_PER_TRADE: float = Field(default=0.02)
-    STOP_LOSS_PCT: float = Field(default=0.05)
-    TARGET_PCT: float = Field(default=0.10)
+    BALANCE_PER_TRADE_PCT: float = Field(default=0.20)  # 20% of balance per trade
+    DEFAULT_LEVERAGE: float = Field(default=50.0)  # Your default 50x leverage
+    MAX_LEVERAGE: float = Field(default=50.0)
     DAILY_TRADES_LIMIT: int = Field(default=50)
     MIN_CONFIDENCE: float = Field(default=50.0)
     
-    # Margin and Leverage Settings
-    MAX_LEVERAGE: float = Field(default=5.0)
-    DEFAULT_LEVERAGE: float = Field(default=1.0)
-    MAX_POSITION_SIZE: float = Field(default=1000.0)
-    
-    # Risk Management Settings
-    MAX_PORTFOLIO_RISK: float = Field(default=0.15)  # 15% max portfolio risk
+    # Risk Management
+    STOP_LOSS_PCT: float = Field(default=0.05)  # 5% stop loss
+    TARGET_PCT: float = Field(default=0.10)     # 10% target
+    LIQUIDATION_BUFFER_PCT: float = Field(default=0.10)  # 10% buffer from liquidation
     
     # Trading Fee Settings
     TRADING_FEE_PCT: float = Field(default=0.001)  # 0.1% of margin
@@ -83,19 +80,18 @@ def get_settings() -> Settings:
 
 
 def get_trading_config() -> dict:
-    """Get simplified trading configuration"""
+    """Get clean trading configuration for algo trading system"""
     settings = get_settings()
     return {
         "initial_balance": settings.INITIAL_BALANCE,
-        "risk_per_trade": settings.RISK_PER_TRADE,
-        "stop_loss_pct": settings.STOP_LOSS_PCT,
-        "target_pct": settings.TARGET_PCT,
+        "balance_per_trade_pct": settings.BALANCE_PER_TRADE_PCT,  # 20% per trade
+        "default_leverage": settings.DEFAULT_LEVERAGE,  # 50x leverage
+        "max_leverage": settings.MAX_LEVERAGE,
         "daily_trades_limit": settings.DAILY_TRADES_LIMIT,
         "min_confidence": settings.MIN_CONFIDENCE,
-        "max_leverage": settings.MAX_LEVERAGE,
-        "default_leverage": settings.DEFAULT_LEVERAGE,
-        "max_position_size": settings.MAX_POSITION_SIZE,
-        "max_portfolio_risk": settings.MAX_PORTFOLIO_RISK,
+        "stop_loss_pct": settings.STOP_LOSS_PCT,
+        "target_pct": settings.TARGET_PCT,
+        "liquidation_buffer_pct": settings.LIQUIDATION_BUFFER_PCT,  # Liquidation safety buffer
         "trading_fee_pct": settings.TRADING_FEE_PCT,
         "exit_fee_multiplier": settings.EXIT_FEE_MULTIPLIER
     }

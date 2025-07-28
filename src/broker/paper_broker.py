@@ -139,8 +139,6 @@ class AsyncBroker:
                 self.account.initial_balance = self.trading_config["initial_balance"]
                 self.account.current_balance = self.trading_config["initial_balance"]
                 self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
-                self.account.max_position_size = self.trading_config["max_position_size"]
-                self.account.risk_per_trade = self.trading_config["risk_per_trade"]
                 self.account.max_leverage = self.trading_config["max_leverage"]
                 self.account.total_trades = 0
                 self.account.profitable_trades = 0
@@ -170,8 +168,6 @@ class AsyncBroker:
         self.account.initial_balance = self.trading_config["initial_balance"]
         self.account.current_balance = self.trading_config["initial_balance"]
         self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
-        self.account.max_position_size = self.trading_config["max_position_size"]
-        self.account.risk_per_trade = self.trading_config["risk_per_trade"]
         self.account.max_leverage = self.trading_config["max_leverage"]
         self.account.last_trade_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     
@@ -511,11 +507,8 @@ class AsyncBroker:
             trade_request.error_message = f"Daily trade limit reached: {self.account.daily_trades_count}/{self.account.daily_trades_limit}"
             return False
         
-        # Check position size limits
+        # Position value calculation (no size limits, handled by risk manager)
         position_value = trade_request.price * trade_request.quantity
-        if position_value > self.account.max_position_size:
-            trade_request.error_message = f"Position size ${position_value:.2f} exceeds limit ${self.account.max_position_size:.2f}"
-            return False
         
         # Check if position already exists for symbol
         for position in self.positions.values():
@@ -547,7 +540,7 @@ class AsyncBroker:
             position.quantity = trade_request.quantity
             position.invested_amount = position_value
             position.strategy_name = trade_request.strategy_name
-            position.leverage = trade_request.leverage if trade_request.leverage > 0 else self.trading_config["default_leverage"]
+            position.leverage = trade_request.leverage if trade_request.leverage and trade_request.leverage > 0 else self.trading_config["default_leverage"]
             position.margin_used = margin_required
             position.trading_fee = trading_fee
             

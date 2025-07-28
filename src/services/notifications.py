@@ -477,7 +477,8 @@ class EmailNotifier:
                 <h3>TRADING PARAMETERS</h3>
                 <table class="config-table">
                     <tr><td>Initial Balance</td><td>{trading_params.get('initial_balance', 'N/A')}</td></tr>
-                    <tr><td>Risk Per Trade</td><td>{trading_params.get('risk_per_trade', 'N/A')}</td></tr>
+                    <tr><td>Balance Per Trade</td><td>{trading_params.get('balance_per_trade', 'N/A')}</td></tr>
+                    <tr><td>Default Leverage</td><td>{trading_params.get('default_leverage', 'N/A')}</td></tr>
                     <tr><td>Stop Loss</td><td>{trading_params.get('stop_loss', 'N/A')}</td></tr>
                     <tr><td>Target Profit</td><td>{trading_params.get('target_profit', 'N/A')}</td></tr>
                     <tr><td>Min Confidence</td><td>{trading_params.get('min_confidence', 'N/A')}</td></tr>
@@ -1002,7 +1003,8 @@ class NotificationManager:
                 trading_config = get_trading_config()
                 trading_params = {
                     "initial_balance": f"${trading_config['initial_balance']:,.2f}",
-                    "risk_per_trade": f"{trading_config['risk_per_trade']*100:.1f}%",
+                    "balance_per_trade": f"{trading_config['balance_per_trade_pct']*100:.0f}%",
+                    "default_leverage": f"{trading_config['default_leverage']:.0f}x",
                     "stop_loss": f"{trading_config['stop_loss_pct']*100:.1f}%",
                     "target_profit": f"{trading_config['target_pct']*100:.1f}%",
                     "min_confidence": f"{trading_config['min_confidence']:.1f}%",

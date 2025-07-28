@@ -30,8 +30,6 @@ class Account:
     initial_balance: float = 10000.0
     current_balance: float = 10000.0
     daily_trades_limit: int = 50
-    max_position_size: float = 1000.0  # Will be updated from config
-    risk_per_trade: float = 0.02
     max_leverage: float = 5.0  # Will be updated from config
     total_trades: int = 0
     profitable_trades: int = 0
@@ -51,8 +49,6 @@ class Account:
             "initial_balance": self.initial_balance,
             "current_balance": self.current_balance,
             "daily_trades_limit": self.daily_trades_limit,
-            "max_position_size": self.max_position_size,
-            "risk_per_trade": self.risk_per_trade,
             "max_leverage": self.max_leverage,
             "total_trades": self.total_trades,
             "profitable_trades": self.profitable_trades,
