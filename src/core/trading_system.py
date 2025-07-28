@@ -1089,9 +1089,25 @@ class TradingSystem:
                 self.logger.info(f"✅ Trade executed: {signal.signal} {signal.symbol} "
                                f"at ${signal.price:.2f} via {signal.strategy_name}")
                 
+                # Wait a moment for position to be fully created and accessible
+                await asyncio.sleep(0.1)
+                
+                # Get the created position for detailed information
+                position = None
+                if trade_request.position_id and trade_request.position_id in self.broker.positions:
+                    position = self.broker.positions[trade_request.position_id]
+                
+                # Calculate detailed trade information
+                position_value = signal.price * safe_quantity
+                margin_used = position.margin_used if position else position_value / trade_request.leverage
+                trading_fee = position.trading_fee if position else margin_used * self.trading_config["trading_fee_pct"]
+                total_cost = margin_used + trading_fee
+                
                 # Get account summaries for detailed email
-                account_before = self.broker.account.current_balance + trade_request.margin_used + trade_request.trading_fee
+                account_before = self.broker.account.current_balance + total_cost
                 account_after = self.broker.account.current_balance
+                investment_amount = position.invested_amount if position else position_value
+                leveraged_amount = signal.price * safe_quantity * trade_request.leverage
                 
                 # Send comprehensive notification with all details
                 await self.notification_manager.notify_trade_execution(
@@ -1102,11 +1118,11 @@ class TradingSystem:
                     position_id=trade_request.position_id or "N/A",
                     quantity=safe_quantity,
                     leverage=trade_request.leverage,
-                    margin_used=self.broker.positions[trade_request.position_id].margin_used if trade_request.position_id in self.broker.positions else 0,
+                    margin_used=margin_used,
                     capital_remaining=account_after,
-                    investment_amount=self.broker.positions[trade_request.position_id].invested_amount if trade_request.position_id in self.broker.positions else 0,
-                    leveraged_amount=signal.price * safe_quantity * trade_request.leverage,
-                    trading_fee=self.broker.positions[trade_request.position_id].trading_fee if trade_request.position_id in self.broker.positions else 0,
+                    investment_amount=investment_amount,
+                    leveraged_amount=leveraged_amount,
+                    trading_fee=trading_fee,
                     strategy_name=signal.strategy_name,
                     confidence=signal.confidence,
                     account_balance_before=account_before,
