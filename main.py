@@ -417,8 +417,7 @@ async def main():
             logger.error("❌ Failed to start trading system")
             return 1
         
-        # Log successful startup
-        logger.info("🎉 Trading system started successfully!")
+        # System started successfully - detailed messages logged by trading_system.start()
         logger.info("📡 WebSocket server running on port %d", args.websocket_port)
         logger.info("🔄 Main monitoring loop starting...")
         logger.info("💡 Press Ctrl+C to stop the system gracefully")
@@ -450,19 +449,7 @@ async def main():
                 logger.info("🛑 Shutting down trading system...")
                 await trading_system.stop()
                 
-                # Log final statistics
-                final_stats = trading_system.get_system_stats()
-                
-                logger.info("📊 Final System Statistics:")
-                logger.info(f"   ⏱️  Uptime: {final_stats.get('uptime', 0):.1f} seconds")
-                logger.info(f"   📈 Trades Executed: {final_stats.get('trades_executed', 0)}")
-                logger.info(f"   ✅ Successful Trades: {final_stats.get('trades_successful', 0)}")
-                logger.info(f"   ❌ Failed Trades: {final_stats.get('trades_failed', 0)}")
-                logger.info(f"   🎯 Signals Generated: {final_stats.get('signals_generated', 0)}")
-                logger.info(f"   📡 WebSocket Updates: {final_stats.get('websocket_updates', 0)}")
-                logger.info(f"   🧠 Strategy Executions: {final_stats.get('strategies_executed', 0)}")
-                logger.info(f"   ❌ Total Errors: {final_stats.get('error_count', 0)}")
-                
+                # Final statistics are logged by trading_system.stop() - no need to duplicate
                 logger.info("✅ Shutdown completed successfully")
                 
             except Exception as e:
