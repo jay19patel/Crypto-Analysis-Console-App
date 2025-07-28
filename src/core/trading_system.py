@@ -243,8 +243,8 @@ class TradingSystem:
                     # Thread-safe update of market data
                     with self.market_data_lock:
                         self.current_market_data[symbol] = market_data
-                        self.logger.debug(f"✅ Market data stored for {symbol} - Price: ${market_data.price:.2f}")
-                        self.logger.debug(f"   📊 Current market data symbols: {list(self.current_market_data.keys())}")
+                        self.logger.info(f"✅ Market data stored for {symbol} - Price: ${market_data.price:.2f}")
+                        self.logger.info(f"   📊 Current market data symbols: {list(self.current_market_data.keys())}")
                     
                     # Live save logic with circuit breaker
                     if self.live_save:
@@ -660,7 +660,7 @@ class TradingSystem:
             self.logger.info(f"   📡 WebSocket Updates: {self._stats.get('websocket_updates', 0)}")
             self.logger.info(f"   🧠 Strategy Executions: {self._stats.get('strategies_executed', 0)}")
             self.logger.info(f"   ❌ Total Errors: {self.error_count}")
-            
+
             # Send comprehensive shutdown notification before stopping components
             self.logger.info("📧 Sending comprehensive shutdown notification...")
             try:
@@ -675,7 +675,7 @@ class TradingSystem:
                 
                 # CRITICAL: Wait for email to be processed and sent
                 self.logger.info("⏱️ Waiting for email delivery...")
-                await asyncio.sleep(5)  # Wait 5 seconds for email processing
+                await asyncio.sleep(8)  # Wait 8 seconds for email processing
                 self.logger.info("✅ Email delivery wait completed")
                 
                 # Cancel any pending notification tasks
@@ -725,6 +725,18 @@ class TradingSystem:
         self.logger.info(f"🎯 Starting strategy execution loop ({strategy_interval}s / {minutes} minutes interval)")
         self.logger.info(f"🚨 POSITION RULE: Maximum ONE position per symbol")
         
+        # Wait for initial market data before first execution
+        self.logger.info("⏱️ Waiting for initial market data before strategy execution...")
+        for initial_wait in range(10):  # Wait up to 10 seconds
+            with self.market_data_lock:
+                if len(self.current_market_data) > 0:
+                    symbols = list(self.current_market_data.keys())
+                    self.logger.info(f"✅ Initial market data received for: {symbols}")
+                    break
+            time.sleep(1)
+            if self._shutdown_event.is_set():
+                return
+        
         loop_count = 0
         while self._running and not self._shutdown_event.is_set():
             loop_count += 1
@@ -733,6 +745,11 @@ class TradingSystem:
             try:
                 symbols = self.strategy_manager.get_all_symbols()
                 self.logger.info(f"🔄 Strategy Loop #{loop_count} - Processing {len(symbols)} symbols: {symbols}")
+                
+                # Show current market data status
+                with self.market_data_lock:
+                    available_symbols = list(self.current_market_data.keys())
+                    self.logger.info(f"📊 Market data available for: {available_symbols}")
                 
                 for symbol in symbols:
                     if self._shutdown_event.is_set():
@@ -743,6 +760,21 @@ class TradingSystem:
                         with self.market_data_lock:
                             market_data = self.current_market_data.get(symbol)
                             available_symbols = list(self.current_market_data.keys())
+                        
+                        # Wait for initial market data if not available (first loop only)
+                        if market_data is None and loop_count == 1:
+                            self.logger.info(f"⏱️ Waiting for initial market data for {symbol}...")
+                            # Wait up to 30 seconds for market data
+                            for wait_attempt in range(30):
+                                time.sleep(1)
+                                with self.market_data_lock:
+                                    market_data = self.current_market_data.get(symbol)
+                                    available_symbols = list(self.current_market_data.keys())
+                                if market_data:
+                                    self.logger.info(f"✅ Market data received for {symbol} after {wait_attempt + 1}s")
+                                    break
+                                if self._shutdown_event.is_set():
+                                    break
                         
                         if market_data:
                             self.logger.info(f"📊 Processing {symbol} - Price: ${market_data.price:.2f}")
@@ -840,11 +872,14 @@ class TradingSystem:
                     self.logger.info(f"   🎯 New Signal: {selected_signal.signal.value} at ${selected_signal.price:.2f}")
                 else:
                     self.logger.info(f"💰 Actionable signal detected for {symbol}: {selected_signal.signal}")
+                    self.logger.info(f"   📊 Signal Details: price=${selected_signal.price:.2f}, quantity={selected_signal.quantity}, confidence={selected_signal.confidence:.1f}%")
                     if self._main_loop is not None:
-                        asyncio.run_coroutine_threadsafe(
+                        self.logger.info(f"🔄 Submitting trade execution task for {symbol}")
+                        future = asyncio.run_coroutine_threadsafe(
                             self._execute_signal(selected_signal),
                             self._main_loop
                         )
+                        self.logger.info(f"✅ Trade execution task submitted for {symbol}")
                     else:
                         self.logger.error("❌ Main event loop not available for trade execution")
             else:

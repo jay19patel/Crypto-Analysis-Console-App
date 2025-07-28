@@ -47,5 +47,6 @@ class EMAStrategy(BaseStrategy):
             symbol=self.symbol,
             confidence=confidence,
             strategy_name=self.name,
-            price=market_data.price
+            price=market_data.price,
+            quantity=1.0  # Set proper quantity for testing
         ) 

@@ -220,6 +220,9 @@ class GracefulShutdownHandler:
                 self.trading_system._shutdown_event.set()
         else:
             self.logger.warning(f"⚠️ Received {signal_name} again - Forcing immediate shutdown...")
+            # Give some time for pending email notifications
+            import time
+            time.sleep(2)
             sys.exit(1)
     
     async def _async_shutdown(self):
@@ -228,6 +231,12 @@ class GracefulShutdownHandler:
             self.logger.info("🔄 Starting async shutdown sequence...")
             await self.trading_system.stop()
             self.logger.info("✅ Async shutdown completed")
+            
+            # Additional wait to ensure all emails are sent
+            self.logger.info("📧 Final wait for email notifications...")
+            await asyncio.sleep(3)
+            self.logger.info("✅ Final email wait completed")
+            
         except Exception as e:
             self.logger.error(f"❌ Error during async shutdown: {e}")
         finally:
