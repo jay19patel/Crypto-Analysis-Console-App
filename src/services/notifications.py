@@ -1,6 +1,7 @@
 """
 Advanced Notification System for Trading Bot
 Handles email notifications, async execution, and multiple notification channels
+Uses centralized EmailFormatter for all email templates
 """
 
 import asyncio
@@ -21,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from src.database.mongodb_client import AsyncMongoDBClient
+from src.core.email_formatter import EmailFormatter, TradeExecutionData, PositionExitData
 try:
     from src.database.schemas import NotificationLog, NotificationStatus
 except ImportError:
@@ -34,16 +36,11 @@ from src.config import get_settings, get_fastapi_mail_config
 
 
 class NotificationType(Enum):
-    """Notification types"""
+    """Essential notification types"""
     TRADE_EXECUTION = "trade_execution"
     POSITION_CLOSE = "position_close"
     RISK_ALERT = "risk_alert"
     SYSTEM_ERROR = "system_error"
-    ACCOUNT_UPDATE = "account_update"
-    PROFIT_ALERT = "profit_alert"
-    LOSS_ALERT = "loss_alert"
-    MARGIN_CALL = "margin_call"
-    STRATEGY_SIGNAL = "strategy_signal"
     SYSTEM_STARTUP = "system_startup"
     SYSTEM_SHUTDOWN = "system_shutdown"
 
@@ -91,7 +88,7 @@ class NotificationEvent:
 
 
 class EmailNotifier:
-    """Email notification handler using FastAPI-Mail and MongoDB logging"""
+    """Email notification handler using FastAPI-Mail and MongoDB logging with centralized EmailFormatter"""
     def __init__(self):
         self.settings = get_settings()
         self.logger = logging.getLogger("notifications.email")
@@ -99,6 +96,13 @@ class EmailNotifier:
         self.fastmail = FastMail(self.mail_config)
         self.mongo_client = None
         self._mongo_initialized = False
+        
+        # Initialize centralized email formatter
+        self.email_formatter = EmailFormatter()
+        
+        # Email deduplication cache (trade_id -> timestamp)
+        self._sent_emails = {}
+        self._cache_timeout = 300  # 5 minutes
 
     async def _ensure_mongo_connection(self):
         """Ensure MongoDB connection is established"""
@@ -165,7 +169,7 @@ class EmailNotifier:
             return False
 
     async def send_notification_email(self, event: NotificationEvent) -> bool:
-        """Send notification email and log to database"""
+        """Send notification email and log to database with deduplication"""
         if not self.settings.EMAIL_NOTIFICATIONS_ENABLED:
             self.logger.info("Email notifications are disabled")
             await self._log_notification_to_db(event, "skipped", "Email notifications disabled")
@@ -174,6 +178,12 @@ class EmailNotifier:
         if not self._should_send_email_for_event(event):
             self.logger.info(f"Email notification skipped for event type: {event.type.value}")
             await self._log_notification_to_db(event, "skipped", f"Event type {event.type.value} disabled")
+            return False
+
+        # Check for duplicate emails (especially for trade execution)
+        if event.trade_id and self._is_duplicate_email(event):
+            self.logger.info(f"Duplicate email prevented for trade {event.trade_id}")
+            await self._log_notification_to_db(event, "skipped", "Duplicate email prevented")
             return False
 
         subject = self._create_email_subject(event)
@@ -187,6 +197,9 @@ class EmailNotifier:
             sent = await self.send_email(subject, body)
             if sent:
                 status = "sent"
+                # Mark email as sent for deduplication
+                if event.trade_id:
+                    self._mark_email_sent(event)
                 self.logger.info(f"Notification email sent successfully: {event.title}")
             else:
                 error = "Email sending failed"
@@ -243,21 +256,37 @@ class EmailNotifier:
     
     def _should_send_email_for_event(self, event: NotificationEvent) -> bool:
         """Check if email should be sent for this event type"""
-        event_settings = {
-            NotificationType.TRADE_EXECUTION: getattr(self.settings, 'NOTIFY_ON_TRADE_EXECUTION', True),
-            NotificationType.POSITION_CLOSE: getattr(self.settings, 'NOTIFY_ON_POSITION_CLOSE', True),
-            NotificationType.RISK_ALERT: getattr(self.settings, 'NOTIFY_ON_RISK_ALERT', True),
-            NotificationType.SYSTEM_ERROR: getattr(self.settings, 'NOTIFY_ON_SYSTEM_ERROR', True),
-            NotificationType.ACCOUNT_UPDATE: getattr(self.settings, 'NOTIFY_ON_ACCOUNT_UPDATE', True),
-            NotificationType.PROFIT_ALERT: True,
-            NotificationType.LOSS_ALERT: True,
-            NotificationType.MARGIN_CALL: True,
-            NotificationType.STRATEGY_SIGNAL: True,
-            NotificationType.SYSTEM_STARTUP: True,
-            NotificationType.SYSTEM_SHUTDOWN: True,
+        # Send emails for all essential notification types
+        return event.type in [
+            NotificationType.TRADE_EXECUTION,
+            NotificationType.POSITION_CLOSE,
+            NotificationType.RISK_ALERT,
+            NotificationType.SYSTEM_ERROR,
+            NotificationType.SYSTEM_STARTUP,
+            NotificationType.SYSTEM_SHUTDOWN
+        ]
+    
+    def _is_duplicate_email(self, event: NotificationEvent) -> bool:
+        """Check if this email was already sent recently"""
+        if not event.trade_id:
+            return False
+            
+        # Clean old entries
+        current_time = time.time()
+        self._sent_emails = {
+            trade_id: timestamp for trade_id, timestamp in self._sent_emails.items()
+            if current_time - timestamp < self._cache_timeout
         }
         
-        return event_settings.get(event.type, True)
+        # Check if this trade_id was already sent
+        cache_key = f"{event.type.value}_{event.trade_id}"
+        return cache_key in self._sent_emails
+    
+    def _mark_email_sent(self, event: NotificationEvent):
+        """Mark this email as sent in the deduplication cache"""
+        if event.trade_id:
+            cache_key = f"{event.type.value}_{event.trade_id}"
+            self._sent_emails[cache_key] = time.time()
     
     def _create_email_subject(self, event: NotificationEvent) -> str:
         """Create email subject line"""
@@ -272,11 +301,53 @@ class EmailNotifier:
         return f"{emoji} Trading Bot - {event.title}"
     
     def _create_email_body(self, event: NotificationEvent) -> str:
-        """Create HTML email body with special handling for startup/shutdown"""
-        # Special handling for startup and shutdown emails
-        if event.type in [NotificationType.SYSTEM_STARTUP, NotificationType.SYSTEM_SHUTDOWN]:
-            return self._create_system_email_body(event)
-        
+        """Create HTML email body using centralized EmailFormatter"""
+        try:
+            # Special handling for startup and shutdown emails
+            if event.type in [NotificationType.SYSTEM_STARTUP, NotificationType.SYSTEM_SHUTDOWN]:
+                return self._create_system_email_body(event)
+            
+            # Use EmailFormatter for specific notification types
+            if event.type == NotificationType.TRADE_EXECUTION:
+                trade_data = event.data.get("trade_execution_data")
+                if trade_data:
+                    _, email_body = self.email_formatter.format_trade_execution_email(trade_data)
+                    return email_body
+            
+            elif event.type == NotificationType.POSITION_CLOSE:
+                exit_data = event.data.get("position_exit_data")
+                if exit_data:
+                    _, email_body = self.email_formatter.format_position_exit_email(exit_data)
+                    return email_body
+            
+            elif event.type == NotificationType.RISK_ALERT:
+                _, email_body = self.email_formatter.format_risk_alert_email(
+                    symbol=event.symbol or "PORTFOLIO",
+                    alert_type=event.data.get("alert_type", "Risk Alert"),
+                    current_price=event.price or 0.0,
+                    risk_level=event.data.get("risk_level", "unknown"),
+                    additional_data=event.data
+                )
+                return email_body
+            
+            elif event.type == NotificationType.SYSTEM_ERROR:
+                _, email_body = self.email_formatter.format_system_error_email(
+                    error_message=event.message,
+                    component=event.data.get("component", "Unknown"),
+                    additional_data=event.data
+                )
+                return email_body
+            
+            # Fallback to legacy email format for other types
+            return self._create_legacy_email_body(event)
+            
+        except Exception as e:
+            self.logger.error(f"Error creating email body with EmailFormatter: {e}")
+            # Fallback to legacy format
+            return self._create_legacy_email_body(event)
+    
+    def _create_legacy_email_body(self, event: NotificationEvent) -> str:
+        """Create legacy HTML email body format"""
         timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
         
         # Color coding based on priority
@@ -294,7 +365,9 @@ class EmailNotifier:
         if event.data:
             data_html = "<h3>Additional Details:</h3><table border='1' style='border-collapse: collapse; width: 100%;'>"
             for key, value in event.data.items():
-                data_html += f"<tr><td style='padding: 8px; background-color: #f8f9fa;'><strong>{key.replace('_', ' ').title()}</strong></td><td style='padding: 8px;'>{value}</td></tr>"
+                # Skip complex objects
+                if isinstance(value, (str, int, float, bool)) or value is None:
+                    data_html += f"<tr><td style='padding: 8px; background-color: #f8f9fa;'><strong>{key.replace('_', ' ').title()}</strong></td><td style='padding: 8px;'>{value}</td></tr>"
             data_html += "</table>"
         
         html_body = f"""
@@ -336,7 +409,7 @@ class EmailNotifier:
             <div class="footer">
                 <p><strong>Timestamp:</strong> {timestamp}</p>
                 <p>This is an automated notification from your Trading Bot system.</p>
-                <p>Please do not reply to this email as it is sent from an unmonitored address.</p>
+                <p>🤖 Generated with Claude Code | Co-Authored-By: Claude &lt;noreply@anthropic.com&gt;</p>
             </div>
         </body>
         </html>
@@ -345,7 +418,23 @@ class EmailNotifier:
         return html_body
     
     def _create_system_email_body(self, event: NotificationEvent) -> str:
-        """Create enhanced HTML email body for system startup/shutdown events"""
+        """Create enhanced HTML email body for system startup/shutdown events using EmailFormatter"""
+        try:
+            if event.type == NotificationType.SYSTEM_STARTUP:
+                _, email_body = self.email_formatter.format_system_startup_email(event.data)
+                return email_body
+            elif event.type == NotificationType.SYSTEM_SHUTDOWN:
+                _, email_body = self.email_formatter.format_system_shutdown_email(event.data)
+                return email_body
+            else:
+                # Fallback to legacy format
+                return self._create_legacy_system_email_body(event)
+        except Exception as e:
+            self.logger.error(f"Error creating system email body with EmailFormatter: {e}")
+            return self._create_legacy_system_email_body(event)
+    
+    def _create_legacy_system_email_body(self, event: NotificationEvent) -> str:
+        """Create legacy system email body format"""
         timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
         
         # Color scheme for system events
@@ -713,16 +802,43 @@ class NotificationManager:
             self.logger.error(f"Failed to queue notification: {e}")
             return False
     
-    # Convenience methods for common notifications
+    # Enhanced convenience methods for common notifications
     async def notify_trade_execution(self, symbol: str, signal: str, price: float, 
-                                   trade_id: str, position_id: str, pnl: float = 0.0, 
-                                   user_id: str = None) -> bool:
-        """Notify about trade execution"""
+                                   trade_id: str, position_id: str, quantity: float = 0.0,
+                                   leverage: float = 1.0, margin_used: float = 0.0,
+                                   capital_remaining: float = 0.0, investment_amount: float = 0.0,
+                                   leveraged_amount: float = 0.0, trading_fee: float = 0.0,
+                                   strategy_name: str = "", confidence: float = 100.0,
+                                   account_balance_before: float = 0.0, account_balance_after: float = 0.0,
+                                   pnl: float = 0.0, user_id: str = None) -> bool:
+        """Enhanced trade execution notification with detailed position information"""
+        
+        # Create enhanced trade execution data
+        trade_data = TradeExecutionData(
+            symbol=symbol,
+            signal=signal,
+            price=price,
+            quantity=quantity,
+            leverage=leverage,
+            margin_used=margin_used,
+            capital_remaining=capital_remaining,
+            investment_amount=investment_amount,
+            leveraged_amount=leveraged_amount,
+            trade_id=trade_id,
+            position_id=position_id,
+            strategy_name=strategy_name,
+            confidence=confidence,
+            trading_fee=trading_fee,
+            timestamp=datetime.now(timezone.utc),
+            account_balance_before=account_balance_before,
+            account_balance_after=account_balance_after
+        )
+        
         event = NotificationEvent(
             type=NotificationType.TRADE_EXECUTION,
             priority=NotificationPriority.HIGH,
             title=f"Trade Executed: {signal} {symbol}",
-            message=f"Successfully executed {signal} order for {symbol} at ${price:,.2f}",
+            message=f"Successfully executed {signal} order for {symbol} at ${price:,.2f} with {leverage:.1f}x leverage",
             symbol=symbol,
             price=price,
             trade_id=trade_id,
@@ -730,8 +846,16 @@ class NotificationManager:
             pnl=pnl,
             user_id=user_id,
             data={
+                "trade_execution_data": trade_data,
                 "signal": signal,
                 "execution_price": price,
+                "quantity": quantity,
+                "leverage": leverage,
+                "margin_used": margin_used,
+                "capital_remaining": capital_remaining,
+                "investment_amount": investment_amount,
+                "strategy_name": strategy_name,
+                "confidence": confidence,
                 "execution_time": datetime.now(timezone.utc).isoformat(),
                 "order_type": signal
             }
@@ -740,24 +864,72 @@ class NotificationManager:
     
     async def notify_position_close(self, symbol: str, position_id: str, 
                                   exit_price: float, pnl: float, reason: str,
+                                  position_type: str = "LONG", entry_price: float = 0.0,
+                                  quantity: float = 0.0, leverage: float = 1.0,
+                                  pnl_percentage: float = 0.0, investment_amount: float = 0.0,
+                                  leveraged_amount: float = 0.0, margin_used: float = 0.0,
+                                  trading_fee: float = 0.0, exit_fee: float = 0.0,
+                                  total_fees: float = 0.0, trade_duration: str = "Unknown",
+                                  account_balance_before: float = 0.0, account_balance_after: float = 0.0,
+                                  account_growth: float = 0.0, account_growth_percentage: float = 0.0,
+                                  total_portfolio_pnl: float = 0.0, win_rate: float = 0.0,
                                   user_id: str = None) -> bool:
-        """Notify about position closure"""
+        """Enhanced position closure notification with comprehensive PnL and account details"""
+        
+        # Create enhanced position exit data
+        exit_data = PositionExitData(
+            symbol=symbol,
+            position_type=position_type,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            quantity=quantity,
+            leverage=leverage,
+            pnl=pnl,
+            pnl_percentage=pnl_percentage,
+            investment_amount=investment_amount,
+            leveraged_amount=leveraged_amount,
+            margin_used=margin_used,
+            trading_fee=trading_fee,
+            exit_fee=exit_fee,
+            total_fees=total_fees,
+            position_id=position_id,
+            trade_duration=trade_duration,
+            exit_reason=reason,
+            account_balance_before=account_balance_before,
+            account_balance_after=account_balance_after,
+            account_growth=account_growth,
+            account_growth_percentage=account_growth_percentage,
+            total_portfolio_pnl=total_portfolio_pnl,
+            win_rate=win_rate,
+            timestamp=datetime.now(timezone.utc)
+        )
+        
         priority = NotificationPriority.CRITICAL if pnl < -100 else NotificationPriority.HIGH
         
         event = NotificationEvent(
             type=NotificationType.POSITION_CLOSE,
             priority=priority,
-            title=f"Position Closed: {symbol}",
-            message=f"Position closed for {symbol} at ${exit_price:,.2f}. P&L: ${pnl:,.2f}. Reason: {reason}",
+            title=f"Position Closed: {symbol} | P&L: ${pnl:,.2f}",
+            message=f"Position closed for {symbol} at ${exit_price:,.2f}. P&L: ${pnl:,.2f} ({pnl_percentage:.2f}%). Reason: {reason}",
             symbol=symbol,
             price=exit_price,
             position_id=position_id,
             pnl=pnl,
             user_id=user_id,
             data={
+                "position_exit_data": exit_data,
                 "exit_price": exit_price,
                 "pnl": pnl,
+                "pnl_percentage": pnl_percentage,
                 "reason": reason,
+                "position_type": position_type,
+                "entry_price": entry_price,
+                "quantity": quantity,
+                "leverage": leverage,
+                "account_growth": account_growth,
+                "account_growth_percentage": account_growth_percentage,
+                "total_portfolio_pnl": total_portfolio_pnl,
+                "win_rate": win_rate,
                 "close_time": datetime.now(timezone.utc).isoformat(),
                 "profit_loss": "profit" if pnl > 0 else "loss"
             }
@@ -963,41 +1135,6 @@ class NotificationManager:
             self.logger.error(f"Failed to send system shutdown notification: {e}")
             return False
     
-    async def notify_profit_alert(self, symbol: str, pnl: float, 
-                                 profit_percentage: float, user_id: str = None) -> bool:
-        """Notify about significant profits"""
-        event = NotificationEvent(
-            type=NotificationType.PROFIT_ALERT,
-            priority=NotificationPriority.MEDIUM,
-            title=f"Profit Alert: {symbol}",
-            message=f"Significant profit for {symbol}: ${pnl:,.2f} ({profit_percentage:.1f}%)",
-            symbol=symbol,
-            pnl=pnl,
-            user_id=user_id,
-            data={
-                "profit_percentage": profit_percentage,
-                "profit_amount": pnl,
-                "alert_time": datetime.now(timezone.utc).isoformat()
-            }
-        )
-        return await self.send_notification(event)
-    
-    async def notify_margin_call(self, account_id: str, margin_usage: float) -> bool:
-        """Notify about margin call risk"""
-        event = NotificationEvent(
-            type=NotificationType.MARGIN_CALL,
-            priority=NotificationPriority.CRITICAL,
-            title=f"Margin Call Alert",
-            message=f"High margin usage detected: {margin_usage:.1f}%. Consider reducing positions immediately.",
-            user_id=account_id,
-            data={
-                "margin_usage": margin_usage,
-                "account_id": account_id,
-                "alert_time": datetime.now(timezone.utc).isoformat(),
-                "recommendation": "Reduce positions or add funds"
-            }
-        )
-        return await self.send_notification(event)
     
     # Private methods
     async def _process_notifications(self):

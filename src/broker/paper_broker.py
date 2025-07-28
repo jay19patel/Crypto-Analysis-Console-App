@@ -14,7 +14,6 @@ from collections import OrderedDict
 
 from src.broker.models import Account, Position, PositionType, PositionStatus
 from src.config import get_settings, get_trading_config
-from src.services.notifications import NotificationManager
 from src.database.mongodb_client import AsyncMongoDBClient
 
 
@@ -83,9 +82,6 @@ class AsyncBroker:
             "avg_execution_time": 0.0
         }
         
-        # Notification system
-        self.notification_manager = NotificationManager()
-        
         # MongoDB client
         self.mongodb_client = AsyncMongoDBClient()
         
@@ -110,9 +106,6 @@ class AsyncBroker:
             # Load positions
             await self._load_positions()
             
-            # Note: Notification manager is started by main trading system
-            # Don't start it here to avoid conflicts
-            
             self.logger.info("Simplified async broker system started successfully")
             return True
             
@@ -123,8 +116,6 @@ class AsyncBroker:
     async def stop(self):
         """Stop async broker system"""
         self.logger.info("Stopping simplified async broker system")
-        
-        # Note: Notification manager is stopped by main trading system
         
         # Disconnect from MongoDB
         await self.mongodb_client.disconnect()
@@ -233,15 +224,6 @@ class AsyncBroker:
                 # Save updated account to MongoDB
                 await self.mongodb_client.save_account(self.account.to_dict())
                 
-                # Send notification
-                await self.notification_manager.notify_trade_execution(
-                    symbol=trade_request.symbol,
-                    signal=trade_request.signal,
-                    price=trade_request.price,
-                    trade_id=trade_request.id,
-                    position_id=trade_request.position_id
-                )
-                
                 self._trade_stats["successful_trades"] += 1
                 self.logger.info(f"✅ Trade executed successfully")
                 return True
@@ -256,12 +238,6 @@ class AsyncBroker:
             self._trade_stats["failed_trades"] += 1
             
             self.logger.error(f"❌ Trade execution failed: {e}")
-            
-            # Send error notification
-            await self.notification_manager.notify_system_error(
-                error_message=str(e),
-                component="AsyncBroker"
-            )
             
             return False
     
@@ -281,15 +257,6 @@ class AsyncBroker:
                 
                 # Save updated account to MongoDB
                 await self.mongodb_client.save_account(self.account.to_dict())
-                
-                # Send notification
-                await self.notification_manager.notify_position_close(
-                    symbol=position.symbol,
-                    position_id=position_id,
-                    exit_price=exit_price,
-                    pnl=position.pnl,
-                    reason=reason
-                )
                 
                 self.logger.info(f"✅ Position closed: {position.symbol} at ${exit_price:.2f}")
                 return True

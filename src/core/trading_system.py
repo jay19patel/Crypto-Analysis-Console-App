@@ -1089,13 +1089,28 @@ class TradingSystem:
                 self.logger.info(f"✅ Trade executed: {signal.signal} {signal.symbol} "
                                f"at ${signal.price:.2f} via {signal.strategy_name}")
                 
-                # Send notification
+                # Get account summaries for detailed email
+                account_before = self.broker.account.current_balance + trade_request.margin_used + trade_request.trading_fee
+                account_after = self.broker.account.current_balance
+                
+                # Send comprehensive notification with all details
                 await self.notification_manager.notify_trade_execution(
                     symbol=signal.symbol,
                     signal=signal.signal.value,
                     price=signal.price,
                     trade_id=trade_request.id,
-                    position_id=trade_request.position_id or "N/A"
+                    position_id=trade_request.position_id or "N/A",
+                    quantity=safe_quantity,
+                    leverage=trade_request.leverage,
+                    margin_used=self.broker.positions[trade_request.position_id].margin_used if trade_request.position_id in self.broker.positions else 0,
+                    capital_remaining=account_after,
+                    investment_amount=self.broker.positions[trade_request.position_id].invested_amount if trade_request.position_id in self.broker.positions else 0,
+                    leveraged_amount=signal.price * safe_quantity * trade_request.leverage,
+                    trading_fee=self.broker.positions[trade_request.position_id].trading_fee if trade_request.position_id in self.broker.positions else 0,
+                    strategy_name=signal.strategy_name,
+                    confidence=signal.confidence,
+                    account_balance_before=account_before,
+                    account_balance_after=account_after
                 )
                 
                 # Broadcast to WebSocket clients
