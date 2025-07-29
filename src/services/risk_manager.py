@@ -387,6 +387,20 @@ class AsyncRiskManager:
             if not self.broker.account:
                 return 0.0, "No account available"
             
+            # Step 0: ANTI-OVERTRADE CHECK - Check portfolio risk before allowing new trades
+            portfolio_risk_data = await self.analyze_portfolio_risk_async()
+            if portfolio_risk_data.get("status") == "analyzed":
+                portfolio_margin_usage = portfolio_risk_data.get("portfolio_margin_usage", 0.0)
+                max_portfolio_risk = self.trading_config.get("max_portfolio_risk_pct", 80.0)
+                
+                if portfolio_margin_usage >= max_portfolio_risk:
+                    return 0.0, f"🚫 ANTI-OVERTRADE: Portfolio risk too high {portfolio_margin_usage:.1f}% >= {max_portfolio_risk}%. Close existing positions first."
+                
+                # Additional check for high risk warning
+                high_risk_threshold = self.trading_config.get("high_risk_margin_pct", 85.0)
+                if portfolio_margin_usage >= high_risk_threshold:
+                    self.logger.warning(f"⚠️ Portfolio approaching high risk: {portfolio_margin_usage:.1f}% (limit: {max_portfolio_risk}%)")
+            
             # Step 1: Check if position already exists for symbol (One position per symbol rule)
             for pos in self.broker.positions.values():
                 if pos.symbol == symbol and pos.status.value == "OPEN":
@@ -394,7 +408,7 @@ class AsyncRiskManager:
             
             # Step 1.5: Check maximum open positions limit
             open_positions_count = len([pos for pos in self.broker.positions.values() if pos.status.value == "OPEN"])
-            max_positions = self.trading_config.get("max_positions_open", 3)
+            max_positions = self.trading_config.get("max_positions_open", 2)  # Updated to 2
             
             if open_positions_count >= max_positions:
                 return 0.0, f"Maximum open positions limit reached ({open_positions_count}/{max_positions}). Close some positions first."
@@ -682,27 +696,33 @@ class AsyncRiskManager:
     def _determine_portfolio_risk_level(self, portfolio_margin_usage: float, portfolio_pnl_percentage: float, 
                                        portfolio_return_pct: float, critical_positions: int, 
                                        high_risk_positions: int, total_positions: int) -> RiskLevel:
-        """Smart portfolio risk level determination based on multiple factors"""
+        """Smart portfolio risk level determination based on configurable thresholds"""
         try:
+            # Get configurable thresholds
+            config = self.trading_config
+            max_portfolio_risk = config.get("max_portfolio_risk_pct", 80.0)
+            high_risk_margin = config.get("high_risk_margin_pct", 85.0)
+            
             # Critical risk conditions (immediate action needed)
             if (critical_positions > 0 or 
-                portfolio_margin_usage > 90.0 or 
-                portfolio_pnl_percentage < -15.0 or
+                portfolio_margin_usage >= config.get("critical_risk_margin_pct", 90.0) or 
+                portfolio_pnl_percentage < -config.get("critical_risk_loss_pct", 12.0) or
                 portfolio_return_pct < -20.0):
                 return RiskLevel.CRITICAL
             
-            # High risk conditions
+            # High risk conditions - now includes the new high_risk_margin_pct threshold
             if (high_risk_positions > 1 or 
-                portfolio_margin_usage > 75.0 or 
-                portfolio_pnl_percentage < -10.0 or
+                portfolio_margin_usage >= high_risk_margin or 
+                portfolio_margin_usage >= max_portfolio_risk or  # Anti-overtrade threshold
+                portfolio_pnl_percentage < -config.get("high_risk_loss_pct", 8.0) or
                 portfolio_return_pct < -12.0 or
                 (high_risk_positions > 0 and total_positions <= 2)):
                 return RiskLevel.HIGH
             
             # Medium risk conditions
             if (high_risk_positions > 0 or 
-                portfolio_margin_usage > 50.0 or 
-                portfolio_pnl_percentage < -5.0 or
+                portfolio_margin_usage >= config.get("medium_risk_margin_pct", 70.0) or 
+                portfolio_pnl_percentage < -config.get("medium_risk_loss_pct", 5.0) or
                 portfolio_return_pct < -8.0):
                 return RiskLevel.MEDIUM
             
@@ -753,10 +773,14 @@ class AsyncRiskManager:
                 if portfolio_pnl_percentage > 5:
                     recommendations.append("🎯 Good performance - Consider taking partial profits")
             
-            # General recommendations
+            # Anti-overtrade recommendations
             max_portfolio_margin = self.trading_config.get("max_portfolio_risk_pct", 80.0)
-            if portfolio_margin_usage > max_portfolio_margin:
-                recommendations.append(f"⚡ Margin limit exceeded: {portfolio_margin_usage:.1f}% > {max_portfolio_margin}%")
+            high_risk_margin = self.trading_config.get("high_risk_margin_pct", 85.0)
+            
+            if portfolio_margin_usage >= max_portfolio_margin:
+                recommendations.append(f"🚫 ANTI-OVERTRADE ACTIVE: {portfolio_margin_usage:.1f}% >= {max_portfolio_margin}% - New trades blocked")
+            elif portfolio_margin_usage >= high_risk_margin:
+                recommendations.append(f"⚠️ Approaching overtrade threshold: {portfolio_margin_usage:.1f}% (limit: {max_portfolio_margin}%)")
             
             return recommendations
             

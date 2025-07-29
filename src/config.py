@@ -16,11 +16,11 @@ class Settings(BaseSettings):
     DATABASE_NAME: str = Field(default="trading_system")
     MONGODB_TIMEOUT: int = Field(default=5)
     
-    # Core Trading Settings
-    INITIAL_BALANCE: float = Field(default=10000.0)
-    BALANCE_PER_TRADE_PCT: float = Field(default=0.20)  # 20% of balance per trade
-    DEFAULT_LEVERAGE: float = Field(default=50.0)  # Your default 50x leverage
-    MAX_LEVERAGE: float = Field(default=50.0)
+    # Core Trading Settings - Recommended Optimized Settings
+    INITIAL_BALANCE: float = Field(default=17500.0)  # $15,000-20,000 recommended range (₹14.6L-16.7L)
+    BALANCE_PER_TRADE_PCT: float = Field(default=0.15)  # 15% of balance per trade (optimized from 20%)
+    DEFAULT_LEVERAGE: float = Field(default=30.0)  # 30x leverage (optimized from 50x for better risk management)
+    MAX_LEVERAGE: float = Field(default=50.0)  # Keep max at 50x for flexibility
     DAILY_TRADES_LIMIT: int = Field(default=50)
     MIN_CONFIDENCE: float = Field(default=50.0)
     
@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     
     # Safe Position Sizing for Small Balance
     SAFE_BALANCE_PER_TRADE_PCT: float = Field(default=0.05)  # 5% of balance per trade for safety
-    MAX_POSITIONS_OPEN: int = Field(default=3)               # Max 3 positions open simultaneously
-    MAX_PORTFOLIO_RISK_PCT: float = Field(default=15.0)      # Maximum portfolio risk percentage
+    MAX_POSITIONS_OPEN: int = Field(default=2)               # Max 2 positions open simultaneously (optimized)
+    HIGH_RISK_MARGIN_PCT: float = Field(default=85.0)        # Portfolio high risk threshold at 85% margin
+    MAX_PORTFOLIO_RISK_PCT: float = Field(default=80.0)      # Maximum portfolio risk percentage (anti-overtrade)
     
     # Trading Fee Settings
     TRADING_FEE_PCT: float = Field(default=0.001)  # 0.1% of margin
@@ -138,7 +139,8 @@ def get_trading_config() -> dict:
         "medium_risk_loss_pct": settings.MEDIUM_RISK_LOSS_PCT,
         "medium_risk_time_hours": settings.MEDIUM_RISK_TIME_HOURS,
         
-        "max_portfolio_risk_pct": settings.MAX_PORTFOLIO_RISK_PCT
+        "max_portfolio_risk_pct": settings.MAX_PORTFOLIO_RISK_PCT,
+        "high_risk_margin_pct": settings.HIGH_RISK_MARGIN_PCT
     }
 
 
