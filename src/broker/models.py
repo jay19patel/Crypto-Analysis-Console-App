@@ -113,13 +113,28 @@ class Position:
         
         return self.pnl
     
-    def calculate_margin_usage(self, current_price: float) -> float:
-        """Calculate current margin usage percentage"""
+    def calculate_margin_usage(self, current_price: float, account_balance: float = None) -> float:
+        """Calculate current margin usage percentage - now correctly implemented"""
         if self.margin_used <= 0:
             return 0.0
         
-        current_value = current_price * self.quantity
-        return (current_value / self.margin_used) * 100
+        # Primary calculation: Margin used as percentage of account balance
+        if account_balance and account_balance > 0:
+            base_margin_pct = (self.margin_used / account_balance) * 100
+            
+            # Adjust for current PnL impact on available margin
+            unrealized_pnl = self.calculate_pnl(current_price)
+            
+            # If losing money, effective margin usage increases
+            if unrealized_pnl < 0:
+                loss_impact = abs(unrealized_pnl) / account_balance * 100
+                return min(base_margin_pct + loss_impact, 100.0)
+            
+            # If making profit, margin usage remains same (profit adds to available balance)
+            return base_margin_pct
+        
+        # Fallback: If no account balance, return conservative estimate
+        return 50.0  # Conservative 50% usage estimate
     
     def close_position(self, exit_price: float, reason: str = "Manual Close"):
         """Close the position"""

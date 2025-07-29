@@ -41,6 +41,28 @@ class TradeExecutionData:
     timestamp: datetime
     account_balance_before: float
     account_balance_after: float
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "symbol": self.symbol,
+            "signal": self.signal,
+            "price": self.price,
+            "quantity": self.quantity,
+            "leverage": self.leverage,
+            "margin_used": self.margin_used,
+            "capital_remaining": self.capital_remaining,
+            "investment_amount": self.investment_amount,
+            "leveraged_amount": self.leveraged_amount,
+            "trade_id": self.trade_id,
+            "position_id": self.position_id,
+            "strategy_name": self.strategy_name,
+            "confidence": self.confidence,
+            "trading_fee": self.trading_fee,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "account_balance_before": self.account_balance_before,
+            "account_balance_after": self.account_balance_after
+        }
 
 
 @dataclass
@@ -70,6 +92,35 @@ class PositionExitData:
     total_portfolio_pnl: float
     win_rate: float
     timestamp: datetime
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "symbol": self.symbol,
+            "position_type": self.position_type,
+            "entry_price": self.entry_price,
+            "exit_price": self.exit_price,
+            "quantity": self.quantity,
+            "leverage": self.leverage,
+            "pnl": self.pnl,
+            "pnl_percentage": self.pnl_percentage,
+            "investment_amount": self.investment_amount,
+            "leveraged_amount": self.leveraged_amount,
+            "margin_used": self.margin_used,
+            "trading_fee": self.trading_fee,
+            "exit_fee": self.exit_fee,
+            "total_fees": self.total_fees,
+            "position_id": self.position_id,
+            "trade_duration": self.trade_duration,
+            "exit_reason": self.exit_reason,
+            "account_balance_before": self.account_balance_before,
+            "account_balance_after": self.account_balance_after,
+            "account_growth": self.account_growth,
+            "account_growth_percentage": self.account_growth_percentage,
+            "total_portfolio_pnl": self.total_portfolio_pnl,
+            "win_rate": self.win_rate,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None
+        }
 
 
 class EmailFormatter:

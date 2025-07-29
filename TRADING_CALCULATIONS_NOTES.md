@@ -324,21 +324,42 @@ take_profit = entry_price * (1 - target_pct)   # Default: 10% below entry
 
 ## System Configuration
 
-### Key Configuration Parameters
+### Key Configuration Parameters (Updated for Small Balance Trading)
 ```python
 # Trading Configuration (src/config.py)
-INITIAL_BALANCE = 10000.0        # Starting account balance
-RISK_PER_TRADE = 0.02           # 2% risk per trade
-STOP_LOSS_PCT = 0.05            # 5% stop loss
-TARGET_PCT = 0.10               # 10% take profit
-DAILY_TRADES_LIMIT = 50         # Max trades per day
-MIN_CONFIDENCE = 50.0           # Minimum signal confidence
-MAX_LEVERAGE = 5.0              # Maximum leverage allowed
-DEFAULT_LEVERAGE = 1.0          # Default leverage
-MAX_POSITION_SIZE = 1000.0      # Maximum position value
-MAX_PORTFOLIO_RISK = 0.15       # 15% max portfolio risk
-TRADING_FEE_PCT = 0.001         # 0.1% trading fee
-EXIT_FEE_MULTIPLIER = 0.5       # Exit fee = 50% of entry fee
+INITIAL_BALANCE = 100.0                 # Starting account balance (Small balance)
+BALANCE_PER_TRADE_PCT = 0.20           # 20% per trade (Normal mode)
+SAFE_BALANCE_PER_TRADE_PCT = 0.05      # 5% per trade (Safe mode - auto for ≤₹1000)
+STOP_LOSS_PCT = 0.05                   # 5% stop loss
+TARGET_PCT = 0.10                      # 10% take profit
+DAILY_TRADES_LIMIT = 50                # Max trades per day
+MIN_CONFIDENCE = 50.0                  # Minimum signal confidence
+DEFAULT_LEVERAGE = 50.0                # 50x leverage for crypto futures
+MAX_LEVERAGE = 50.0                    # Maximum leverage allowed
+LIQUIDATION_BUFFER_PCT = 0.30          # 30% buffer from liquidation
+MAX_POSITIONS_OPEN = 3                 # Max 3 positions simultaneously
+TRADING_FEE_PCT = 0.001                # 0.1% trading fee
+
+# EMERGENCY CLOSE THRESHOLDS (Configurable via .env)
+EMERGENCY_CLOSE_MARGIN_PCT = 95.0      # Emergency close at 95% margin usage
+EMERGENCY_CLOSE_LOSS_PCT = 15.0        # Emergency close at 15% loss
+EMERGENCY_CLOSE_TIME_HOURS = 48.0      # Emergency close after 48 hours
+
+# RISK LEVEL THRESHOLDS (All Configurable)
+# Critical Risk
+CRITICAL_RISK_MARGIN_PCT = 90.0        # Critical at 90% margin
+CRITICAL_RISK_LOSS_PCT = 12.0          # Critical at 12% loss
+CRITICAL_RISK_TIME_HOURS = 36.0        # Critical after 36 hours
+
+# High Risk  
+HIGH_RISK_MARGIN_PCT = 80.0            # High risk at 80% margin
+HIGH_RISK_LOSS_PCT = 8.0               # High risk at 8% loss
+HIGH_RISK_TIME_HOURS = 24.0            # High risk after 24 hours
+
+# Medium Risk
+MEDIUM_RISK_MARGIN_PCT = 70.0          # Medium risk at 70% margin
+MEDIUM_RISK_LOSS_PCT = 5.0             # Medium risk at 5% loss
+MEDIUM_RISK_TIME_HOURS = 12.0          # Medium risk after 12 hours
 ```
 
 ### System Intervals
@@ -362,32 +383,147 @@ FASTAPI_MAIL_STARTTLS = True
 
 ## Calculation Examples
 
-### Example 1: BTC Long Position
+### Example 1: BTC Long Position (Small Balance - Safe Mode)
 ```
 Signal: BUY BTCUSD
-Price: $50,000
-Account Balance: $10,000
-Risk per Trade: 2% ($200)
-Stop Loss: 5%
-Leverage: 3x
+Price: $50,000 (₹42,00,000)
+Account Balance: ₹100
+Risk per Trade: 5% (Safe Mode) = ₹5
+Leverage: 50x
+SAFE MODE ACTIVATED: Balance ≤ ₹1000
 
 Calculations:
-1. Risk Amount: $10,000 * 0.02 = $200
-2. Position Value: $200 / 0.05 = $4,000
-3. Quantity: $4,000 / $50,000 = 0.08 BTC
-4. Margin Required: $4,000 / 3 = $1,333.33
-5. Trading Fee: $1,333.33 * 0.001 = $1.33
-6. Total Cost: $1,333.33 + $1.33 = $1,334.66
+1. Balance per Trade: ₹100 * 0.05 = ₹5 (Safe Mode)
+2. Position Value: ₹5 * 50 = ₹250
+3. Quantity: ₹250 / ₹42,00,000 = 0.0000595 BTC
+4. Margin Required: ₹5
+5. Trading Fee: ₹5 * 0.001 = ₹0.005
+6. Total Cost: ₹5 + ₹0.005 = ₹5.005
 
 Position Details:
-- Leveraged Exposure: $4,000
-- Margin Used: $1,333.33
-- Remaining Balance: $8,665.34
-- Stop Loss Level: $47,500
-- Take Profit Level: $55,000
+- Leveraged Exposure: ₹250
+- Margin Used: ₹5
+- Remaining Balance: ₹94.995
+- Stop Loss Level: ₹39,90,000 (5% below entry)
+- Take Profit Level: ₹46,20,000 (10% above entry)
+- Emergency Close: Will trigger at 95% margin usage
+- Risk Management: Conservative thresholds applied
 ```
 
-### Example 2: Position Exit with Profit
+### Example 2: BTC Long Position (Large Balance - Normal Mode)
+```
+Signal: BUY BTCUSD
+Price: $50,000 (₹42,00,000)
+Account Balance: ₹10,000
+Risk per Trade: 20% (Normal Mode) = ₹2,000
+Leverage: 50x
+
+Calculations:
+1. Balance per Trade: ₹10,000 * 0.20 = ₹2,000 (Normal Mode)
+2. Position Value: ₹2,000 * 50 = ₹1,00,000
+3. Quantity: ₹1,00,000 / ₹42,00,000 = 0.00238 BTC
+4. Margin Required: ₹2,000
+5. Trading Fee: ₹2,000 * 0.001 = ₹2
+6. Total Cost: ₹2,000 + ₹2 = ₹2,002
+
+Position Details:
+- Leveraged Exposure: ₹1,00,000
+- Margin Used: ₹2,000
+- Remaining Balance: ₹7,998
+- Stop Loss Level: ₹39,90,000 (5% below entry)
+- Take Profit Level: ₹46,20,000 (10% above entry)
+```
+
+### Example 3: Emergency Close Scenarios (Configurable)
+
+#### Scenario A: Margin Usage Emergency Close
+```
+Account Balance: ₹100
+Position: LONG BTC (₹5 margin, 50x leverage)
+Current Position Value: ₹250
+Emergency Close Threshold: 95% margin usage (configurable)
+
+Trigger Condition:
+- Margin Usage = (₹5 / ₹100) * 100 = 5%
+- If BTC drops significantly and margin usage reaches 95%
+- System automatically closes position to prevent liquidation
+
+Configuration (in .env):
+EMERGENCY_CLOSE_MARGIN_PCT=95.0  # Can be adjusted
+```
+
+#### Scenario B: Loss Percentage Emergency Close
+```
+Account Balance: ₹100
+Position: LONG BTC (₹5 margin)
+Entry Price: ₹42,00,000
+Emergency Close Loss: 15% (configurable)
+
+Trigger Condition:
+- Current Loss = 15% of position value
+- If BTC drops to ₹35,70,000 (15% drop)
+- Position automatically closed
+
+Configuration (in .env):
+EMERGENCY_CLOSE_LOSS_PCT=15.0  # Can be adjusted
+```
+
+#### Scenario C: Time-Based Emergency Close
+```
+Position held for: 48 hours (configurable)
+Maximum holding time: 48 hours
+
+Trigger Condition:
+- Position held longer than configured time limit
+- Automatic closure regardless of PnL
+
+Configuration (in .env):
+EMERGENCY_CLOSE_TIME_HOURS=48.0  # Can be adjusted
+```
+
+### Example 4: Risk Level Thresholds (All Configurable)
+
+#### Low Risk (Green Zone)
+```
+Margin Usage: <70%
+Loss: <5%
+Holding Time: <12 hours
+Action: Monitor only
+```
+
+#### Medium Risk (Yellow Zone)
+```
+Margin Usage: 70-80%
+Loss: 5-8%
+Holding Time: 12-24 hours
+Action: Close monitoring, consider profit taking
+```
+
+#### High Risk (Orange Zone)
+```
+Margin Usage: 80-90%
+Loss: 8-12%
+Holding Time: 24-36 hours
+Action: Tighten stop-loss, consider position reduction
+```
+
+#### Critical Risk (Red Zone)
+```
+Margin Usage: 90-95%
+Loss: 12-15%
+Holding Time: 36-48 hours
+Action: Close position or reduce size
+```
+
+#### Emergency Close (Black Zone)
+```
+Margin Usage: >95%
+Loss: >15%
+Holding Time: >48 hours
+Action: Immediate position closure
+```
+
+### Example 5: Position Exit with Profit
 ```
 Entry: $50,000 (LONG 0.08 BTC)
 Exit: $52,000 (4% price increase)

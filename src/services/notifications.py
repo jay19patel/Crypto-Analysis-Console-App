@@ -180,10 +180,10 @@ class EmailNotifier:
             await self._log_notification_to_db(event, "skipped", f"Event type {event.type.value} disabled")
             return False
 
-        # Check for duplicate emails (especially for trade execution)
-        if event.trade_id and self._is_duplicate_email(event):
-            self.logger.info(f"Duplicate email prevented for trade {event.trade_id}")
-            await self._log_notification_to_db(event, "skipped", "Duplicate email prevented")
+        # Check for duplicate emails (for trade execution and risk alerts)
+        if self._is_duplicate_notification(event):
+            self.logger.info(f"Duplicate/throttled notification prevented: {event.title}")
+            await self._log_notification_to_db(event, "skipped", "Duplicate notification prevented")
             return False
 
         subject = self._create_email_subject(event)
@@ -197,9 +197,8 @@ class EmailNotifier:
             sent = await self.send_email(subject, body)
             if sent:
                 status = "sent"
-                # Mark email as sent for deduplication
-                if event.trade_id:
-                    self._mark_email_sent(event)
+                # Mark email as sent for deduplication/throttling
+                self._mark_notification_sent(event)
                 self.logger.info(f"Notification email sent successfully: {event.title}")
             else:
                 error = "Email sending failed"
@@ -266,27 +265,51 @@ class EmailNotifier:
             NotificationType.SYSTEM_SHUTDOWN
         ]
     
-    def _is_duplicate_email(self, event: NotificationEvent) -> bool:
-        """Check if this email was already sent recently"""
-        if not event.trade_id:
-            return False
-            
+    def _is_duplicate_notification(self, event: NotificationEvent) -> bool:
+        """Check if this notification was already sent recently (supports throttling)"""
+        
         # Clean old entries
         current_time = time.time()
         self._sent_emails = {
-            trade_id: timestamp for trade_id, timestamp in self._sent_emails.items()
+            key: timestamp for key, timestamp in self._sent_emails.items()
             if current_time - timestamp < self._cache_timeout
         }
         
-        # Check if this trade_id was already sent
-        cache_key = f"{event.type.value}_{event.trade_id}"
-        return cache_key in self._sent_emails
-    
-    def _mark_email_sent(self, event: NotificationEvent):
-        """Mark this email as sent in the deduplication cache"""
+        # For trade executions, use trade_id for strict deduplication
         if event.trade_id:
             cache_key = f"{event.type.value}_{event.trade_id}"
-            self._sent_emails[cache_key] = time.time()
+            return cache_key in self._sent_emails
+        
+        # For risk alerts, use symbol + alert type for throttling (10 minutes)
+        if event.type == NotificationType.RISK_ALERT:
+            risk_throttle_window = 600  # 10 minutes for risk alerts
+            symbol = event.symbol or "PORTFOLIO"
+            alert_type = event.data.get("alert_type", "Risk Alert")
+            cache_key = f"risk_{symbol}_{alert_type}"
+            
+            # Check if this specific risk alert was sent recently
+            if cache_key in self._sent_emails:
+                time_since_last = current_time - self._sent_emails[cache_key]
+                return time_since_last < risk_throttle_window
+        
+        # For other notifications, no throttling by default
+        return False
+    
+    def _mark_notification_sent(self, event: NotificationEvent):
+        """Mark this notification as sent in the cache"""
+        current_time = time.time()
+        
+        # For trade executions
+        if event.trade_id:
+            cache_key = f"{event.type.value}_{event.trade_id}"
+            self._sent_emails[cache_key] = current_time
+        
+        # For risk alerts
+        elif event.type == NotificationType.RISK_ALERT:
+            symbol = event.symbol or "PORTFOLIO"
+            alert_type = event.data.get("alert_type", "Risk Alert")
+            cache_key = f"risk_{symbol}_{alert_type}"
+            self._sent_emails[cache_key] = current_time
     
     def _create_email_subject(self, event: NotificationEvent) -> str:
         """Create email subject line"""
@@ -309,14 +332,69 @@ class EmailNotifier:
             
             # Use EmailFormatter for specific notification types
             if event.type == NotificationType.TRADE_EXECUTION:
-                trade_data = event.data.get("trade_execution_data")
-                if trade_data:
+                trade_data_dict = event.data.get("trade_execution_data")
+                if trade_data_dict:
+                    # Reconstruct TradeExecutionData object from dictionary
+                    if isinstance(trade_data_dict, dict):
+                        trade_data = TradeExecutionData(
+                            symbol=trade_data_dict.get("symbol", ""),
+                            signal=trade_data_dict.get("signal", ""),
+                            price=trade_data_dict.get("price", 0.0),
+                            quantity=trade_data_dict.get("quantity", 0.0),
+                            leverage=trade_data_dict.get("leverage", 1.0),
+                            margin_used=trade_data_dict.get("margin_used", 0.0),
+                            capital_remaining=trade_data_dict.get("capital_remaining", 0.0),
+                            investment_amount=trade_data_dict.get("investment_amount", 0.0),
+                            leveraged_amount=trade_data_dict.get("leveraged_amount", 0.0),
+                            trade_id=trade_data_dict.get("trade_id", ""),
+                            position_id=trade_data_dict.get("position_id", ""),
+                            strategy_name=trade_data_dict.get("strategy_name", ""),
+                            confidence=trade_data_dict.get("confidence", 100.0),
+                            trading_fee=trade_data_dict.get("trading_fee", 0.0),
+                            timestamp=datetime.fromisoformat(trade_data_dict.get("timestamp")) if trade_data_dict.get("timestamp") else datetime.now(timezone.utc),
+                            account_balance_before=trade_data_dict.get("account_balance_before", 0.0),
+                            account_balance_after=trade_data_dict.get("account_balance_after", 0.0)
+                        )
+                    else:
+                        trade_data = trade_data_dict  # Already a TradeExecutionData object
+                    
                     _, email_body = self.email_formatter.format_trade_execution_email(trade_data)
                     return email_body
             
             elif event.type == NotificationType.POSITION_CLOSE:
-                exit_data = event.data.get("position_exit_data")
-                if exit_data:
+                exit_data_dict = event.data.get("position_exit_data")
+                if exit_data_dict:
+                    # Reconstruct PositionExitData object from dictionary
+                    if isinstance(exit_data_dict, dict):
+                        exit_data = PositionExitData(
+                            symbol=exit_data_dict.get("symbol", ""),
+                            position_type=exit_data_dict.get("position_type", ""),
+                            entry_price=exit_data_dict.get("entry_price", 0.0),
+                            exit_price=exit_data_dict.get("exit_price", 0.0),
+                            quantity=exit_data_dict.get("quantity", 0.0),
+                            leverage=exit_data_dict.get("leverage", 1.0),
+                            pnl=exit_data_dict.get("pnl", 0.0),
+                            pnl_percentage=exit_data_dict.get("pnl_percentage", 0.0),
+                            investment_amount=exit_data_dict.get("investment_amount", 0.0),
+                            leveraged_amount=exit_data_dict.get("leveraged_amount", 0.0),
+                            margin_used=exit_data_dict.get("margin_used", 0.0),
+                            trading_fee=exit_data_dict.get("trading_fee", 0.0),
+                            exit_fee=exit_data_dict.get("exit_fee", 0.0),
+                            total_fees=exit_data_dict.get("total_fees", 0.0),
+                            position_id=exit_data_dict.get("position_id", ""),
+                            trade_duration=exit_data_dict.get("trade_duration", ""),
+                            exit_reason=exit_data_dict.get("exit_reason", ""),
+                            account_balance_before=exit_data_dict.get("account_balance_before", 0.0),
+                            account_balance_after=exit_data_dict.get("account_balance_after", 0.0),
+                            account_growth=exit_data_dict.get("account_growth", 0.0),
+                            account_growth_percentage=exit_data_dict.get("account_growth_percentage", 0.0),
+                            total_portfolio_pnl=exit_data_dict.get("total_portfolio_pnl", 0.0),
+                            win_rate=exit_data_dict.get("win_rate", 0.0),
+                            timestamp=datetime.fromisoformat(exit_data_dict.get("timestamp")) if exit_data_dict.get("timestamp") else datetime.now(timezone.utc)
+                        )
+                    else:
+                        exit_data = exit_data_dict  # Already a PositionExitData object
+                        
                     _, email_body = self.email_formatter.format_position_exit_email(exit_data)
                     return email_body
             
@@ -847,7 +925,7 @@ class NotificationManager:
             pnl=pnl,
             user_id=user_id,
             data={
-                "trade_execution_data": trade_data,
+                "trade_execution_data": trade_data.to_dict() if hasattr(trade_data, 'to_dict') else trade_data,
                 "signal": signal,
                 "execution_price": price,
                 "quantity": quantity,
@@ -918,7 +996,7 @@ class NotificationManager:
             pnl=pnl,
             user_id=user_id,
             data={
-                "position_exit_data": exit_data,
+                "position_exit_data": exit_data.to_dict() if hasattr(exit_data, 'to_dict') else exit_data,
                 "exit_price": exit_price,
                 "pnl": pnl,
                 "pnl_percentage": pnl_percentage,

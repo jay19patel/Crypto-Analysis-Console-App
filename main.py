@@ -9,7 +9,7 @@ Features:
 
 Usage:
     python main.py                          # Start trading system (INFO level)
-    python main.py --new                    # Start with fresh data
+    python main.py --new                    # Complete cleanup (data, logs, cache)
     python main.py --liveSave               # Enable live price saving
     python main.py --websocket-port 8765    # Custom WebSocket port
     python main.py --log-level DEBUG        # Debug mode with detailed logs
@@ -113,7 +113,7 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
     python main.py                          # Start with default settings (INFO level)
-    python main.py --new                    # Fresh start (delete all data)
+    python main.py --new                    # Complete cleanup (data, logs, cache)
     python main.py --liveSave               # Enable live price saving
     python main.py --websocket-port 8080    # Use port 8080 for WebSocket
     python main.py --log-level DEBUG        # Enable debug logging with file save
@@ -126,7 +126,7 @@ Examples:
     parser.add_argument(
         "--new", 
         action="store_true", 
-        help="Delete all trading data from database and start fresh"
+        help="Complete cleanup: Delete all trading data, logs, cache files and start fresh"
     )
     
     parser.add_argument(
@@ -400,14 +400,15 @@ async def main():
         shutdown_handler = GracefulShutdownHandler(trading_system)
         shutdown_handler.setup_signal_handlers()
         
-        # Handle --new flag (delete all data)
+        # Handle --new flag (complete cleanup)
         if args.new:
-            logger.info("🗑️ Deleting all trading data (--new flag)...")
-            deletion_success = await trading_system.delete_all_data()
-            if deletion_success:
-                logger.info("✅ Data deletion completed successfully")
+            logger.info("🗑️ Starting complete cleanup (--new flag)...")
+            logger.info("   This will clear: Database, Logs, Cache files, Python cache")
+            cleanup_success = await trading_system.delete_all_data()
+            if cleanup_success:
+                logger.info("✅ Complete cleanup completed successfully")
             else:
-                logger.error("❌ Data deletion failed")
+                logger.error("❌ Complete cleanup failed")
                 return 1
         
         # Start the trading system

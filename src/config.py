@@ -24,10 +24,33 @@ class Settings(BaseSettings):
     DAILY_TRADES_LIMIT: int = Field(default=50)
     MIN_CONFIDENCE: float = Field(default=50.0)
     
-    # Risk Management
+    # Risk Management - Basic Settings
     STOP_LOSS_PCT: float = Field(default=0.05)  # 5% stop loss
     TARGET_PCT: float = Field(default=0.10)     # 10% target
-    LIQUIDATION_BUFFER_PCT: float = Field(default=0.10)  # 10% buffer from liquidation
+    LIQUIDATION_BUFFER_PCT: float = Field(default=0.30)  # 30% buffer from liquidation for safety
+    
+    # Emergency Close Risk Thresholds (Configurable)
+    EMERGENCY_CLOSE_MARGIN_PCT: float = Field(default=95.0)  # Emergency close at 95% margin usage
+    EMERGENCY_CLOSE_LOSS_PCT: float = Field(default=15.0)    # Emergency close at 15% loss 
+    EMERGENCY_CLOSE_TIME_HOURS: float = Field(default=48.0)  # Emergency close after 48 hours
+    
+    # Risk Level Thresholds
+    CRITICAL_RISK_MARGIN_PCT: float = Field(default=90.0)    # Critical risk at 90% margin
+    CRITICAL_RISK_LOSS_PCT: float = Field(default=12.0)      # Critical risk at 12% loss
+    CRITICAL_RISK_TIME_HOURS: float = Field(default=36.0)    # Critical risk after 36 hours
+    
+    HIGH_RISK_MARGIN_PCT: float = Field(default=80.0)        # High risk at 80% margin
+    HIGH_RISK_LOSS_PCT: float = Field(default=8.0)           # High risk at 8% loss
+    HIGH_RISK_TIME_HOURS: float = Field(default=24.0)        # High risk after 24 hours
+    
+    MEDIUM_RISK_MARGIN_PCT: float = Field(default=70.0)      # Medium risk at 70% margin
+    MEDIUM_RISK_LOSS_PCT: float = Field(default=5.0)         # Medium risk at 5% loss
+    MEDIUM_RISK_TIME_HOURS: float = Field(default=12.0)      # Medium risk after 12 hours
+    
+    # Safe Position Sizing for Small Balance
+    SAFE_BALANCE_PER_TRADE_PCT: float = Field(default=0.05)  # 5% of balance per trade for safety
+    MAX_POSITIONS_OPEN: int = Field(default=3)               # Max 3 positions open simultaneously
+    MAX_PORTFOLIO_RISK_PCT: float = Field(default=15.0)      # Maximum portfolio risk percentage
     
     # Trading Fee Settings
     TRADING_FEE_PCT: float = Field(default=0.001)  # 0.1% of margin
@@ -84,7 +107,8 @@ def get_trading_config() -> dict:
     settings = get_settings()
     return {
         "initial_balance": settings.INITIAL_BALANCE,
-        "balance_per_trade_pct": settings.BALANCE_PER_TRADE_PCT,  # 20% per trade
+        "balance_per_trade_pct": settings.BALANCE_PER_TRADE_PCT,  # 20% per trade (normal)
+        "safe_balance_per_trade_pct": settings.SAFE_BALANCE_PER_TRADE_PCT,  # 5% per trade (safe mode)
         "default_leverage": settings.DEFAULT_LEVERAGE,  # 50x leverage
         "max_leverage": settings.MAX_LEVERAGE,
         "daily_trades_limit": settings.DAILY_TRADES_LIMIT,
@@ -93,7 +117,28 @@ def get_trading_config() -> dict:
         "target_pct": settings.TARGET_PCT,
         "liquidation_buffer_pct": settings.LIQUIDATION_BUFFER_PCT,  # Liquidation safety buffer
         "trading_fee_pct": settings.TRADING_FEE_PCT,
-        "exit_fee_multiplier": settings.EXIT_FEE_MULTIPLIER
+        "exit_fee_multiplier": settings.EXIT_FEE_MULTIPLIER,
+        "max_positions_open": settings.MAX_POSITIONS_OPEN,
+        
+        # Emergency Close Thresholds
+        "emergency_close_margin_pct": settings.EMERGENCY_CLOSE_MARGIN_PCT,
+        "emergency_close_loss_pct": settings.EMERGENCY_CLOSE_LOSS_PCT,
+        "emergency_close_time_hours": settings.EMERGENCY_CLOSE_TIME_HOURS,
+        
+        # Risk Level Thresholds
+        "critical_risk_margin_pct": settings.CRITICAL_RISK_MARGIN_PCT,
+        "critical_risk_loss_pct": settings.CRITICAL_RISK_LOSS_PCT,
+        "critical_risk_time_hours": settings.CRITICAL_RISK_TIME_HOURS,
+        
+        "high_risk_margin_pct": settings.HIGH_RISK_MARGIN_PCT,
+        "high_risk_loss_pct": settings.HIGH_RISK_LOSS_PCT,
+        "high_risk_time_hours": settings.HIGH_RISK_TIME_HOURS,
+        
+        "medium_risk_margin_pct": settings.MEDIUM_RISK_MARGIN_PCT,
+        "medium_risk_loss_pct": settings.MEDIUM_RISK_LOSS_PCT,
+        "medium_risk_time_hours": settings.MEDIUM_RISK_TIME_HOURS,
+        
+        "max_portfolio_risk_pct": settings.MAX_PORTFOLIO_RISK_PCT
     }
 
 

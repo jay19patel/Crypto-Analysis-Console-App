@@ -104,6 +104,9 @@ class TradingSystem:
             self.notification_manager = NotificationManager(email_enabled=email_enabled)
             self.strategy_manager = StrategyManager(max_workers=4)
             
+            # Assign notification manager to broker for position close emails
+            self.broker.notification_manager = self.notification_manager
+            
             # WebSocket server for real-time data broadcasting
             self.websocket_server = get_websocket_server()
             self.websocket_server.port = websocket_port
@@ -1181,26 +1184,83 @@ class TradingSystem:
                     "warning"
                 )
             
-            # Analyze portfolio risk
+            # Smart portfolio risk analysis with change detection
             portfolio_risk = await self.risk_manager.analyze_portfolio_risk_async()
             
-            if portfolio_risk.get("overall_risk_level") in ["high", "critical"]:
+            # Only send alerts if risk level changed or is critical
+            current_risk_level = portfolio_risk.get("overall_risk_level", "unknown")
+            previous_risk_level = getattr(self, '_last_portfolio_risk_level', "unknown")
+            
+            # Send alert only if:
+            # 1. Risk level changed from previous check
+            # 2. Risk is critical (always alert for critical)
+            # 3. This is the first check (previous is unknown)
+            should_alert = (
+                current_risk_level != previous_risk_level or
+                current_risk_level == "critical" or
+                previous_risk_level == "unknown"
+            )
+            
+            if should_alert and current_risk_level in ["high", "critical"]:
+                # Determine alert type based on specific risk factors
+                alert_type = self._determine_portfolio_alert_type(portfolio_risk)
+                
                 await self.notification_manager.notify_risk_alert(
                     symbol="PORTFOLIO",
-                    alert_type="High Portfolio Risk",
+                    alert_type=alert_type,
                     current_price=0.0,
-                    risk_level=portfolio_risk.get("overall_risk_level", "unknown")
+                    risk_level=current_risk_level
                 )
+                
+                # Log the risk level change
+                if current_risk_level != previous_risk_level:
+                    self.logger.warning(f"📊 Portfolio risk level changed: {previous_risk_level} → {current_risk_level}")
+                    self.logger.info(f"📈 Portfolio details: Margin usage: {portfolio_risk.get('portfolio_margin_usage', 0):.1f}%, PnL: {portfolio_risk.get('portfolio_pnl_percentage', 0):.1f}%")
                 
                 await self.websocket_server.broadcast_notification(
                     "portfolio_risk",
-                    f"Portfolio risk level: {portfolio_risk.get('overall_risk_level')}",
-                    "error"
+                    f"Portfolio risk: {current_risk_level} ({portfolio_risk.get('portfolio_margin_usage', 0):.1f}% margin usage)",
+                    "error" if current_risk_level == "critical" else "warning"
                 )
+            
+            # Store current risk level for next comparison
+            self._last_portfolio_risk_level = current_risk_level
                         
         except Exception as e:
             self.logger.error(f"❌ Error updating risk management: {e}")
             self._record_error(str(e))
+    
+    def _determine_portfolio_alert_type(self, portfolio_risk: Dict[str, Any]) -> str:
+        """Determine specific alert type based on portfolio risk factors"""
+        try:
+            margin_usage = portfolio_risk.get("portfolio_margin_usage", 0)
+            pnl_percentage = portfolio_risk.get("portfolio_pnl_percentage", 0)
+            risk_level = portfolio_risk.get("overall_risk_level", "unknown")
+            
+            # Critical alerts
+            if risk_level == "critical":
+                if margin_usage > 90:
+                    return "Critical Margin Usage"
+                elif pnl_percentage < -15:
+                    return "Critical Portfolio Loss"
+                else:
+                    return "Critical Portfolio Risk"
+            
+            # High risk alerts  
+            elif risk_level == "high":
+                if margin_usage > 75:
+                    return "High Margin Usage"
+                elif pnl_percentage < -10:
+                    return "High Portfolio Loss"
+                else:
+                    return "High Portfolio Risk"
+            
+            # Default
+            return "Portfolio Risk Alert"
+            
+        except Exception as e:
+            self.logger.error(f"Error determining portfolio alert type: {e}")
+            return "Portfolio Risk Alert"
 
     async def _log_system_summary(self):
         """Log comprehensive system summary with performance metrics"""
@@ -1245,38 +1305,137 @@ class TradingSystem:
             self._record_error(str(e))
 
     async def delete_all_data(self) -> bool:
-        """Delete all trading data with error handling"""
+        """Delete all trading data, logs, cache files with comprehensive cleanup"""
         try:
-            self.logger.info("🗑️ Deleting all trading data...")
-            success = await self.broker.delete_all_data()
+            self.logger.info("🗑️ Starting comprehensive data cleanup...")
             
-            if success:
-                self.logger.info("✅ All trading data deleted successfully")
-                
-                # Reset statistics
-                self._stats.update({
-                    "trades_executed": 0,
-                    "trades_successful": 0,
-                    "trades_failed": 0,
-                    "total_pnl": 0.0,
-                    "signals_generated": 0
-                })
+            # Step 1: Delete database data
+            self.logger.info("🗑️ Deleting database records...")
+            db_success = await self.broker.delete_all_data()
+            
+            if not db_success:
+                self.logger.error("❌ Failed to delete database data")
+                return False
+            
+            # Step 2: Clear logs directory
+            self.logger.info("🗑️ Clearing logs directory...")
+            logs_cleared = self._clear_directory("logs", "log files")
+            
+            # Step 3: Clear cache directory  
+            self.logger.info("🗑️ Clearing cache directory...")
+            cache_cleared = self._clear_directory("cache", "cache files")
+            
+            # Step 4: Clear Python cache files
+            self.logger.info("🗑️ Clearing Python cache files...")
+            pycache_cleared = self._clear_pycache_files()
+            
+            # Step 5: Reset in-memory statistics
+            self._stats.update({
+                "trades_executed": 0,
+                "trades_successful": 0,
+                "trades_failed": 0,
+                "total_pnl": 0.0,
+                "signals_generated": 0
+            })
+            
+            # Summary of cleanup
+            cleanup_summary = {
+                "database": "✅" if db_success else "❌",
+                "logs": "✅" if logs_cleared else "❌", 
+                "cache": "✅" if cache_cleared else "❌",
+                "pycache": "✅" if pycache_cleared else "❌"
+            }
+            
+            all_success = all([db_success, logs_cleared, cache_cleared, pycache_cleared])
+            
+            if all_success:
+                self.logger.info("✅ Complete cleanup successful:")
+                for component, status in cleanup_summary.items():
+                    self.logger.info(f"   {status} {component.capitalize()} cleanup")
                 
                 # Broadcast deletion notification
                 await self.websocket_server.broadcast_notification(
-                    "data_deleted",
-                    "All trading data has been deleted",
+                    "complete_cleanup",
+                    "All data, logs, and cache files have been cleared",
                     "info"
                 )
-                
                 return True
             else:
-                self.logger.error("❌ Failed to delete trading data")
+                self.logger.warning("⚠️ Partial cleanup completed:")
+                for component, status in cleanup_summary.items():
+                    self.logger.warning(f"   {status} {component.capitalize()} cleanup")
                 return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Error deleting data: {e}")
-            self._record_error(str(e))
+            self.logger.error(f"❌ Error during complete cleanup: {e}")
+            return False
+    
+    def _clear_directory(self, directory_path: str, description: str) -> bool:
+        """Clear all files in a directory"""
+        try:
+            import shutil
+            import os
+            
+            if os.path.exists(directory_path):
+                # Remove all contents but keep the directory
+                for filename in os.listdir(directory_path):
+                    file_path = os.path.join(directory_path, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                        elif os.path.isdir(file_path):
+                            shutil.rmtree(file_path)
+                    except Exception as e:
+                        self.logger.error(f"❌ Failed to delete {file_path}: {e}")
+                
+                self.logger.info(f"✅ Cleared {description} from {directory_path}/")
+                return True
+            else:
+                self.logger.info(f"⚠️ Directory {directory_path} does not exist")
+                return True  # Consider as success if directory doesn't exist
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to clear {description}: {e}")
+            return False
+    
+    def _clear_pycache_files(self) -> bool:
+        """Clear Python cache files recursively"""
+        try:
+            import shutil
+            import os
+            
+            cache_dirs_removed = 0
+            
+            # Walk through all directories and remove __pycache__ folders
+            for root, dirs, files in os.walk('.'):
+                if '__pycache__' in dirs:
+                    pycache_path = os.path.join(root, '__pycache__')
+                    try:
+                        shutil.rmtree(pycache_path)
+                        cache_dirs_removed += 1
+                        self.logger.debug(f"   Removed: {pycache_path}")
+                    except Exception as e:
+                        self.logger.error(f"❌ Failed to remove {pycache_path}: {e}")
+                        
+                # Also remove .pyc files
+                for file in files:
+                    if file.endswith('.pyc'):
+                        pyc_path = os.path.join(root, file)
+                        try:
+                            os.unlink(pyc_path)
+                            self.logger.debug(f"   Removed: {pyc_path}")
+                        except Exception as e:
+                            self.logger.error(f"❌ Failed to remove {pyc_path}: {e}")
+            
+            if cache_dirs_removed > 0:
+                self.logger.info(f"✅ Removed {cache_dirs_removed} __pycache__ directories")
+            else:
+                self.logger.info("✅ No Python cache files found to remove")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to clear Python cache files: {e}")
             return False
 
     async def run_main_loop(self):

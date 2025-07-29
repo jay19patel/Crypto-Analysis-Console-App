@@ -128,10 +128,11 @@ class AsyncRiskManager:
             
             holding_time_hours = (datetime.now(timezone.utc) - entry_time).total_seconds() / 3600
             
-            # Calculate margin usage
+            # Calculate margin usage with account balance context
             margin_usage = 0.0
             if position.leverage > 1 and position.margin_used > 0:
-                margin_usage = position.calculate_margin_usage(current_price)
+                account_balance = self.broker.account.current_balance if self.broker.account else 1000.0
+                margin_usage = position.calculate_margin_usage(current_price, account_balance)
             
             # Calculate distances from stop loss and target
             distance_from_sl = 0.0
@@ -266,26 +267,75 @@ class AsyncRiskManager:
             return False
     
     async def analyze_portfolio_risk_async(self) -> Dict[str, Any]:
-        """Analyze overall portfolio risk asynchronously"""
+        """Analyze overall portfolio risk with proper risk calculation logic"""
         try:
             if not self.broker.positions:
-                return {"status": "no_positions", "risk_level": "low"}
+                return {"status": "no_positions", "overall_risk_level": "low"}
             
-            # Collect all position risks
+            if not self.broker.account:
+                return {"status": "error", "error": "No account available"}
+            
+            account_balance = self.broker.account.current_balance
+            if account_balance <= 0:
+                return {"status": "error", "error": "Invalid account balance"}
+            
+            # Get open positions only
+            open_positions = [pos for pos in self.broker.positions.values() if pos.status.value == "OPEN"]
+            
+            if not open_positions:
+                return {"status": "no_open_positions", "overall_risk_level": "low"}
+            
+            # Calculate portfolio metrics properly
             position_risks = []
-            total_risk_value = 0.0
-            total_portfolio_value = self.broker.account.current_balance if self.broker.account else 0.0
+            total_margin_used = 0.0
+            total_unrealized_pnl = 0.0
+            critical_positions = 0
+            high_risk_positions = 0
             
-            for position in self.broker.positions.values():
+            for position in open_positions:
+                # Get current price
+                current_price = 0.0
                 if position.symbol in self.broker._price_cache:
                     current_price = self.broker._price_cache[position.symbol].get("price", 0.0)
-                    if current_price > 0:
-                        risk_metrics = await self.analyze_position_risk_async(position, current_price)
-                        position_risks.append(risk_metrics)
-                        total_risk_value += position.invested_amount
+                
+                if current_price <= 0:
+                    continue  # Skip positions without valid price data
+                
+                # Update position PnL with current price
+                position.calculate_pnl(current_price)
+                
+                # Get risk metrics for this position
+                risk_metrics = await self.analyze_position_risk_async(position, current_price)
+                position_risks.append(risk_metrics)
+                
+                # Accumulate portfolio totals
+                total_margin_used += position.margin_used
+                total_unrealized_pnl += position.pnl
+                
+                # Count high-risk positions
+                if risk_metrics.risk_level == RiskLevel.CRITICAL:
+                    critical_positions += 1
+                elif risk_metrics.risk_level == RiskLevel.HIGH:
+                    high_risk_positions += 1
             
-            # Calculate portfolio metrics
-            portfolio_risk_percentage = (total_risk_value / total_portfolio_value * 100) if total_portfolio_value > 0 else 0
+            # Calculate portfolio risk percentage (margin used as % of account balance)
+            portfolio_margin_usage = (total_margin_used / account_balance) * 100 if account_balance > 0 else 0
+            
+            # Calculate portfolio PnL percentage
+            portfolio_pnl_percentage = (total_unrealized_pnl / account_balance) * 100 if account_balance > 0 else 0
+            
+            # Calculate total portfolio value (balance + unrealized PnL)
+            total_portfolio_value = account_balance + total_unrealized_pnl
+            
+            # Portfolio return percentage from initial balance
+            initial_balance = self.broker.account.initial_balance
+            portfolio_return_pct = ((total_portfolio_value - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
+            
+            # Smart portfolio risk level determination
+            overall_risk = self._determine_portfolio_risk_level(
+                portfolio_margin_usage, portfolio_pnl_percentage, portfolio_return_pct,
+                critical_positions, high_risk_positions, len(open_positions)
+            )
             
             # Count positions by risk level
             risk_distribution = {
@@ -295,32 +345,30 @@ class AsyncRiskManager:
                 "critical": len([r for r in position_risks if r.risk_level == RiskLevel.CRITICAL])
             }
             
-            # Determine overall portfolio risk
-            if risk_distribution["critical"] > 0:
-                overall_risk = RiskLevel.CRITICAL
-            elif risk_distribution["high"] > 2 or portfolio_risk_percentage > 12:
-                overall_risk = RiskLevel.HIGH
-            elif risk_distribution["high"] > 0 or portfolio_risk_percentage > 8:
-                overall_risk = RiskLevel.MEDIUM
-            else:
-                overall_risk = RiskLevel.LOW
-            
-            # Generate recommendations
+            # Generate smart recommendations
             recommendations = self._generate_portfolio_recommendations(
-                overall_risk, risk_distribution, portfolio_risk_percentage
+                overall_risk, risk_distribution, portfolio_margin_usage, portfolio_pnl_percentage
             )
             
             return {
                 "status": "analyzed",
                 "overall_risk_level": overall_risk.value,
-                "portfolio_risk_percentage": portfolio_risk_percentage,
+                "portfolio_margin_usage": portfolio_margin_usage,
+                "portfolio_pnl_percentage": portfolio_pnl_percentage,
+                "portfolio_return_percentage": portfolio_return_pct,
+                "total_margin_used": total_margin_used,
+                "total_unrealized_pnl": total_unrealized_pnl,
+                "account_balance": account_balance,
+                "total_portfolio_value": total_portfolio_value,
                 "total_positions": len(position_risks),
+                "open_positions": len(open_positions),
                 "risk_distribution": risk_distribution,
                 "position_risks": [
                     {
                         "symbol": r.symbol,
                         "risk_level": r.risk_level.value,
                         "pnl_percentage": r.pnl_percentage,
+                        "margin_usage": r.margin_usage,
                         "recommendation": r.recommendation.value,
                         "risk_score": r.risk_score
                     } for r in position_risks
@@ -331,7 +379,7 @@ class AsyncRiskManager:
             
         except Exception as e:
             self.logger.error(f"Portfolio risk analysis failed: {e}")
-            return {"status": "error", "error": str(e)}
+            return {"status": "error", "error": str(e), "overall_risk_level": "unknown"}
     
     async def calculate_safe_quantity_async(self, symbol: str, price: float, requested_quantity: float, leverage: float = None) -> Tuple[float, str]:
         """Calculate safe quantity with proper position sizing and liquidation protection"""
@@ -344,6 +392,13 @@ class AsyncRiskManager:
                 if pos.symbol == symbol and pos.status.value == "OPEN":
                     return 0.0, f"Position already open for {symbol} ({pos.position_type.value}, qty={pos.quantity}, entry=₹{pos.entry_price:.2f})"
             
+            # Step 1.5: Check maximum open positions limit
+            open_positions_count = len([pos for pos in self.broker.positions.values() if pos.status.value == "OPEN"])
+            max_positions = self.trading_config.get("max_positions_open", 3)
+            
+            if open_positions_count >= max_positions:
+                return 0.0, f"Maximum open positions limit reached ({open_positions_count}/{max_positions}). Close some positions first."
+            
             # Step 2: Get current available balance
             available_balance = self.broker.account.current_balance
             if available_balance <= 0:
@@ -353,8 +408,17 @@ class AsyncRiskManager:
             if leverage is None:
                 leverage = self.trading_config.get("default_leverage", 50.0)
             
-            # Step 4: Calculate position sizing (% of balance)
-            balance_per_trade_pct = self.trading_config.get("balance_per_trade_pct", 0.20)  # 20%
+            # Step 4: Calculate position sizing (% of balance) - Use safe mode for small balances
+            # Use safe mode if balance is small or if configured
+            use_safe_mode = available_balance <= 1000  # Use safe mode for balances <= 1000
+            
+            if use_safe_mode:
+                balance_per_trade_pct = self.trading_config.get("safe_balance_per_trade_pct", 0.05)  # 5% safe mode
+                self.logger.info(f"Using SAFE MODE: {balance_per_trade_pct*100}% per trade for balance ₹{available_balance:.2f}")
+            else:
+                balance_per_trade_pct = self.trading_config.get("balance_per_trade_pct", 0.20)  # 20% normal mode
+                self.logger.info(f"Using NORMAL MODE: {balance_per_trade_pct*100}% per trade for balance ₹{available_balance:.2f}")
+            
             margin_to_use = available_balance * balance_per_trade_pct
             
             # Step 5: Calculate position value with leverage
@@ -412,6 +476,8 @@ class AsyncRiskManager:
                 if position.status != PositionStatus.OPEN:
                     continue
                 
+                # No grace period - immediate risk management as requested by user
+                
                 if position.symbol in self.broker._price_cache:
                     current_price = self.broker._price_cache[position.symbol].get("price", 0.0)
                     
@@ -436,7 +502,7 @@ class AsyncRiskManager:
                             actions_taken.append(f"Time Limit: {position.symbol}")
                             continue
                     
-                    # Advanced risk management
+                    # Advanced risk management - only after grace period
                     risk_metrics = await self.analyze_position_risk_async(position, current_price)
                     if await self.execute_risk_action_async(position, risk_metrics, current_price):
                         actions_taken.append(f"Risk Action: {position.symbol}")
@@ -450,25 +516,28 @@ class AsyncRiskManager:
     # Private methods
     def _determine_risk_level(self, margin_usage: float, pnl_percentage: float, 
                             holding_time_hours: float, volatility_score: float) -> RiskLevel:
-        """Determine risk level based on multiple factors - More conservative for algo trading"""
-        # Critical conditions - More tolerant for 50x leverage trading
-        if (margin_usage > 98 or 
-            pnl_percentage < -20 or 
-            holding_time_hours > 168):  # 7 days max holding time
+        """Determine risk level based on configurable thresholds"""
+        # Get configurable thresholds from trading config
+        config = self.trading_config
+        
+        # Critical conditions - Now configurable
+        if (margin_usage > config.get("critical_risk_margin_pct", 90.0) or 
+            pnl_percentage < -config.get("critical_risk_loss_pct", 12.0) or 
+            holding_time_hours > config.get("critical_risk_time_hours", 36.0)):
             return RiskLevel.CRITICAL
         
-        # High risk conditions - Adjusted for high leverage
-        if (margin_usage > 95 or 
-            pnl_percentage < -15 or 
+        # High risk conditions - Now configurable
+        if (margin_usage > config.get("high_risk_margin_pct", 80.0) or 
+            pnl_percentage < -config.get("high_risk_loss_pct", 8.0) or 
             volatility_score > 90 or
-            holding_time_hours > 120):  # 5 days
+            holding_time_hours > config.get("high_risk_time_hours", 24.0)):
             return RiskLevel.HIGH
         
-        # Medium risk conditions - More lenient
-        if (margin_usage > 90 or 
-            pnl_percentage < -10 or 
+        # Medium risk conditions - Now configurable
+        if (margin_usage > config.get("medium_risk_margin_pct", 70.0) or 
+            pnl_percentage < -config.get("medium_risk_loss_pct", 5.0) or 
             volatility_score > 80 or
-            holding_time_hours > 72):  # 3 days
+            holding_time_hours > config.get("medium_risk_time_hours", 12.0)):
             return RiskLevel.MEDIUM
         
         return RiskLevel.LOW
@@ -476,21 +545,29 @@ class AsyncRiskManager:
     def _generate_risk_recommendation(self, position: Position, risk_level: RiskLevel, 
                                     pnl_percentage: float, holding_time_hours: float, 
                                     margin_usage: float) -> RiskAction:
-        """Generate risk management recommendation - Conservative for algo trading"""
+        """Generate risk management recommendation with configurable thresholds"""
+        config = self.trading_config
+        
+        # Check for emergency close conditions first (configurable)
+        if (margin_usage > config.get("emergency_close_margin_pct", 95.0) or
+            pnl_percentage < -config.get("emergency_close_loss_pct", 15.0) or
+            holding_time_hours > config.get("emergency_close_time_hours", 48.0)):
+            return RiskAction.EMERGENCY_CLOSE
+        
         if risk_level == RiskLevel.CRITICAL:
-            if margin_usage > 98:  # Only emergency close at 98%+ margin
-                return RiskAction.EMERGENCY_CLOSE
-            elif pnl_percentage < -20:  # More tolerant loss threshold
+            if pnl_percentage < -config.get("critical_risk_loss_pct", 12.0):
                 return RiskAction.CLOSE_POSITION
-            elif holding_time_hours > 168:  # 7 days
+            elif margin_usage > config.get("critical_risk_margin_pct", 90.0):
+                return RiskAction.CLOSE_POSITION
+            elif holding_time_hours > config.get("critical_risk_time_hours", 36.0):
                 return RiskAction.CLOSE_POSITION
             else:
-                return RiskAction.MONITOR  # Monitor instead of emergency close
+                return RiskAction.MONITOR
         
         elif risk_level == RiskLevel.HIGH:
-            if pnl_percentage < -5:
+            if pnl_percentage < -config.get("high_risk_loss_pct", 8.0):
                 return RiskAction.TIGHTEN_STOP_LOSS
-            elif margin_usage > 80:
+            elif margin_usage > config.get("high_risk_margin_pct", 80.0):
                 return RiskAction.MONITOR
             else:
                 return RiskAction.CLOSE_POSITION
@@ -602,31 +679,90 @@ class AsyncRiskManager:
                 "activated_at": datetime.now(timezone.utc).isoformat()
             }
     
+    def _determine_portfolio_risk_level(self, portfolio_margin_usage: float, portfolio_pnl_percentage: float, 
+                                       portfolio_return_pct: float, critical_positions: int, 
+                                       high_risk_positions: int, total_positions: int) -> RiskLevel:
+        """Smart portfolio risk level determination based on multiple factors"""
+        try:
+            # Critical risk conditions (immediate action needed)
+            if (critical_positions > 0 or 
+                portfolio_margin_usage > 90.0 or 
+                portfolio_pnl_percentage < -15.0 or
+                portfolio_return_pct < -20.0):
+                return RiskLevel.CRITICAL
+            
+            # High risk conditions
+            if (high_risk_positions > 1 or 
+                portfolio_margin_usage > 75.0 or 
+                portfolio_pnl_percentage < -10.0 or
+                portfolio_return_pct < -12.0 or
+                (high_risk_positions > 0 and total_positions <= 2)):
+                return RiskLevel.HIGH
+            
+            # Medium risk conditions
+            if (high_risk_positions > 0 or 
+                portfolio_margin_usage > 50.0 or 
+                portfolio_pnl_percentage < -5.0 or
+                portfolio_return_pct < -8.0):
+                return RiskLevel.MEDIUM
+            
+            # Low risk (healthy portfolio)
+            return RiskLevel.LOW
+            
+        except Exception as e:
+            self.logger.error(f"Error determining portfolio risk level: {e}")
+            return RiskLevel.MEDIUM  # Safe default
+
     def _generate_portfolio_recommendations(self, overall_risk: RiskLevel, 
                                           risk_distribution: Dict, 
-                                          portfolio_risk_percentage: float) -> List[str]:
-        """Generate portfolio-level recommendations"""
+                                          portfolio_margin_usage: float,
+                                          portfolio_pnl_percentage: float) -> List[str]:
+        """Generate smart portfolio-level recommendations"""
         recommendations = []
         
-        if overall_risk == RiskLevel.CRITICAL:
-            recommendations.append("EMERGENCY: Close high-risk positions immediately")
-            recommendations.append("Reduce portfolio exposure below 10%")
-        
-        elif overall_risk == RiskLevel.HIGH:
-            recommendations.append("Reduce position sizes or close some positions")
-            recommendations.append("Tighten stop losses on all positions")
-        
-        elif overall_risk == RiskLevel.MEDIUM:
-            recommendations.append("Monitor positions closely")
-            recommendations.append("Consider taking profits on profitable positions")
-        
-        if portfolio_risk_percentage > self.max_portfolio_risk * 100:
-            recommendations.append(f"Portfolio risk ({portfolio_risk_percentage:.1f}%) exceeds limit")
-        
-        if risk_distribution["critical"] > 0:
-            recommendations.append(f"{risk_distribution['critical']} position(s) need immediate attention")
-        
-        return recommendations
+        try:
+            if overall_risk == RiskLevel.CRITICAL:
+                recommendations.append("🚨 CRITICAL: Immediate action required")
+                if portfolio_margin_usage > 90:
+                    recommendations.append(f"⚠️ Margin usage too high: {portfolio_margin_usage:.1f}% - Close positions immediately")
+                if portfolio_pnl_percentage < -15:
+                    recommendations.append(f"📉 Portfolio loss critical: {portfolio_pnl_percentage:.1f}% - Emergency close")
+                if risk_distribution["critical"] > 0:
+                    recommendations.append(f"🔴 {risk_distribution['critical']} position(s) in critical state")
+            
+            elif overall_risk == RiskLevel.HIGH:
+                recommendations.append("⚠️ HIGH RISK: Consider reducing exposure")
+                if portfolio_margin_usage > 75:
+                    recommendations.append(f"📊 Margin usage high: {portfolio_margin_usage:.1f}% - Reduce position sizes")
+                if portfolio_pnl_percentage < -10:
+                    recommendations.append(f"📉 Portfolio declining: {portfolio_pnl_percentage:.1f}% - Review stop losses")
+                if risk_distribution["high"] > 1:
+                    recommendations.append(f"🟡 {risk_distribution['high']} positions need attention")
+            
+            elif overall_risk == RiskLevel.MEDIUM:
+                recommendations.append("📊 MODERATE RISK: Monitor closely")
+                if portfolio_margin_usage > 50:
+                    recommendations.append(f"📈 Margin usage: {portfolio_margin_usage:.1f}% - Consider taking profits")
+                if portfolio_pnl_percentage < -5:
+                    recommendations.append(f"📉 Portfolio down: {portfolio_pnl_percentage:.1f}% - Review positions")
+            
+            else:  # LOW risk
+                recommendations.append("✅ Portfolio risk is healthy")
+                if portfolio_margin_usage < 30:
+                    recommendations.append("💡 Low margin usage - Opportunity for more positions")
+                if portfolio_pnl_percentage > 5:
+                    recommendations.append("🎯 Good performance - Consider taking partial profits")
+            
+            # General recommendations
+            max_portfolio_margin = self.trading_config.get("max_portfolio_risk_pct", 80.0)
+            if portfolio_margin_usage > max_portfolio_margin:
+                recommendations.append(f"⚡ Margin limit exceeded: {portfolio_margin_usage:.1f}% > {max_portfolio_margin}%")
+            
+            return recommendations
+            
+        except Exception as e:
+            self.logger.error(f"Error generating portfolio recommendations: {e}")
+            return ["⚠️ Unable to generate recommendations - check system logs"]
     
     def _check_stop_loss_hit(self, position: Position, current_price: float) -> bool:
         """Check if stop loss is hit"""

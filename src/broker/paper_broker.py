@@ -244,15 +244,78 @@ class AsyncBroker:
             if not position or position.status != PositionStatus.OPEN:
                 return False
             
+            # Store position data before closing for notification
+            position_data = {
+                "symbol": position.symbol,
+                "position_type": position.position_type.value,
+                "entry_price": position.entry_price,
+                "quantity": position.quantity,
+                "leverage": position.leverage,
+                "investment_amount": position.invested_amount,
+                "leveraged_amount": position.invested_amount * position.leverage,
+                "margin_used": position.margin_used,
+                "account_balance_before": self.account.current_balance,
+                "entry_time": position.entry_time
+            }
+            
             # Close position with dummy data
             success = await self._close_position_simple(position_id, exit_price, reason)
             
             if success:
+                # Calculate exit fees and final PnL
+                exit_fee = position.trading_fee * self.trading_config["exit_fee_multiplier"]
+                total_fees = position.trading_fee + exit_fee
+                
+                # Calculate trade duration
+                duration_seconds = (datetime.now(timezone.utc) - position_data["entry_time"].replace(tzinfo=timezone.utc)).total_seconds()
+                hours = int(duration_seconds // 3600)
+                minutes = int((duration_seconds % 3600) // 60)
+                trade_duration = f"{hours}h {minutes}m"
+                
+                # Calculate account growth
+                account_balance_after = self.account.current_balance
+                account_growth = account_balance_after - position_data["account_balance_before"]
+                account_growth_pct = (account_growth / position_data["account_balance_before"]) * 100 if position_data["account_balance_before"] > 0 else 0
+                
+                # Calculate PnL percentage
+                pnl_percentage = (position.pnl / position_data["margin_used"]) * 100 if position_data["margin_used"] > 0 else 0
+                
                 # Save updated position to MongoDB
                 await self.mongodb_client.save_position(position.to_dict())
                 
                 # Save updated account to MongoDB
                 await self.mongodb_client.save_account(self.account.to_dict())
+                
+                # Send position close notification if notification manager is available
+                if hasattr(self, 'notification_manager') and self.notification_manager:
+                    try:
+                        await self.notification_manager.notify_position_close(
+                            symbol=position_data["symbol"],
+                            position_id=position_id,
+                            exit_price=exit_price,
+                            pnl=position.pnl,
+                            reason=reason,
+                            position_type=position_data["position_type"],
+                            entry_price=position_data["entry_price"],
+                            quantity=position_data["quantity"],
+                            leverage=position_data["leverage"],
+                            pnl_percentage=pnl_percentage,
+                            investment_amount=position_data["investment_amount"],
+                            leveraged_amount=position_data["leveraged_amount"],
+                            margin_used=position_data["margin_used"],
+                            trading_fee=position.trading_fee,
+                            exit_fee=exit_fee,
+                            total_fees=total_fees,
+                            trade_duration=trade_duration,
+                            account_balance_before=position_data["account_balance_before"],
+                            account_balance_after=account_balance_after,
+                            account_growth=account_growth,
+                            account_growth_percentage=account_growth_pct,
+                            total_portfolio_pnl=self.account.realized_pnl,
+                            win_rate=self.account.win_rate
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Failed to send position close notification: {e}")
                 
                 self.logger.info(f"✅ Position closed: {position.symbol} at ${exit_price:.2f}")
                 return True
@@ -363,7 +426,7 @@ class AsyncBroker:
                 "open_time": position.entry_time.isoformat() if position.entry_time else None,
                 "exit_time": position.exit_time.isoformat() if position.exit_time else None,
                 "running_time": self._calculate_running_time(position) if position.status == PositionStatus.OPEN else None,
-                "margin_usage_pct": position.calculate_margin_usage(pos_data["current_price"]) if position.status == PositionStatus.OPEN else 0.0
+                "margin_usage_pct": position.calculate_margin_usage(pos_data["current_price"], self.account.current_balance) if position.status == PositionStatus.OPEN else 0.0
             })
             
             if position.status == PositionStatus.OPEN:
