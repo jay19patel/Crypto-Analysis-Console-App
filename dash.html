@@ -464,6 +464,17 @@
                 this.maxReconnectAttempts = 5;
                 this.reconnectDelay = 1000;
                 this.isConnected = false;
+                this.connectionId = null;
+                
+                // Session management
+                this.sessionId = this.generateSessionId();
+                this.tabId = this.generateTabId();
+                this.lastHeartbeat = Date.now();
+                this.heartbeatInterval = null;
+                
+                // Connection state tracking
+                this.connectionAttempts = new Map();
+                this.isReconnecting = false;
                 
                 // Data storage
                 this.data = {
@@ -478,58 +489,119 @@
                 this.init();
             }
             
+            generateSessionId() {
+                return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+            }
+            
+            generateTabId() {
+                return 'tab_' + Math.random().toString(36).substr(2, 9);
+            }
+            
             init() {
                 this.connectWebSocket();
                 this.setupEventListeners();
             }
             
             connectWebSocket() {
+                // Prevent multiple connection attempts
+                if (this.isReconnecting) {
+                    console.log('Connection attempt already in progress');
+                    return;
+                }
+                
+                this.isReconnecting = true;
+                
                 try {
-                    // Try to connect to WebSocket server
+                    // Close existing connection if any
+                    if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
+                        this.ws.close();
+                    }
+                    
+                    // Clear existing heartbeat
+                    if (this.heartbeatInterval) {
+                        clearInterval(this.heartbeatInterval);
+                    }
+                    
                     const wsUrl = `ws://${window.location.hostname}:8765`;
-                    console.log(`Connecting to WebSocket: ${wsUrl}`);
+                    console.log(`Connecting to WebSocket: ${wsUrl} (Session: ${this.sessionId})`);
                     
                     this.ws = new WebSocket(wsUrl);
                     
+                    // Set connection timeout
+                    const connectionTimeout = setTimeout(() => {
+                        if (this.ws.readyState === WebSocket.CONNECTING) {
+                            console.log('Connection timeout, closing socket');
+                            this.ws.close();
+                        }
+                    }, 10000); // 10 second timeout
+                    
                     this.ws.onopen = () => {
-                        console.log('WebSocket connected');
+                        clearTimeout(connectionTimeout);
+                        console.log('WebSocket connected successfully');
                         this.isConnected = true;
+                        this.isReconnecting = false;
                         this.reconnectAttempts = 0;
+                        this.lastHeartbeat = Date.now();
                         this.updateConnectionStatus('connected');
                         this.subscribeToChannels();
+                        this.startHeartbeat();
                     };
                     
                     this.ws.onmessage = (event) => {
                         try {
                             const message = JSON.parse(event.data);
+                            this.lastHeartbeat = Date.now();
                             this.handleMessage(message);
                         } catch (error) {
                             console.error('Error parsing WebSocket message:', error);
                         }
                     };
                     
-                    this.ws.onclose = () => {
-                        console.log('WebSocket disconnected');
+                    this.ws.onclose = (event) => {
+                        clearTimeout(connectionTimeout);
+                        console.log(`WebSocket disconnected (Code: ${event.code}, Reason: ${event.reason})`);
                         this.isConnected = false;
+                        this.isReconnecting = false;
                         this.updateConnectionStatus('disconnected');
-                        this.scheduleReconnect();
+                        
+                        // Only reconnect if not manually disconnected
+                        if (event.code !== 1000) {
+                            this.scheduleReconnect();
+                        }
                     };
                     
                     this.ws.onerror = (error) => {
+                        clearTimeout(connectionTimeout);
                         console.error('WebSocket error:', error);
+                        this.isReconnecting = false;
                         this.updateConnectionStatus('disconnected');
                     };
                     
                 } catch (error) {
                     console.error('Failed to create WebSocket connection:', error);
+                    this.isReconnecting = false;
                     this.updateConnectionStatus('disconnected');
                     this.scheduleReconnect();
                 }
             }
             
+            startHeartbeat() {
+                // Send periodic ping to keep connection alive
+                this.heartbeatInterval = setInterval(() => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({
+                            type: 'ping',
+                            timestamp: Date.now(),
+                            sessionId: this.sessionId,
+                            tabId: this.tabId
+                        }));
+                    }
+                }, 30000); // Every 30 seconds
+            }
+            
             subscribeToChannels() {
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    // Subscribe to all available channels
+                    // Subscribe to all available channels with session info
                     const subscribeMessage = {
                         type: 'subscribe',
                         channels: [
@@ -540,11 +612,14 @@
                             'account_summary',
                             'system_status',
                             'heartbeat'
-                        ]
+                        ],
+                        sessionId: this.sessionId,
+                        tabId: this.tabId,
+                        timestamp: Date.now()
                     };
                     
                     this.ws.send(JSON.stringify(subscribeMessage));
-                    console.log('Subscribed to all channels');
+                    console.log('Subscribed to all channels with session ID');
                 }
             }
             
@@ -807,16 +882,41 @@
                 const unrealizedPnl = summary.unrealized_pnl || 0;
                 const realizedPnl = summary.realized_pnl || 0;
                 const totalReturnPct = summary.total_return_percentage || 0;
+                const initialBalance = summary.initial_balance || 0;
+                const currentBalance = summary.current_balance || 0;
+                const totalBalance = summary.total_balance || 0;
+                const marginUsed = summary.total_margin_used || 0;
+                const brokerageCharges = summary.brokerage_charges || 0;
+                
+                // Calculate growth from initial balance
+                const growthAmount = totalBalance - initialBalance;
+                const growthPercentage = initialBalance > 0 ? ((growthAmount / initialBalance) * 100) : 0;
                 
                 container.innerHTML = `
                     <div class="account-summary">
                         <div class="balance-item">
-                            <span class="balance-label">Total Portfolio Value</span>
-                            <span class="balance-value">$${this.formatNumber(summary.total_balance || 0)}</span>
+                            <span class="balance-label">Initial Balance</span>
+                            <span class="balance-value">$${this.formatNumber(initialBalance)}</span>
                         </div>
                         <div class="balance-item">
-                            <span class="balance-label">Available Balance</span>
-                            <span class="balance-value">$${this.formatNumber(summary.available_balance || summary.current_balance || 0)}</span>
+                            <span class="balance-label">Current Balance</span>
+                            <span class="balance-value">$${this.formatNumber(currentBalance)}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Total Portfolio Value</span>
+                            <span class="balance-value">$${this.formatNumber(totalBalance)}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Growth Amount</span>
+                            <span class="balance-value change ${growthAmount >= 0 ? 'positive' : 'negative'}">
+                                ${growthAmount >= 0 ? '+' : ''}$${Math.abs(growthAmount).toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Growth Percentage</span>
+                            <span class="balance-value change ${growthPercentage >= 0 ? 'positive' : 'negative'}">
+                                ${growthPercentage >= 0 ? '+' : ''}${growthPercentage.toFixed(2)}%
+                            </span>
                         </div>
                         <div class="balance-item">
                             <span class="balance-label">Total PnL</span>
@@ -837,10 +937,12 @@
                             </span>
                         </div>
                         <div class="balance-item">
-                            <span class="balance-label">Total Return</span>
-                            <span class="balance-value change ${totalReturnPct >= 0 ? 'positive' : 'negative'}">
-                                ${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(2)}%
-                            </span>
+                            <span class="balance-label">Margin Used</span>
+                            <span class="balance-value">$${this.formatNumber(marginUsed)}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-label">Brokerage Charges</span>
+                            <span class="balance-value">$${this.formatNumber(brokerageCharges)}</span>
                         </div>
                         <div class="balance-item">
                             <span class="balance-label">Open Positions</span>
@@ -934,14 +1036,22 @@
             }
             
             scheduleReconnect() {
+                if (this.isReconnecting) {
+                    return; // Already reconnecting
+                }
+                
                 if (this.reconnectAttempts < this.maxReconnectAttempts) {
                     this.reconnectAttempts++;
-                    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+                    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
+                    
+                    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
                     
                     setTimeout(() => {
-                        this.updateConnectionStatus('connecting');
-                        this.connectWebSocket();
-                    }, this.reconnectDelay * this.reconnectAttempts);
+                        if (!this.isConnected) {
+                            this.updateConnectionStatus('connecting');
+                            this.connectWebSocket();
+                        }
+                    }, delay);
                 } else {
                     console.log('Max reconnection attempts reached');
                     this.updateConnectionStatus('disconnected');
@@ -949,19 +1059,39 @@
             }
             
             setupEventListeners() {
-                // Add page visibility change handler to reconnect when page becomes visible
+                // Add page visibility change handler
                 document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden && !this.isConnected) {
-                        this.reconnectAttempts = 0;
-                        this.connectWebSocket();
+                    if (!document.hidden && !this.isConnected && !this.isReconnecting) {
+                        console.log('Page became visible, checking connection');
+                        // Check if connection is truly lost before reconnecting
+                        setTimeout(() => {
+                            if (!this.isConnected) {
+                                this.reconnectAttempts = Math.max(0, this.reconnectAttempts - 1);
+                                this.connectWebSocket();
+                            }
+                        }, 1000);
                     }
                 });
                 
                 // Add window focus handler
                 window.addEventListener('focus', () => {
-                    if (!this.isConnected) {
-                        this.reconnectAttempts = 0;
-                        this.connectWebSocket();
+                    if (!this.isConnected && !this.isReconnecting) {
+                        console.log('Window focused, checking connection');
+                        setTimeout(() => {
+                            if (!this.isConnected) {
+                                this.connectWebSocket();
+                            }
+                        }, 500);
+                    }
+                });
+                
+                // Add before unload handler to properly close connection
+                window.addEventListener('beforeunload', () => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.close(1000, 'Page unloading');
+                    }
+                    if (this.heartbeatInterval) {
+                        clearInterval(this.heartbeatInterval);
                     }
                 });
             }

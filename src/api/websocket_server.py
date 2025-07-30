@@ -20,6 +20,7 @@ from websockets.exceptions import ConnectionClosed, ConnectionClosedError, Conne
 
 from src.config import get_settings
 from src.database.schemas import MarketData, TradingSignal
+from src.database.mongodb_client import AsyncMongoDBClient
 
 
 class MessageType(Enum):
@@ -60,6 +61,8 @@ class ClientConnection:
     ip_address: str
     user_agent: Optional[str] = None
     authenticated: bool = False
+    browser_fingerprint: Optional[str] = None
+    tab_id: Optional[str] = None
 
     def is_alive(self) -> bool:
         """Check if connection is still alive"""
@@ -100,10 +103,19 @@ class WebSocketServer:
         # Client connection management
         self.clients: Dict[str, ClientConnection] = {}
         self.client_lock = asyncio.Lock()
+        self.ip_connections: Dict[str, Set[str]] = {}  # Track connections per IP
+        self.browser_sessions: Dict[str, str] = {}  # Track browser sessions
+        
+        # MongoDB for client tracking
+        self.mongodb_client = AsyncMongoDBClient()
         
         # Message queuing for offline clients
         self.message_queue: Dict[str, List[WebSocketMessage]] = {}
         self.max_queue_size = 100
+        
+        # Connection limits
+        self.max_connections_per_ip = 2  # Max 2 connections per IP
+        self.connection_timeout = 30  # seconds
         
         # Server state
         self.server = None
@@ -120,7 +132,8 @@ class WebSocketServer:
             "active_connections": 0,
             "messages_sent": 0,
             "messages_failed": 0,
-            "uptime": 0
+            "uptime": 0,
+            "duplicate_connections_blocked": 0
         }
         
         # Heartbeat task
@@ -186,12 +199,38 @@ class WebSocketServer:
             self.logger.error(f"❌ Error stopping WebSocket server: {e}")
 
     async def _handle_client_connection(self, websocket: WebSocketServerProtocol, path: str = "/"):
-        """Handle new client connection"""
-        client_id = str(uuid.uuid4())
+        """Handle new client connection with deduplication"""
         client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
         
         try:
-            self.logger.info(f"🔌 New client connected: {client_id} from {client_ip}")
+            # Check for existing connections from same IP
+            async with self.client_lock:
+                if client_ip in self.ip_connections:
+                    active_connections = len([
+                        cid for cid in self.ip_connections[client_ip] 
+                        if cid in self.clients and self.clients[cid].is_alive()
+                    ])
+                    
+                    if active_connections >= self.max_connections_per_ip:
+                        self.logger.warning(f"🚫 Connection limit reached for IP {client_ip}. Closing oldest connection.")
+                        # Close oldest connection from same IP
+                        oldest_client_id = None
+                        oldest_time = float('inf')
+                        
+                        for cid in self.ip_connections[client_ip]:
+                            if cid in self.clients:
+                                client_time = self.clients[cid].connected_at.timestamp()
+                                if client_time < oldest_time:
+                                    oldest_time = client_time
+                                    oldest_client_id = cid
+                        
+                        if oldest_client_id:
+                            await self._remove_client(oldest_client_id)
+                        
+                        self.stats["duplicate_connections_blocked"] += 1
+            
+            client_id = str(uuid.uuid4())
+            self.logger.info(f"🔌 Client connected: {client_id[:8]} from {client_ip}")
             
             # Create client connection
             client = ClientConnection(
@@ -201,14 +240,22 @@ class WebSocketServer:
                 subscriptions=set(),
                 last_heartbeat=time.time(),
                 ip_address=client_ip,
-                authenticated=False  # Implement authentication if needed
+                authenticated=False
             )
             
-            # Add to clients
+            # Add to clients and IP tracking
             async with self.client_lock:
                 self.clients[client_id] = client
+                
+                if client_ip not in self.ip_connections:
+                    self.ip_connections[client_ip] = set()
+                self.ip_connections[client_ip].add(client_id)
+                
                 self.stats["total_connections"] += 1
                 self.stats["active_connections"] += 1
+                
+                # Store in MongoDB
+                await self._store_client_in_db(client)
             
             # Send welcome message
             await self._send_message_to_client(
@@ -232,6 +279,31 @@ class WebSocketServer:
         finally:
             # Clean up client
             await self._remove_client(client_id)
+    
+    async def _store_client_in_db(self, client: ClientConnection):
+        """Store client connection in MongoDB"""
+        try:
+            client_doc = {
+                "client_id": client.client_id,
+                "ip_address": client.ip_address,
+                "connected_at": client.connected_at,
+                "user_agent": client.user_agent,
+                "status": "connected"
+            }
+            await self.mongodb_client.insert_document("websocket_clients", client_doc)
+        except Exception as e:
+            self.logger.debug(f"Failed to store client in DB: {e}")
+    
+    async def _remove_client_from_db(self, client_id: str):
+        """Remove client from MongoDB"""
+        try:
+            await self.mongodb_client.update_document(
+                "websocket_clients",
+                {"client_id": client_id},
+                {"$set": {"status": "disconnected", "disconnected_at": datetime.now(timezone.utc)}}
+            )
+        except Exception as e:
+            self.logger.debug(f"Failed to update client in DB: {e}")
 
     async def _handle_client_messages(self, client: ClientConnection):
         """Handle messages from client"""
@@ -448,32 +520,49 @@ class WebSocketServer:
         await self._broadcast_to_subscribers(MessageType.POSITIONS, positions)
 
     async def _broadcast_to_subscribers(self, message_type: MessageType, data: Dict[str, Any]):
-        """Broadcast message to all clients subscribed to the message type"""
+        """Broadcast message to all clients subscribed to the message type with reliability"""
         if not self.clients:
             return
         
-        # Get clients subscribed to this message type
-        subscribed_clients = [
-            client_id for client_id, client in self.clients.items()
-            if message_type.value in client.subscriptions and client.is_alive()
-        ]
+        async with self.client_lock:
+            # Get clients subscribed to this message type and verify they're alive
+            subscribed_clients = []
+            dead_clients = []
+            
+            for client_id, client in list(self.clients.items()):
+                if message_type.value in client.subscriptions:
+                    if client.is_alive():
+                        subscribed_clients.append(client_id)
+                    else:
+                        dead_clients.append(client_id)
+            
+            # Clean up dead clients
+            for client_id in dead_clients:
+                await self._remove_client(client_id)
         
         if not subscribed_clients:
             return
         
-        # Send to all subscribed clients concurrently
-        tasks = [
-            self._send_message_to_client(client_id, message_type, data)
-            for client_id in subscribed_clients
-        ]
+        # Send to all subscribed clients with better error handling
+        successful_sends = 0
+        failed_sends = 0
         
-        # Execute all sends concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for client_id in subscribed_clients:
+            try:
+                success = await self._send_message_to_client(client_id, message_type, data)
+                if success:
+                    successful_sends += 1
+                else:
+                    failed_sends += 1
+            except Exception as e:
+                self.logger.debug(f"Failed to send {message_type.value} to client {client_id[:8]}: {e}")
+                failed_sends += 1
         
-        # Log failed sends
-        failed_count = sum(1 for result in results if isinstance(result, Exception) or result is False)
-        if failed_count > 0:
-            self.logger.warning(f"Failed to send {message_type.value} to {failed_count} clients")
+        # Log broadcast statistics
+        if failed_sends > 0:
+            self.logger.warning(f"Broadcast {message_type.value}: {successful_sends} success, {failed_sends} failed")
+        else:
+            self.logger.debug(f"Broadcast {message_type.value}: {successful_sends} clients")
 
     async def _heartbeat_loop(self):
         """Background heartbeat loop"""
@@ -509,18 +598,34 @@ class WebSocketServer:
         """Background cleanup loop"""
         while self.running:
             try:
-                # Clean up disconnected clients
+                current_time = time.time()
+                
+                # Clean up disconnected clients more aggressively
                 async with self.client_lock:
-                    disconnected_clients = [
-                        client_id for client_id, client in self.clients.items()
-                        if not client.is_alive()
-                    ]
+                    disconnected_clients = []
                     
-                    for client_id in disconnected_clients:
-                        await self._remove_client(client_id)
+                    for client_id, client in list(self.clients.items()):
+                        # Check multiple conditions for dead connections
+                        if (not client.is_alive() or 
+                            (current_time - client.last_heartbeat) > 180 or  # 3 minutes without heartbeat
+                            hasattr(client.websocket, 'closed') and client.websocket.closed):
+                            disconnected_clients.append(client_id)
+                    
+                    if disconnected_clients:
+                        self.logger.info(f"🧹 Cleaning up {len(disconnected_clients)} dead connections")
+                        for client_id in disconnected_clients:
+                            await self._remove_client(client_id)
+                
+                # Clean up IP tracking for IPs with no active connections
+                for ip in list(self.ip_connections.keys()):
+                    active_clients = [cid for cid in self.ip_connections[ip] if cid in self.clients]
+                    if not active_clients:
+                        del self.ip_connections[ip]
+                    else:
+                        # Update the set to only include active clients
+                        self.ip_connections[ip] = set(active_clients)
                 
                 # Clean up old rate limit data
-                current_time = time.time()
                 for client_id in list(self.rate_limits.keys()):
                     if client_id not in self.clients:
                         del self.rate_limits[client_id]
@@ -529,7 +634,11 @@ class WebSocketServer:
                 self.stats["uptime"] = current_time - self.start_time
                 self.stats["active_connections"] = len(self.clients)
                 
-                await asyncio.sleep(60)  # Cleanup every minute
+                # Log connection status
+                if len(self.clients) > 0:
+                    self.logger.debug(f"📊 Active connections: {len(self.clients)}, IPs: {len(self.ip_connections)}")
+                
+                await asyncio.sleep(30)  # Cleanup every 30 seconds (more frequent)
                 
             except asyncio.CancelledError:
                 break
@@ -542,6 +651,8 @@ class WebSocketServer:
         async with self.client_lock:
             if client_id in self.clients:
                 client = self.clients[client_id]
+                client_ip = client.ip_address
+                
                 try:
                     # Check if websocket has closed attribute before accessing it
                     if hasattr(client.websocket, 'closed') and not client.websocket.closed:
@@ -552,9 +663,18 @@ class WebSocketServer:
                 except Exception as e:
                     self.logger.debug(f"Error closing websocket for client {client_id}: {e}")
                 
+                # Remove from IP tracking
+                if client_ip in self.ip_connections:
+                    self.ip_connections[client_ip].discard(client_id)
+                    if not self.ip_connections[client_ip]:
+                        del self.ip_connections[client_ip]
+                
+                # Remove from MongoDB
+                await self._remove_client_from_db(client_id)
+                
                 del self.clients[client_id]
                 self.stats["active_connections"] = max(0, self.stats["active_connections"] - 1)
-                self.logger.info(f"🔌 Client {client_id} removed")
+                self.logger.info(f"🔌 Client {client_id[:8]} removed from {client_ip}")
 
     async def _close_all_clients(self):
         """Close all client connections"""

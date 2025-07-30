@@ -246,8 +246,7 @@ class TradingSystem:
                     # Thread-safe update of market data
                     with self.market_data_lock:
                         self.current_market_data[symbol] = market_data
-                        self.logger.info(f"✅ Market data stored for {symbol} - Price: ${market_data.price:.2f}")
-                        self.logger.info(f"   📊 Current market data symbols: {list(self.current_market_data.keys())}")
+                        # Price logging now handled in live_price_ws.py as consolidated log
                     
                     # Live save logic with circuit breaker
                     if self.live_save:

@@ -243,7 +243,6 @@ class RealTimeMarketData:
             if "type" in data and data["type"] == "v2/ticker":
                 # Keep the original symbol format (BTCUSD, ETHUSD) to match strategy expectations
                 symbol = data["symbol"]  # Use original format from Delta Exchange
-                self.logger.info(f"📊 Received ticker data for {symbol} - Price: {data.get('mark_price', 'N/A')}")
                 with self.price_lock:
                     # Extract all available fields from the message
                     price_update = {
@@ -312,17 +311,21 @@ class RealTimeMarketData:
                     self.live_prices[symbol] = price_update
                     self._update_count += 1
                     
-                    self.logger.debug(f"✅ Price update stored for {symbol}: ${price_update['price']:.2f}")
+                    # Log all live prices in a single line when we have updates
+                    price_summaries = []
+                    for sym, price_data in self.live_prices.items():
+                        symbol_name = sym.replace('USD', '')  # ETH, BTC
+                        price_summaries.append(f"{symbol_name}: ${price_data['price']:.2f}")
+                    
+                    if price_summaries:
+                        self.logger.info(f"📊 Live Prices - {', '.join(price_summaries)}")
                     
                     # Notify callback with current prices
                     if self.price_callback:
                         try:
                             self.price_callback(self.live_prices)
-                            self.logger.debug(f"📡 Price callback executed successfully for {symbol}")
                         except Exception as callback_error:
                             self.logger.error(f"❌ Error in price callback: {callback_error}")
-                    else:
-                        self.logger.warning("⚠️ No price callback registered")
                 
         except json.JSONDecodeError as e:
             self.logger.warning(f"WARN - [MarketData] WebSocket | Invalid message format: {str(e)}")
