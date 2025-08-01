@@ -933,23 +933,53 @@
                 </div>
             </div>
 
-            <!-- Open Positions Card -->
-            <div class="card">
+            <!-- Positions Section with Tabs -->
+            <div class="card wide-grid">
                 <div class="update-indicator" id="positionsUpdateIndicator"></div>
                 <div class="card-title">
                     <i class="fas fa-chart-area icon"></i>
-                    Open Positions
+                    Trading Positions
                 </div>
-                <div id="openPositions" class="scroll-container">
-                    <div class="empty-state">No open positions</div>
+                <div class="tabs" id="positionTabs">
+                    <div class="tab active" onclick="dashboard.switchPositionTab('open')">Open Positions</div>
+                    <div class="tab" onclick="dashboard.switchPositionTab('closed')">Closed Positions</div>
+                </div>
+                
+                <div id="openPositionsTab" class="tab-content active">
+                    <div id="openPositions" class="scroll-container">
+                        <div class="empty-state">No open positions</div>
+                    </div>
+                </div>
+                
+                <div id="closedPositionsTab" class="tab-content">
+                    <div class="filters-row">
+                        <input type="date" id="positionsDateFrom" class="filter-input" placeholder="From Date">
+                        <input type="date" id="positionsDateTo" class="filter-input" placeholder="To Date">
+                        <input type="text" id="positionsSymbolFilter" class="filter-input" placeholder="Symbol">
+                        <select id="positionsStrategyFilter" class="filter-select">
+                            <option value="">All Strategies</option>
+                        </select>
+                        <select id="positionsTypeFilter" class="filter-select">
+                            <option value="">All Types</option>
+                            <option value="LONG">Long</option>
+                            <option value="SHORT">Short</option>
+                        </select>
+                        <input type="text" id="positionsSearchFilter" class="filter-input" placeholder="Search...">
+                        <button id="applyPositionsFilters" class="btn-primary">Apply Filters</button>
+                        <button id="clearPositionsFilters" class="btn-secondary">Clear</button>
+                    </div>
+                    <div id="closedPositionsInTab" class="scroll-container">
+                        <div class="empty-state">Loading closed positions...</div>
+                    </div>
+                    <div id="positionsPagination" class="pagination"></div>
                 </div>
             </div>
 
-            <!-- Closed Positions Card with Filters -->
-            <div class="card wide-grid">
+            <!-- Legacy Closed Positions (Hidden) -->
+            <div class="card wide-grid" style="display: none;">
                 <div class="card-title">
                     <i class="fas fa-history icon"></i>
-                    Closed Positions
+                    Closed Positions (Legacy)
                 </div>
                 <div class="filters-row">
                     <input type="date" id="closedDateFrom" class="filter-input" placeholder="From Date">
@@ -979,7 +1009,7 @@
                     <i class="fas fa-bell icon"></i>
                     Notifications
                 </div>
-                <div class="tabs">
+                <div class="tabs" id="notificationsTabs">
                     <div class="tab active" onclick="dashboard.switchNotificationTab('live')">Live</div>
                     <div class="tab" onclick="dashboard.switchNotificationTab('historical')">Historical</div>
                 </div>
@@ -1073,6 +1103,7 @@
                 this.isConnecting = false;
                 this.subscribed = false;
                 this.reconnectTimeoutId = null;
+                this.connectionMutex = false;  // Prevent race conditions
                 
                 // Data storage
                 this.data = {
@@ -1083,6 +1114,11 @@
                         pagination: {},
                         filters: {}
                     },
+                    positionsTabData: {
+                        data: [],
+                        pagination: {}
+                    },
+                    positionsTabFilters: {},
                     signals: [],
                     notifications: {
                         live: [],
@@ -1103,6 +1139,9 @@
                 // Current notification tab
                 this.currentNotificationTab = 'live';
                 
+                // Current position tab
+                this.currentPositionTab = 'open';
+                
                 // SSE connection
                 this.sseSource = null;
                 
@@ -1113,7 +1152,7 @@
                 // Use a session ID that persists for the browser session
                 let sessionId = sessionStorage.getItem('trading_session_id');
                 if (!sessionId) {
-                    sessionId = 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                    sessionId = 'session_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
                     sessionStorage.setItem('trading_session_id', sessionId);
                 }
                 return sessionId;
@@ -1121,7 +1160,7 @@
             
             generateTabId() {
                 // Generate unique tab ID each time page loads
-                return 'tab_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                return 'tab_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
             }
             
             generateBrowserFingerprint() {
@@ -1151,21 +1190,38 @@
             }
             
             init() {
-                // Prevent multiple initializations
+                // Prevent duplicate initialization
+                if (window.dashboardInitializing) {
+                    console.warn('⚠️ Dashboard initialization already in progress, skipping...');
+                    return;
+                }
+                window.dashboardInitializing = true;
+                
+                // Clean up any existing dashboard instance more thoroughly
                 if (window.dashboard) {
                     console.log('⚠️ Dashboard already initialized, cleaning up...');
-                    window.dashboard.disconnect();
+                    try {
+                        window.dashboard.cleanupConnection();
+                        if (window.dashboard.sseSource) {
+                            window.dashboard.sseSource.close();
+                        }
+                    } catch (e) {
+                        console.debug('Error during cleanup:', e);
+                    }
+                    window.dashboard = null;
                 }
                 
                 this.connectWebSocket();
                 this.setupEventListeners();
                 this.loadClosedPositions();
+                this.loadClosedPositionsForTab(); // Load positions for the tab
                 this.loadHistoricalNotifications();
                 this.loadStrategiesPerformance();
                 this.connectSSE();
                 
                 // Store reference globally
                 window.dashboard = this;
+                window.dashboardInitializing = false;  // Clear initialization flag
             }
             
             connectWebSocket() {
@@ -1181,8 +1237,16 @@
                     return true;
                 }
                 
+                // Check for connection mutex to prevent race conditions
+                if (this.connectionMutex) {
+                    console.log('🔒 Connection mutex active, skipping...');
+                    return false;
+                }
+                
+                // Set connection flags with mutex-like behavior
+                this.connectionMutex = true;
                 this.isConnecting = true;
-                this.isReconnecting = true;
+                this.isReconnecting = false;  // Don't set both flags
                 
                 try {
                     // Clean up existing connection
@@ -1209,6 +1273,7 @@
                         this.isConnected = true;
                         this.isConnecting = false;
                         this.isReconnecting = false;
+                        this.connectionMutex = false;  // Release mutex
                         this.subscribed = false;
                         this.reconnectAttempts = 0;
                         this.lastHeartbeat = Date.now();
@@ -1237,6 +1302,7 @@
                         this.isConnected = false;
                         this.isConnecting = false;
                         this.isReconnecting = false;
+                        this.connectionMutex = false;  // Release mutex
                         this.subscribed = false;
                         this.updateConnectionStatus('disconnected');
                         
@@ -1251,6 +1317,7 @@
                         console.error('❌ WebSocket error:', error);
                         this.isConnecting = false;
                         this.isReconnecting = false;
+                        this.connectionMutex = false;  // Release mutex
                         this.updateConnectionStatus('disconnected');
                     };
                     
@@ -1260,6 +1327,7 @@
                     console.error('❌ Failed to create WebSocket connection:', error);
                     this.isConnecting = false;
                     this.isReconnecting = false;
+                    this.connectionMutex = false;  // Release mutex
                     this.updateConnectionStatus('disconnected');
                     this.scheduleReconnect();
                     return false;
@@ -1267,10 +1335,26 @@
             }
             
             cleanupConnection() {
-                // Clean up existing WebSocket connection
+                // Clear any pending reconnect timeout
+                if (this.reconnectTimeoutId) {
+                    clearTimeout(this.reconnectTimeoutId);
+                    this.reconnectTimeoutId = null;
+                }
+                
+                // Clean up existing WebSocket connection more aggressively
                 if (this.ws) {
-                    if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-                        this.ws.close(1000, 'Cleaning up connection');
+                    try {
+                        // Remove event handlers to prevent unwanted callbacks
+                        this.ws.onopen = null;
+                        this.ws.onmessage = null;
+                        this.ws.onclose = null;
+                        this.ws.onerror = null;
+                        
+                        if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+                            this.ws.close(1000, 'Connection cleanup');
+                        }
+                    } catch (e) {
+                        console.debug('Error during WebSocket cleanup:', e);
                     }
                     this.ws = null;
                 }
@@ -1417,18 +1501,22 @@
             
             updateLivePrices(prices) {
                 console.log('🔄 Live prices updated:', prices);
-                this.data.livePrices = { ...this.data.livePrices, ...prices };
-                this.renderLivePrices();
+                if (prices && typeof prices === 'object') {
+                    this.data.livePrices = { ...this.data.livePrices, ...prices };
+                    this.renderLivePrices();
+                } else {
+                    console.warn('Invalid live prices data received:', prices);
+                }
             }
             
             updateOpenPositions(positionsData) {
                 console.log('📈 Open positions updated:', positionsData);
                 if (positionsData && positionsData.open_positions) {
-                    this.data.openPositions = positionsData.open_positions;
-                } else if (Array.isArray(positionsData)) {
                     this.data.openPositions = positionsData;
+                } else if (Array.isArray(positionsData)) {
+                    this.data.openPositions = { open_positions: positionsData };
                 } else {
-                    this.data.openPositions = [];
+                    this.data.openPositions = { open_positions: [] };
                 }
                 this.renderOpenPositions();
                 this.flashUpdateIndicator('positionsUpdateIndicator');
@@ -1441,7 +1529,14 @@
             }
             
             addLiveNotification(notification) {
-                this.data.notifications.live.unshift(notification);
+                // Handle both single notification and array of notifications
+                if (Array.isArray(notification)) {
+                    notification.forEach(notif => {
+                        this.data.notifications.live.unshift(notif);
+                    });
+                } else {
+                    this.data.notifications.live.unshift(notification);
+                }
                 this.data.notifications.live = this.data.notifications.live.slice(0, 15);
                 if (this.currentNotificationTab === 'live') {
                     this.renderLiveNotifications();
@@ -1450,14 +1545,22 @@
             
             updateAccountSummary(summary) {
                 console.log('💰 Account summary updated:', summary);
-                this.data.accountSummary = summary;
-                this.renderAccountSummary();
-                this.flashUpdateIndicator('accountUpdateIndicator');
+                if (summary && typeof summary === 'object') {
+                    this.data.accountSummary = summary;
+                    this.renderAccountSummary();
+                    this.flashUpdateIndicator('accountUpdateIndicator');
+                } else {
+                    console.warn('Invalid account summary data received:', summary);
+                }
             }
             
             updateSystemStatus(status) {
-                this.data.systemStatus = status;
-                this.renderSystemStatus();
+                if (status && typeof status === 'object') {
+                    this.data.systemStatus = status;
+                    this.renderSystemStatus();
+                } else {
+                    console.warn('Invalid system status data received:', status);
+                }
             }
 
             // REST API methods
@@ -1576,13 +1679,70 @@
                 this.data.notifications.historical.filters = {};
                 this.loadHistoricalNotifications(1);
             }
+            
+            // Position tab filter methods
+            applyPositionsFilters() {
+                const filters = {
+                    date_from: document.getElementById('positionsDateFrom').value,
+                    date_to: document.getElementById('positionsDateTo').value,
+                    symbol: document.getElementById('positionsSymbolFilter').value,
+                    strategy: document.getElementById('positionsStrategyFilter').value,
+                    position_type: document.getElementById('positionsTypeFilter').value,
+                    search: document.getElementById('positionsSearchFilter').value
+                };
+
+                // Remove empty filters
+                Object.keys(filters).forEach(key => {
+                    if (!filters[key]) delete filters[key];
+                });
+
+                this.data.positionsTabFilters = filters;
+                this.loadClosedPositionsForTab(1);
+            }
+
+            clearPositionsFilters() {
+                document.getElementById('positionsDateFrom').value = '';
+                document.getElementById('positionsDateTo').value = '';
+                document.getElementById('positionsSymbolFilter').value = '';
+                document.getElementById('positionsStrategyFilter').value = '';
+                document.getElementById('positionsTypeFilter').value = '';
+                document.getElementById('positionsSearchFilter').value = '';
+                
+                this.data.positionsTabFilters = {};
+                this.loadClosedPositionsForTab(1);
+            }
+            
+            async loadClosedPositionsForTab(page = 1) {
+                try {
+                    const filters = this.data.positionsTabFilters || {};
+                    const params = new URLSearchParams({
+                        page: page.toString(),
+                        limit: '20',
+                        ...filters
+                    });
+
+                    const response = await fetch(`${this.apiBaseUrl}/positions/closed?${params}`);
+                    const data = await response.json();
+                    
+                    this.data.positionsTabData = {
+                        data: data.positions,
+                        pagination: data.pagination
+                    };
+                    this.renderClosedPositionsInTab();
+                } catch (error) {
+                    console.error('Error loading closed positions for tab:', error);
+                }
+            }
 
             switchNotificationTab(tab) {
                 this.currentNotificationTab = tab;
                 
-                // Update tab appearance
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                // Update tab appearance (only for notification tabs)
+                const notificationTabs = document.querySelectorAll('#notificationsTabs .tab');
+                const notificationTabContents = document.querySelectorAll('#liveNotifications, #historicalNotifications');
+                
+                notificationTabs.forEach(t => t.classList.remove('active'));
+                notificationTabContents.forEach(tc => tc.classList.remove('active'));
                 
                 event.target.classList.add('active');
                 document.getElementById(`${tab}Notifications`).classList.add('active');
@@ -1592,6 +1752,28 @@
                     this.renderLiveNotifications();
                 } else {
                     this.renderHistoricalNotifications();
+                }
+            }
+            
+            switchPositionTab(tab) {
+                this.currentPositionTab = tab;
+                
+                // Update tab appearance (only for position tabs)
+                const positionTabs = document.querySelectorAll('#positionTabs .tab');
+                const positionTabContents = document.querySelectorAll('#openPositionsTab, #closedPositionsTab');
+                
+                positionTabs.forEach(t => t.classList.remove('active'));
+                positionTabContents.forEach(tc => tc.classList.remove('active'));
+                
+                event.target.classList.add('active');
+                document.getElementById(`${tab}PositionsTab`).classList.add('active');
+                
+                // Render appropriate content
+                if (tab === 'open') {
+                    this.renderOpenPositions();
+                } else {
+                    this.renderClosedPositionsInTab();
+                    this.loadClosedPositionsForTab();
                 }
             }
             
@@ -1634,81 +1816,75 @@
                 const container = document.getElementById('openPositions');
                 const positions = this.data.openPositions;
                 
-                if (!positions || !Array.isArray(positions) || positions.length === 0) {
+                if (!positions || (!Array.isArray(positions) && !positions.open_positions) || 
+                    (Array.isArray(positions) && positions.length === 0) || 
+                    (positions.open_positions && positions.open_positions.length === 0)) {
                     container.innerHTML = '<div class="empty-state">No open positions</div>';
                     return;
                 }
                 
-                container.innerHTML = positions.map(position => {
-                    const pnl = parseFloat(position.pnl || 0);
-                    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
-                    const pnlSymbol = pnl >= 0 ? '+' : '';
-                    const sideClass = position.type === 'LONG' ? 'positive' : 'negative';
-                    
-                    return `
-                        <div class="position-item">
-                            <div class="position-header">
-                                <div>
-                                    <strong>${position.symbol}</strong>
-                                    <span class="change ${sideClass}" style="margin-left: 8px; font-size: 0.8rem;">
-                                        ${position.type || position.side}
-                                    </span>
-                                </div>
-                                <div class="change ${pnlClass}">
-                                    ${pnlSymbol}$${Math.abs(pnl).toFixed(2)}
-                                </div>
-                            </div>
-                            <div class="position-details">
-                                <div class="detail-item">
-                                    <div class="detail-label">Quantity</div>
-                                    <div class="detail-value">${position.quantity || 0}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Entry Price</div>
-                                    <div class="detail-value">$${this.formatPrice(position.entry_price)}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Current Price</div>
-                                    <div class="detail-value">$${this.formatPrice(position.current_price)}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Leverage</div>
-                                    <div class="detail-value">${position.leverage}x</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Margin Used</div>
-                                    <div class="detail-value">$${this.formatNumber(position.margin_used)}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Total Investment</div>
-                                    <div class="detail-value">$${this.formatNumber(position.total_investment)}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Stop Loss</div>
-                                    <div class="detail-value">${position.stop_loss_price ? '$' + this.formatPrice(position.stop_loss_price) : 'N/A'}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Target</div>
-                                    <div class="detail-value">${position.target_price ? '$' + this.formatPrice(position.target_price) : 'N/A'}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">PnL %</div>
-                                    <div class="detail-value change ${pnlClass}">
-                                        ${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%
-                                    </div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Strategy</div>
-                                    <div class="detail-value" style="font-size: 0.8rem;">${position.strategy || 'Unknown'}</div>
-                                </div>
-                                <div class="detail-item">
-                                    <div class="detail-label">Holding Time</div>
-                                    <div class="detail-value" style="font-size: 0.8rem;">${position.holding_time || 'N/A'}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                // Handle both direct array and wrapped object with open_positions
+                const positionsList = Array.isArray(positions) ? positions : (positions.open_positions || []);
+                
+                const tableHtml = `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Type</th>
+                                    <th>Entry Price</th>
+                                    <th>Current Price</th>
+                                    <th>Quantity</th>
+                                    <th>Leverage</th>
+                                    <th>Margin Used</th>
+                                    <th>Stop Loss</th>
+                                    <th>Target</th>
+                                    <th>PnL</th>
+                                    <th>PnL %</th>
+                                    <th>Strategy</th>
+                                    <th>Holding Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${positionsList.map(position => {
+                                    const pnl = parseFloat(position.pnl || 0);
+                                    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                                    const pnlSymbol = pnl >= 0 ? '+' : '';
+                                    const positionType = position.position_type || position.type || position.side || 'LONG';
+                                    const sideClass = positionType === 'LONG' ? 'positive' : 'negative';
+                                    
+                                    return `
+                                        <tr>
+                                            <td><strong>${position.symbol}</strong></td>
+                                            <td><span class="change ${sideClass}">${positionType}</span></td>
+                                            <td>$${this.formatPrice(position.entry_price || 0)}</td>
+                                            <td>$${this.formatPrice(position.current_price || position.entry_price || 0)}</td>
+                                            <td>${this.formatNumber(position.quantity || 0)}</td>
+                                            <td>${position.leverage || 1}x</td>
+                                            <td>$${this.formatNumber(position.margin_used || position.invested_amount || 0)}</td>
+                                            <td>${position.stop_loss || position.stop_loss_price ? '$' + this.formatPrice(position.stop_loss || position.stop_loss_price) : 'N/A'}</td>
+                                            <td>${position.target || position.target_price ? '$' + this.formatPrice(position.target || position.target_price) : 'N/A'}</td>
+                                            <td><span class="change ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</span></td>
+                                            <td><span class="change ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</span></td>
+                                            <td style="font-size: 0.85rem;">${position.strategy_name || position.strategy || 'Unknown'}</td>
+                                            <td style="font-size: 0.85rem;">${position.holding_time || this.calculateHoldingTime(position.entry_time) || 'N/A'}</td>
+                                            <td>
+                                                <button class="btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" 
+                                                        onclick="dashboard.closePosition('${position.id}', '${position.symbol}')">
+                                                    Close
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                container.innerHTML = tableHtml;
             }
             
             renderClosedPositions() {
@@ -1730,11 +1906,14 @@
                                     <th>Entry Price</th>
                                     <th>Exit Price</th>
                                     <th>Quantity</th>
+                                    <th>Leverage</th>
+                                    <th>Margin Used</th>
                                     <th>PnL</th>
                                     <th>PnL %</th>
                                     <th>Strategy</th>
-                                    <th>Holding Time</th>
+                                    <th>Duration</th>
                                     <th>Exit Date</th>
+                                    <th>Reason</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1742,20 +1921,24 @@
                                     const pnl = parseFloat(position.pnl || 0);
                                     const pnlClass = pnl >= 0 ? 'positive' : 'negative';
                                     const pnlSymbol = pnl >= 0 ? '+' : '';
-                                    const typeClass = position.type === 'LONG' ? 'positive' : 'negative';
+                                    const positionType = position.position_type || position.type || 'LONG';
+                                    const typeClass = positionType === 'LONG' ? 'positive' : 'negative';
                                     
                                     return `
                                         <tr>
                                             <td><strong>${position.symbol}</strong></td>
-                                            <td><span class="change ${typeClass}">${position.type}</span></td>
-                                            <td>$${this.formatPrice(position.entry_price)}</td>
-                                            <td>$${this.formatPrice(position.exit_price)}</td>
-                                            <td>${position.quantity}</td>
+                                            <td><span class="change ${typeClass}">${positionType}</span></td>
+                                            <td>$${this.formatPrice(position.entry_price || 0)}</td>
+                                            <td>$${this.formatPrice(position.exit_price || 0)}</td>
+                                            <td>${this.formatNumber(position.quantity || 0)}</td>
+                                            <td>${position.leverage || 1}x</td>
+                                            <td>$${this.formatNumber(position.margin_used || position.invested_amount || 0)}</td>
                                             <td><span class="change ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</span></td>
                                             <td><span class="change ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</span></td>
-                                            <td>${position.strategy}</td>
-                                            <td>${position.holding_time || 'N/A'}</td>
-                                            <td style="font-size: 0.85rem;">${position.exit_datetime ? new Date(position.exit_datetime).toLocaleDateString() : 'N/A'}</td>
+                                            <td style="font-size: 0.85rem;">${position.strategy_name || position.strategy || 'Unknown'}</td>
+                                            <td style="font-size: 0.85rem;">${position.duration || position.holding_time || 'N/A'}</td>
+                                            <td style="font-size: 0.85rem;">${position.exit_time ? new Date(position.exit_time).toLocaleDateString() : (position.exit_datetime ? new Date(position.exit_datetime).toLocaleDateString() : 'N/A')}</td>
+                                            <td style="font-size: 0.85rem;">${position.close_reason || position.notes || 'Manual'}</td>
                                         </tr>
                                     `;
                                 }).join('')}
@@ -1766,6 +1949,70 @@
                 
                 container.innerHTML = tableHtml;
                 this.renderClosedPositionsPagination();
+            }
+            
+            renderClosedPositionsInTab() {
+                const container = document.getElementById('closedPositionsInTab');
+                const positions = this.data.positionsTabData.data;
+                
+                if (!positions || positions.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No closed positions found</div>';
+                    return;
+                }
+                
+                const tableHtml = `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Type</th>
+                                    <th>Entry Price</th>
+                                    <th>Exit Price</th>
+                                    <th>Quantity</th>
+                                    <th>Leverage</th>
+                                    <th>Margin Used</th>
+                                    <th>PnL</th>
+                                    <th>PnL %</th>
+                                    <th>Strategy</th>
+                                    <th>Duration</th>
+                                    <th>Exit Date</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${positions.map(position => {
+                                    const pnl = parseFloat(position.pnl || 0);
+                                    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                                    const pnlSymbol = pnl >= 0 ? '+' : '';
+                                    const positionType = position.position_type || position.type || 'LONG';
+                                    const typeClass = positionType === 'LONG' ? 'positive' : 'negative';
+                                    
+                                    return `
+                                        <tr>
+                                            <td><strong>${position.symbol}</strong></td>
+                                            <td><span class="change ${typeClass}">${positionType}</span></td>
+                                            <td>$${this.formatPrice(position.entry_price || 0)}</td>
+                                            <td>$${this.formatPrice(position.exit_price || 0)}</td>
+                                            <td>${this.formatNumber(position.quantity || 0)}</td>
+                                            <td>${position.leverage || 1}x</td>
+                                            <td>$${this.formatNumber(position.margin_used || position.invested_amount || 0)}</td>
+                                            <td><span class="change ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</span></td>
+                                            <td><span class="change ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</span></td>
+                                            <td style="font-size: 0.85rem;">${position.strategy_name || position.strategy || 'Unknown'}</td>
+                                            <td style="font-size: 0.85rem;">${position.duration || position.holding_time || 'N/A'}</td>
+                                            <td style="font-size: 0.85rem;">${position.exit_time ? new Date(position.exit_time).toLocaleDateString() : (position.exit_datetime ? new Date(position.exit_datetime).toLocaleDateString() : 'N/A')}</td>
+                                            <td style="font-size: 0.85rem;">${position.close_reason || position.notes || 'Manual'}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                container.innerHTML = tableHtml;
+                this.renderPositionsTabPagination();
             }
             
             renderClosedPositionsPagination() {
@@ -1793,26 +2040,55 @@
                 container.innerHTML = paginationHtml;
             }
             
+            renderPositionsTabPagination() {
+                const container = document.getElementById('positionsPagination');
+                const pagination = this.data.positionsTabData.pagination;
+                
+                if (!pagination || pagination.pages <= 1) {
+                    container.innerHTML = '';
+                    return;
+                }
+                
+                let paginationHtml = '';
+                
+                // Previous button
+                paginationHtml += `<button ${pagination.page <= 1 ? 'disabled' : ''} onclick="dashboard.loadClosedPositionsForTab(${pagination.page - 1})">Previous</button>`;
+                
+                // Page numbers
+                for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.pages, pagination.page + 2); i++) {
+                    paginationHtml += `<button class="${i === pagination.page ? 'active' : ''}" onclick="dashboard.loadClosedPositionsForTab(${i})">${i}</button>`;
+                }
+                
+                // Next button
+                paginationHtml += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="dashboard.loadClosedPositionsForTab(${pagination.page + 1})">Next</button>`;
+                
+                container.innerHTML = paginationHtml;
+            }
+            
             renderLiveNotifications() {
                 const container = document.getElementById('liveNotificationsList');
                 const notifications = this.data.notifications.live;
                 
-                if (notifications.length === 0) {
+                if (!notifications || notifications.length === 0) {
                     container.innerHTML = '<div class="empty-state">No recent notifications</div>';
                     return;
                 }
                 
                 container.innerHTML = notifications.map(notification => {
-                    const time = new Date(notification.timestamp).toLocaleTimeString();
+                    const time = new Date(notification.timestamp || notification.created_at || Date.now()).toLocaleTimeString();
+                    const level = notification.level || notification.priority || 'info';
+                    const title = notification.title || notification.type || 'Notification';
                     
                     return `
                         <div class="notification-item">
                             <div class="notification-header">
-                                <span class="notification-level ${notification.level || 'info'}">${(notification.level || 'info').toUpperCase()}</span>
+                                <span class="notification-level ${level}">${level.toUpperCase()}</span>
                                 <span class="notification-time">${time}</span>
                             </div>
                             <div class="notification-message">
-                                <strong>${notification.title || 'Notification'}</strong>: ${notification.message}
+                                <strong>${title}</strong>: ${notification.message}
+                                ${notification.symbol ? `<br><small>Symbol: ${notification.symbol}</small>` : ''}
+                                ${notification.data && typeof notification.data === 'object' ? `<br><small>Details: ${JSON.stringify(notification.data).substring(0, 100)}...</small>` : ''}
                             </div>
                         </div>
                     `;
@@ -1829,17 +2105,20 @@
                 }
                 
                 container.innerHTML = notifications.map(notification => {
-                    const time = new Date(notification.timestamp).toLocaleString();
+                    const time = new Date(notification.timestamp || notification.created_at || Date.now()).toLocaleString();
+                    const level = notification.level || notification.priority || 'info';
+                    const title = notification.title || notification.type || 'Notification';
                     
                     return `
                         <div class="notification-item">
                             <div class="notification-header">
-                                <span class="notification-level ${notification.level || 'info'}">${(notification.level || 'info').toUpperCase()}</span>
+                                <span class="notification-level ${level}">${level.toUpperCase()}</span>
                                 <span class="notification-time">${time}</span>
                             </div>
                             <div class="notification-message">
-                                <strong>${notification.title || 'Notification'}</strong>: ${notification.message}
+                                <strong>${title}</strong>: ${notification.message}
                                 ${notification.symbol ? `<br><small>Symbol: ${notification.symbol}</small>` : ''}
+                                ${notification.data && typeof notification.data === 'object' ? `<br><small>Details: ${JSON.stringify(notification.data).substring(0, 100)}...</small>` : ''}
                             </div>
                         </div>
                     `;
@@ -2020,12 +2299,9 @@
                             <div class="metric-value">${summary.daily_trades_count || 0}/${summary.daily_trades_limit || 50}</div>
                         </div>
                         <div class="metric-card ${summary.max_daily_profit >= 0 ? 'positive' : 'negative'}">
-                            <div class="metric-label">Max Daily Profit</div>
-                            <div class="metric-value">$${this.formatNumber(summary.max_daily_profit || 0)}</div>
-                        </div>
-                        <div class="metric-card ${summary.max_daily_loss <= 0 ? 'negative' : 'positive'}">
-                            <div class="metric-label">Max Daily Loss</div>
-                            <div class="metric-value">$${this.formatNumber(Math.abs(summary.max_daily_loss || 0))}</div>
+                            <div class="metric-label">Max Daily P&L</div>
+                            <div class="metric-value">$${this.formatNumber(summary.max_daily_profit || 0)} / $${this.formatNumber(Math.abs(summary.max_daily_loss || 0))}</div>
+                            <div class="metric-change" style="font-size: 0.75rem; margin-top: 4px;">Profit / Loss</div>
                         </div>
                         <div class="metric-card ${totalPnl >= 0 ? 'positive' : 'negative'}">
                             <div class="metric-label">Total P&L</div>
@@ -2140,6 +2416,7 @@
                 this.isConnected = false;
                 this.isConnecting = false;
                 this.isReconnecting = false;
+                this.connectionMutex = false;  // Release mutex
                 this.subscribed = false;
                 this.updateConnectionStatus('disconnected');
             }
@@ -2151,7 +2428,8 @@
                 }
                 
                 this.reconnectAttempts++;
-                const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
+                // Increase delays to reduce connection spam
+                const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 60000);  // Max 1 minute
                 
                 console.log(`⏰ Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
                 
@@ -2161,10 +2439,13 @@
                 }
                 
                 this.reconnectTimeoutId = setTimeout(() => {
-                    if (!this.isConnected && !this.isConnecting) {
+                    if (!this.isConnected && !this.isConnecting && !this.isReconnecting) {
                         console.log(`🔄 Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+                        this.isReconnecting = true;
                         this.updateConnectionStatus('connecting');
                         this.connectWebSocket();
+                    } else {
+                        console.log('🔄 Reconnect skipped - connection state changed');
                     }
                 }, delay);
             }
@@ -2176,29 +2457,24 @@
                 document.getElementById('applyNotificationFilters').addEventListener('click', () => this.applyNotificationFilters());
                 document.getElementById('clearNotificationFilters').addEventListener('click', () => this.clearNotificationFilters());
                 
-                // Page visibility and focus handlers
+                // Position tab filter event listeners
+                document.getElementById('applyPositionsFilters').addEventListener('click', () => this.applyPositionsFilters());
+                document.getElementById('clearPositionsFilters').addEventListener('click', () => this.clearPositionsFilters());
+                
+                // Page visibility and focus handlers - be less aggressive
                 document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden && !this.isConnected && !this.isConnecting && !this.isReconnecting) {
-                        console.log('👁️ Page became visible, checking connection');
+                    if (!document.hidden && !this.isConnected && !this.isConnecting && !this.isReconnecting && this.reconnectAttempts < this.maxReconnectAttempts) {
+                        console.log('👁️ Page became visible, checking connection after delay');
+                        // Longer delay to prevent rapid reconnections
                         setTimeout(() => {
-                            if (!this.isConnected && !this.isConnecting) {
-                                this.reconnectAttempts = Math.max(0, this.reconnectAttempts - 1);
-                                this.connectWebSocket();
+                            if (!this.isConnected && !this.isConnecting && !this.isReconnecting) {
+                                this.scheduleReconnect();
                             }
-                        }, 1000);
+                        }, 3000);  // 3 second delay
                     }
                 });
                 
-                window.addEventListener('focus', () => {
-                    if (!this.isConnected && !this.isConnecting && !this.isReconnecting) {
-                        console.log('🎯 Window focused, checking connection');
-                        setTimeout(() => {
-                            if (!this.isConnected && !this.isConnecting) {
-                                this.connectWebSocket();
-                            }
-                        }, 500);
-                    }
-                });
+                // Remove window focus handler to prevent excessive reconnects
                 
                 window.addEventListener('beforeunload', () => {
                     console.log('🚪 Page unloading, cleaning up connections');
@@ -2237,6 +2513,83 @@
                     setTimeout(() => {
                         indicator.classList.remove('flash');
                     }, 500);
+                }
+            }
+            
+            calculateHoldingTime(entryTime) {
+                if (!entryTime) return 'N/A';
+                
+                try {
+                    const entry = new Date(entryTime);
+                    const now = new Date();
+                    const diffMs = now - entry;
+                    
+                    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    if (hours > 24) {
+                        const days = Math.floor(hours / 24);
+                        return `${days}d ${hours % 24}h`;
+                    } else if (hours > 0) {
+                        return `${hours}h ${minutes}m`;
+                    } else {
+                        return `${minutes}m`;
+                    }
+                } catch {
+                    return 'N/A';
+                }
+            }
+            
+            async closePosition(positionId, symbol) {
+                if (!confirm(`Are you sure you want to close position for ${symbol}?`)) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/positions/${positionId}/close`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            reason: 'Manual close from dashboard'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log('Position closed successfully:', result);
+                        
+                        // Show success notification
+                        this.showNotification(`Position ${symbol} closed successfully`, 'success');
+                        
+                        // Refresh positions and closed positions
+                        this.loadClosedPositions();
+                    } else {
+                        const error = await response.json();
+                        console.error('Failed to close position:', error);
+                        this.showNotification(`Failed to close position: ${error.detail || error.message}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error closing position:', error);
+                    this.showNotification('Error closing position. Please try again.', 'error');
+                }
+            }
+            
+            showNotification(message, type = 'info') {
+                // Add notification to live notifications
+                const notification = {
+                    message: message,
+                    level: type,
+                    timestamp: new Date().toISOString(),
+                    title: type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info'
+                };
+                
+                this.data.notifications.live.unshift(notification);
+                this.data.notifications.live = this.data.notifications.live.slice(0, 15);
+                
+                if (this.currentNotificationTab === 'live') {
+                    this.renderLiveNotifications();
                 }
             }
         }

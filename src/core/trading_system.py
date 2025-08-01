@@ -546,10 +546,11 @@ class TradingSystem:
             
             # Broadcast system status
             self.logger.info("🔄 STEP 6.2: Broadcasting system status to WebSocket clients...")
-            await self.websocket_server.broadcast_notification(
+            await self.websocket_server.broadcast_notification_simple(
                 "system_startup",
                 "Trading system started successfully",
-                "info"
+                "info",
+                "System Status"
             )
             self.logger.info("✅ STEP 6.2: System status broadcasted")
             
@@ -1030,10 +1031,11 @@ class TradingSystem:
                 self.logger.warning(f"   💡 Reason: Only one position per symbol allowed")
                 
                 # Broadcast rejection notification
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "trade_rejected",
                     f"Trade rejected: {signal.symbol} already has an open position ({existing_position.position_type.value})",
-                    "warning"
+                    "warning",
+                    "Trade Alert"
                 )
                 
                 # Show position counts for debugging
@@ -1054,20 +1056,22 @@ class TradingSystem:
             
             if safe_quantity <= 0:
                 self.logger.warning(f"❌ Trade rejected by risk manager: {quantity_reason}")
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "trade_rejected",
                     f"Trade rejected: {quantity_reason}",
-                    "warning"
+                    "warning",
+                    "Risk Manager"
                 )
                 return
             
             # Log quantity adjustment if needed
             if safe_quantity < signal.quantity:
                 self.logger.info(f"📊 Quantity adjusted: {signal.quantity:.6f} → {safe_quantity:.6f} ({quantity_reason})")
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "quantity_adjusted",
                     f"Quantity adjusted from {signal.quantity:.6f} to {safe_quantity:.6f}: {quantity_reason}",
-                    "info"
+                    "info",
+                    "Risk Manager"
                 )
             
             # Create trade request with safe quantity
@@ -1132,10 +1136,11 @@ class TradingSystem:
                 )
                 
                 # Broadcast to WebSocket clients
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "trade_executed",
                     f"Trade executed: {signal.signal} {signal.symbol} at ${signal.price:.2f}",
-                    "success"
+                    "success",
+                    "Trade Execution"
                 )
                 
                 # Immediately broadcast updated positions and account (bypass throttling for trades)
@@ -1156,10 +1161,11 @@ class TradingSystem:
                 self._stats["trades_failed"] += 1
                 self.logger.error(f"❌ Trade execution failed: {signal.symbol}")
                 
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "trade_failed",
                     f"Trade execution failed for {signal.symbol}",
-                    "error"
+                    "error",
+                    "Trade Execution"
                 )
                 
         except Exception as e:
@@ -1177,10 +1183,11 @@ class TradingSystem:
                 self.logger.info(f"🛡️ Risk actions taken: {actions_taken}")
                 
                 # Broadcast risk actions to clients
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "risk_action",
                     f"Risk management actions: {actions_taken}",
-                    "warning"
+                    "warning",
+                    "Risk Manager"
                 )
             
             # Smart portfolio risk analysis with change detection
@@ -1216,10 +1223,11 @@ class TradingSystem:
                     self.logger.warning(f"📊 Portfolio risk level changed: {previous_risk_level} → {current_risk_level}")
                     self.logger.info(f"📈 Portfolio details: Margin usage: {portfolio_risk.get('portfolio_margin_usage', 0):.1f}%, PnL: {portfolio_risk.get('portfolio_pnl_percentage', 0):.1f}%")
                 
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "portfolio_risk",
                     f"Portfolio risk: {current_risk_level} ({portfolio_risk.get('portfolio_margin_usage', 0):.1f}% margin usage)",
-                    "error" if current_risk_level == "critical" else "warning"
+                    "error" if current_risk_level == "critical" else "warning",
+                    "Risk Analysis"
                 )
             
             # Store current risk level for next comparison
@@ -1353,10 +1361,11 @@ class TradingSystem:
                     self.logger.info(f"   {status} {component.capitalize()} cleanup")
                 
                 # Broadcast deletion notification
-                await self.websocket_server.broadcast_notification(
+                await self.websocket_server.broadcast_notification_simple(
                     "complete_cleanup",
                     "All data, logs, and cache files have been cleared",
-                    "info"
+                    "info",
+                    "System Cleanup"
                 )
                 return True
             else:

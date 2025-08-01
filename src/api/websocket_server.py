@@ -77,8 +77,8 @@ class ClientConnection:
                 # If neither closed nor open attribute exists, check connection state
                 websocket_alive = True
             
-            # Check heartbeat timeout (increase timeout to 120 seconds for better stability)
-            heartbeat_alive = (time.time() - self.last_heartbeat) < 120
+            # Check heartbeat timeout (reduce timeout to 60 seconds for faster cleanup)
+            heartbeat_alive = (time.time() - self.last_heartbeat) < 60
             
             return websocket_alive and heartbeat_alive
             
@@ -114,7 +114,7 @@ class WebSocketServer:
         self.max_queue_size = 100
         
         # Connection limits
-        self.max_connections_per_ip = 2  # Max 2 connections per IP
+        self.max_connections_per_ip = 1  # Max 1 connection per IP to prevent duplicates
         self.connection_timeout = 30  # seconds
         
         # Server state
@@ -219,41 +219,31 @@ class WebSocketServer:
                 async with self.client_lock:
                     duplicate_clients = []
                     for existing_id, existing_client in self.clients.items():
-                        if (existing_client.browser_fingerprint == browser_fingerprint and 
-                            existing_client.is_alive()):
-                            duplicate_clients.append(existing_id)
+                        if (existing_client.browser_fingerprint == browser_fingerprint or 
+                            existing_client.ip_address == client_ip):
+                            # Close any existing connection from same browser or IP immediately
+                            if existing_client.is_alive():
+                                duplicate_clients.append(existing_id)
                     
-                    # Close duplicate connections from same browser
+                    # Close duplicate connections more aggressively
                     if duplicate_clients:
-                        self.logger.warning(f"🚫 Duplicate browser connection detected. Closing {len(duplicate_clients)} existing connections.")
+                        self.logger.warning(f"🚫 Duplicate connection detected from {client_ip}. Closing {len(duplicate_clients)} existing connections.")
                         for dup_id in duplicate_clients:
+                            try:
+                                existing_client = self.clients.get(dup_id)
+                                if existing_client and existing_client.websocket:
+                                    await existing_client.websocket.close(code=4001, reason="Duplicate connection")
+                            except Exception as e:
+                                self.logger.debug(f"Error closing duplicate connection {dup_id}: {e}")
                             await self._remove_client(dup_id)
                         self.stats["duplicate_connections_blocked"] += len(duplicate_clients)
                     
-                    # Also check IP limit
-                    if client_ip in self.ip_connections:
-                        active_connections = len([
-                            cid for cid in self.ip_connections[client_ip] 
-                            if cid in self.clients and self.clients[cid].is_alive()
-                        ])
-                        
-                        if active_connections >= self.max_connections_per_ip:
-                            self.logger.warning(f"🚫 IP connection limit reached for {client_ip}. Closing oldest connection.")
-                            # Close oldest connection from same IP
-                            oldest_client_id = None
-                            oldest_time = float('inf')
-                            
-                            for cid in self.ip_connections[client_ip]:
-                                if cid in self.clients:
-                                    client_time = self.clients[cid].connected_at.timestamp()
-                                    if client_time < oldest_time:
-                                        oldest_time = client_time
-                                        oldest_client_id = cid
-                            
-                            if oldest_client_id:
-                                await self._remove_client(oldest_client_id)
-                            
-                            self.stats["duplicate_connections_blocked"] += 1
+                    # Enforce strict IP limit (only 1 connection per IP)
+                    if client_ip in self.ip_connections and self.ip_connections[client_ip]:
+                        self.logger.warning(f"🚫 IP connection limit reached for {client_ip}. Rejecting new connection.")
+                        await websocket.close(code=4003, reason="Connection limit exceeded")
+                        self.stats["duplicate_connections_blocked"] += 1
+                        return
                             
             except (asyncio.TimeoutError, json.JSONDecodeError) as e:
                 self.logger.warning(f"🚫 Invalid initial connection from {client_ip}: {e}")
@@ -339,7 +329,7 @@ class WebSocketServer:
             await self.mongodb_client.update_document(
                 "websocket_clients",
                 {"client_id": client_id},
-                {"$set": {"status": "disconnected", "disconnected_at": datetime.now(timezone.utc)}}
+                {"status": "disconnected", "disconnected_at": datetime.now(timezone.utc)}
             )
         except Exception as e:
             self.logger.debug(f"Failed to update client in DB: {e}")
@@ -555,29 +545,65 @@ class WebSocketServer:
 
     async def broadcast_positions_update(self, positions: List[Dict]):
         """Broadcast position updates to all subscribed clients"""
-        formatted_positions = {}
+        open_positions = []
         
         for position in positions:
-            if position.get("status") == "open":
-                formatted_positions[position["id"]] = {
-                    "symbol": position["symbol"],
-                    "side": position["position_type"],
-                    "size": position["quantity"],
-                    "entry_price": position["entry_price"],
-                    "current_price": position.get("current_price", position["entry_price"]),
-                    "pnl": position["pnl"],
-                    "pnl_percentage": position["pnl_percentage"],
-                    "unrealized_pnl": position["pnl"]
+            if position.get("status") == "OPEN" or position.get("status") == "open":
+                formatted_position = {
+                    "id": position.get("id"),
+                    "symbol": position.get("symbol"),
+                    "position_type": position.get("position_type"),
+                    "type": position.get("position_type"),  # Alias for frontend compatibility
+                    "side": position.get("position_type"),   # Another alias
+                    "quantity": position.get("quantity"),
+                    "entry_price": position.get("entry_price"),
+                    "current_price": position.get("current_price", position.get("entry_price")),
+                    "leverage": position.get("leverage", 1),
+                    "margin_used": position.get("margin_used"),
+                    "invested_amount": position.get("invested_amount"),
+                    "stop_loss": position.get("stop_loss"),
+                    "stop_loss_price": position.get("stop_loss"),  # Alias
+                    "target": position.get("target"),
+                    "target_price": position.get("target"),  # Alias
+                    "pnl": position.get("pnl"),
+                    "pnl_percentage": position.get("pnl_percentage"),
+                    "unrealized_pnl": position.get("pnl"),
+                    "strategy_name": position.get("strategy_name"),
+                    "strategy": position.get("strategy_name"),  # Alias
+                    "entry_time": position.get("entry_time"),
+                    "holding_time": position.get("holding_time")
                 }
+                open_positions.append(formatted_position)
         
-        await self._broadcast_to_subscribers(MessageType.POSITIONS, formatted_positions)
+        positions_data = {
+            "open_positions": open_positions,
+            "count": len(open_positions)
+        }
+        
+        await self._broadcast_to_subscribers(MessageType.POSITIONS, positions_data)
 
-    async def broadcast_notification(self, notification_id: str, message: str, level: str = "info"):
+    async def broadcast_notification(self, notification_data: Dict[str, Any]):
         """Broadcast notification to all subscribed clients"""
+        # Enhance notification data with required fields
+        enhanced_notification = {
+            "id": notification_data.get("id", str(uuid.uuid4())),
+            "message": notification_data.get("message", ""),
+            "level": notification_data.get("level", notification_data.get("priority", "info")),
+            "title": notification_data.get("title", notification_data.get("type", "Notification")),
+            "symbol": notification_data.get("symbol"),
+            "timestamp": notification_data.get("timestamp", datetime.now(timezone.utc).isoformat()),
+            "data": notification_data.get("data", {})
+        }
+        
+        await self._broadcast_to_subscribers(MessageType.NOTIFICATIONS, enhanced_notification)
+        
+    async def broadcast_notification_simple(self, notification_id: str, message: str, level: str = "info", title: str = "Notification"):
+        """Simple notification broadcast for backward compatibility"""
         notification_data = {
             "id": notification_id,
             "message": message,
             "level": level,
+            "title": title,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
@@ -599,8 +625,8 @@ class WebSocketServer:
         """Broadcast account summary to all subscribed clients"""
         await self._broadcast_to_subscribers(MessageType.ACCOUNT_SUMMARY, account_summary)
 
-    async def broadcast_positions_update(self, positions: List[Dict]):
-        """Broadcast positions update to all subscribed clients"""
+    async def broadcast_positions_update_direct(self, positions: List[Dict]):
+        """Direct broadcast positions update to all subscribed clients"""
         await self._broadcast_to_subscribers(MessageType.POSITIONS, positions)
 
     async def _broadcast_to_subscribers(self, message_type: MessageType, data: Dict[str, Any]):
@@ -691,7 +717,7 @@ class WebSocketServer:
                     for client_id, client in list(self.clients.items()):
                         # Check multiple conditions for dead connections
                         if (not client.is_alive() or 
-                            (current_time - client.last_heartbeat) > 180 or  # 3 minutes without heartbeat
+                            (current_time - client.last_heartbeat) > 90 or  # 1.5 minutes without heartbeat
                             hasattr(client.websocket, 'closed') and client.websocket.closed):
                             disconnected_clients.append(client_id)
                     

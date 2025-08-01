@@ -200,6 +200,88 @@ class TradingRestAPI:
                 self.logger.error(f"Error fetching position {position_id}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
+        @self.app.post("/api/positions/{position_id}/close")
+        async def close_position(position_id: str, request: Dict[str, Any]):
+            """Close an open position"""
+            try:
+                # Get the position from database
+                position = await self.mongodb_client.get_document("positions", {"id": position_id, "status": "OPEN"})
+                if not position:
+                    raise HTTPException(status_code=404, detail="Open position not found")
+                
+                # Get the current price for the symbol
+                current_price = await self._get_current_price(position["symbol"])
+                if not current_price:
+                    raise HTTPException(status_code=400, detail="Could not get current price for symbol")
+                
+                # Close the position by updating its status
+                close_reason = request.get("reason", "Manual close via API")
+                close_time = datetime.now(timezone.utc)
+                
+                # Calculate final PnL
+                entry_price = position["entry_price"]
+                quantity = position["quantity"]
+                position_type = position["position_type"]
+                
+                if position_type == "LONG":
+                    pnl = (current_price - entry_price) * quantity
+                else:
+                    pnl = (entry_price - current_price) * quantity
+                
+                pnl_percentage = (pnl / position.get("margin_used", position.get("invested_amount", 1))) * 100
+                
+                # Update position in database
+                update_data = {
+                    "status": "CLOSED",
+                    "exit_price": current_price,
+                    "exit_time": close_time.isoformat(),
+                    "pnl": pnl,
+                    "pnl_percentage": pnl_percentage,
+                    "notes": close_reason,
+                    "last_updated": close_time.isoformat()
+                }
+                
+                await self.mongodb_client.update_document("positions", {"id": position_id}, update_data)
+                
+                # Get updated position
+                updated_position = await self.mongodb_client.get_document("positions", {"id": position_id})
+                
+                self.logger.info(f"Position {position_id} closed successfully: PnL=${pnl:.2f}")
+                
+                return {
+                    "success": True,
+                    "message": f"Position closed successfully",
+                    "position": self._enhance_closed_position_api(updated_position),
+                    "pnl": pnl,
+                    "exit_price": current_price,
+                    "timestamp": close_time.isoformat()
+                }
+                
+            except HTTPException:
+                raise
+            except Exception as e:
+                self.logger.error(f"Error closing position {position_id}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        # Helper method to get current price
+        async def _get_current_price(self, symbol: str) -> Optional[float]:
+            """Get current price for a symbol from live prices"""
+            try:
+                # Try to get from recent market data
+                recent_data = await self.mongodb_client.get_latest_documents("market_data", {"symbol": symbol}, limit=1)
+                if recent_data:
+                    return recent_data[0].get("price")
+                
+                # Fallback: try to get from live prices collection if available
+                live_price = await self.mongodb_client.get_document("live_prices", {"symbol": symbol})
+                if live_price:
+                    return live_price.get("price")
+                
+                return None
+            except Exception as e:
+                self.logger.error(f"Error getting current price for {symbol}: {e}")
+                return None
+        
         # Notifications Endpoints
         @self.app.get("/api/notifications")
         async def get_notifications(
