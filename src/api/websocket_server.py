@@ -199,40 +199,70 @@ class WebSocketServer:
             self.logger.error(f"❌ Error stopping WebSocket server: {e}")
 
     async def _handle_client_connection(self, websocket: WebSocketServerProtocol, path: str = "/"):
-        """Handle new client connection with deduplication"""
+        """Handle new client connection with enhanced deduplication"""
         client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"
+        client_id = str(uuid.uuid4())
         
         try:
-            # Check for existing connections from same IP
-            async with self.client_lock:
-                if client_ip in self.ip_connections:
-                    active_connections = len([
-                        cid for cid in self.ip_connections[client_ip] 
-                        if cid in self.clients and self.clients[cid].is_alive()
-                    ])
+            # Wait for initial message to get browser fingerprint and session info
+            try:
+                # Wait for first message with timeout
+                first_message = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+                message_data = json.loads(first_message)
+                
+                browser_fingerprint = message_data.get('browserFingerprint', 'unknown')
+                session_id = message_data.get('sessionId', 'unknown')
+                tab_id = message_data.get('tabId', 'unknown')
+                user_agent = message_data.get('userAgent', '')
+                
+                # Check for duplicate browser fingerprint connections
+                async with self.client_lock:
+                    duplicate_clients = []
+                    for existing_id, existing_client in self.clients.items():
+                        if (existing_client.browser_fingerprint == browser_fingerprint and 
+                            existing_client.is_alive()):
+                            duplicate_clients.append(existing_id)
                     
-                    if active_connections >= self.max_connections_per_ip:
-                        self.logger.warning(f"🚫 Connection limit reached for IP {client_ip}. Closing oldest connection.")
-                        # Close oldest connection from same IP
-                        oldest_client_id = None
-                        oldest_time = float('inf')
+                    # Close duplicate connections from same browser
+                    if duplicate_clients:
+                        self.logger.warning(f"🚫 Duplicate browser connection detected. Closing {len(duplicate_clients)} existing connections.")
+                        for dup_id in duplicate_clients:
+                            await self._remove_client(dup_id)
+                        self.stats["duplicate_connections_blocked"] += len(duplicate_clients)
+                    
+                    # Also check IP limit
+                    if client_ip in self.ip_connections:
+                        active_connections = len([
+                            cid for cid in self.ip_connections[client_ip] 
+                            if cid in self.clients and self.clients[cid].is_alive()
+                        ])
                         
-                        for cid in self.ip_connections[client_ip]:
-                            if cid in self.clients:
-                                client_time = self.clients[cid].connected_at.timestamp()
-                                if client_time < oldest_time:
-                                    oldest_time = client_time
-                                    oldest_client_id = cid
-                        
-                        if oldest_client_id:
-                            await self._remove_client(oldest_client_id)
-                        
-                        self.stats["duplicate_connections_blocked"] += 1
+                        if active_connections >= self.max_connections_per_ip:
+                            self.logger.warning(f"🚫 IP connection limit reached for {client_ip}. Closing oldest connection.")
+                            # Close oldest connection from same IP
+                            oldest_client_id = None
+                            oldest_time = float('inf')
+                            
+                            for cid in self.ip_connections[client_ip]:
+                                if cid in self.clients:
+                                    client_time = self.clients[cid].connected_at.timestamp()
+                                    if client_time < oldest_time:
+                                        oldest_time = client_time
+                                        oldest_client_id = cid
+                            
+                            if oldest_client_id:
+                                await self._remove_client(oldest_client_id)
+                            
+                            self.stats["duplicate_connections_blocked"] += 1
+                            
+            except (asyncio.TimeoutError, json.JSONDecodeError) as e:
+                self.logger.warning(f"🚫 Invalid initial connection from {client_ip}: {e}")
+                await websocket.close(4000, "Invalid connection")
+                return
             
-            client_id = str(uuid.uuid4())
-            self.logger.info(f"🔌 Client connected: {client_id[:8]} from {client_ip}")
+            self.logger.info(f"🔌 Client connected: {client_id[:8]} from {client_ip} (Session: {session_id[:8]}, Tab: {tab_id[:8]}, FP: {browser_fingerprint[:8]})")
             
-            # Create client connection
+            # Create client connection with enhanced info
             client = ClientConnection(
                 websocket=websocket,
                 client_id=client_id,
@@ -240,7 +270,10 @@ class WebSocketServer:
                 subscriptions=set(),
                 last_heartbeat=time.time(),
                 ip_address=client_ip,
-                authenticated=False
+                user_agent=user_agent,
+                authenticated=False,
+                browser_fingerprint=browser_fingerprint,
+                tab_id=tab_id
             )
             
             # Add to clients and IP tracking
@@ -265,12 +298,18 @@ class WebSocketServer:
                     "status": "connected",
                     "client_id": client_id,
                     "server_time": datetime.now(timezone.utc).isoformat(),
-                    "available_subscriptions": [msg_type.value for msg_type in MessageType]
+                    "available_subscriptions": [msg_type.value for msg_type in MessageType],
+                    "session_id": session_id,
+                    "tab_id": tab_id
                 }
             )
             
+            # Handle subscription if provided in first message
+            if message_data.get('type') == 'subscribe':
+                await self._handle_subscription(client, message_data.get('channels', []))
+            
             # Handle client messages
-            await self._handle_client_messages(client)
+            await self._handle_client_messages_with_first(client, message_data)
             
         except ConnectionClosed:
             self.logger.info(f"🔌 Client {client_id} disconnected normally")
@@ -305,9 +344,10 @@ class WebSocketServer:
         except Exception as e:
             self.logger.debug(f"Failed to update client in DB: {e}")
 
-    async def _handle_client_messages(self, client: ClientConnection):
-        """Handle messages from client"""
+    async def _handle_client_messages_with_first(self, client: ClientConnection, first_message_data: dict):
+        """Handle messages from client with first message already processed"""
         try:
+            # Continue handling messages after the first one
             async for message in client.websocket:
                 try:
                     # Update heartbeat
@@ -324,20 +364,7 @@ class WebSocketServer:
                     
                     # Parse message
                     data = json.loads(message)
-                    
-                    # Handle different message types
-                    if data.get("type") == "subscribe":
-                        await self._handle_subscription(client, data.get("channels", []))
-                    elif data.get("type") == "unsubscribe":
-                        await self._handle_unsubscription(client, data.get("channels", []))
-                    elif data.get("type") == "ping":
-                        await self._send_message_to_client(
-                            client.client_id,
-                            MessageType.HEARTBEAT,
-                            {"pong": True, "timestamp": datetime.now(timezone.utc).isoformat()}
-                        )
-                    else:
-                        self.logger.warning(f"Unknown message type from client {client.client_id}: {data.get('type')}")
+                    await self._process_client_message(client, data)
                     
                 except json.JSONDecodeError:
                     await self._send_error_to_client(
@@ -357,6 +384,63 @@ class WebSocketServer:
             pass  # Normal disconnection
         except Exception as e:
             self.logger.error(f"Error in client message handler: {e}")
+
+    async def _handle_client_messages(self, client: ClientConnection):
+        """Handle messages from client"""
+        try:
+            async for message in client.websocket:
+                try:
+                    # Update heartbeat
+                    client.last_heartbeat = time.time()
+                    
+                    # Rate limiting check
+                    if not self._check_rate_limit(client.client_id):
+                        await self._send_error_to_client(
+                            client.client_id,
+                            "rate_limit_exceeded",
+                            "Too many messages per minute"
+                        )
+                        continue
+                    
+                    # Parse message
+                    data = json.loads(message)
+                    await self._process_client_message(client, data)
+                    
+                except json.JSONDecodeError:
+                    await self._send_error_to_client(
+                        client.client_id,
+                        "invalid_json",
+                        "Invalid JSON message format"
+                    )
+                except Exception as e:
+                    self.logger.error(f"Error processing message from client {client.client_id}: {e}")
+                    await self._send_error_to_client(
+                        client.client_id,
+                        "processing_error",
+                        str(e)
+                    )
+                    
+        except ConnectionClosed:
+            pass  # Normal disconnection
+        except Exception as e:
+            self.logger.error(f"Error in client message handler: {e}")
+
+    async def _process_client_message(self, client: ClientConnection, data: dict):
+        """Process individual client messages"""
+        message_type = data.get("type")
+        
+        if message_type == "subscribe":
+            await self._handle_subscription(client, data.get("channels", []))
+        elif message_type == "unsubscribe":
+            await self._handle_unsubscription(client, data.get("channels", []))
+        elif message_type == "ping":
+            await self._send_message_to_client(
+                client.client_id,
+                MessageType.HEARTBEAT,
+                {"pong": True, "timestamp": datetime.now(timezone.utc).isoformat()}
+            )
+        else:
+            self.logger.debug(f"Unknown message type from client {client.client_id}: {message_type}")
 
     async def _handle_subscription(self, client: ClientConnection, channels: List[str]):
         """Handle client subscription to channels"""
