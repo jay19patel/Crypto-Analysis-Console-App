@@ -463,9 +463,9 @@ Based on current portfolio state, system provides actionable advice:
 
 This system is designed to be fully automated while keeping you informed of every action through detailed email notifications and maintaining strict risk controls to protect your capital.
 
-**Last Updated**: 2025-01-29  
-**Version**: 3.0 - Optimized Configuration  
-**Features**: Anti-Overtrade Protection, Smart Risk Management, Comprehensive Email System
+**Last Updated**: 2025-08-01  
+**Version**: 3.1 - Enhanced Dashboard & API Improvements  
+**Features**: Anti-Overtrade Protection, Smart Risk Management, Comprehensive Email System, Enhanced Trading Dashboard, Real-time WebSocket Integration
 
 
 
@@ -525,3 +525,33 @@ Confidence >50%  Qty >0       Daily Limit  Risk Manager   0.1% Fee    Position D
 - **Leverage Limits**: 1x default, 5x maximum with risk adjustments
 - **Stop-Loss**: Automatic 5% stop-loss from entry price
 - **Take-Profit**: Automatic 10% take-profit target
+
+---
+
+## 🌟 New Features & Dashboard Enhancements (v3.1)
+
+### Enhanced Trading Dashboard
+- **Real-Time System Status**: Live system status with uptime display in header
+- **Integrated Documentation**: Built-in README viewer accessible from dashboard
+- **Live Market Data Banner**: Horizontal display of all symbols with real-time price updates
+- **Trades History**: Comprehensive trades tab with detailed filtering and pagination
+- **Streamlined UI**: Combined position metrics (Open/Closed) for cleaner interface
+- **Advanced Filtering**: Date range, symbol, strategy, and search filters across all sections
+
+### API & WebSocket Improvements
+- **New Trades API**: `/api/trades` endpoint for complete trade history with filtering
+- **Enhanced WebSocket**: System status broadcasting with uptime and connection info
+- **Strategy Signals Focus**: Replaced performance section with focused strategy signals
+- **Real-Time Updates**: Live price feeds, position updates, and system status via WebSocket
+
+### User Experience Enhancements
+- **Professional Modal System**: In-dashboard documentation viewer with beautiful styling
+- **Responsive Design**: Optimized layout for desktop and mobile viewing
+- **Visual Indicators**: Real-time status indicators and connection health monitoring
+- **Error Handling**: Comprehensive error handling with user-friendly feedback
+
+### Technical Architecture Updates
+- **WebSocket Server**: Enhanced client connection management with session tracking
+- **Database Schema**: Optimized for trades tracking and system metrics
+- **REST API**: Extended endpoints for comprehensive data access
+- **Frontend Architecture**: Modern JavaScript with real-time data synchronization

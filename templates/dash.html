@@ -112,6 +112,53 @@
             to { transform: rotate(360deg); }
         }
 
+        .system-status-header {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            color: var(--accent-green);
+            font-size: 0.8rem;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.offline {
+            color: var(--accent-red);
+        }
+
+        .btn-readme {
+            padding: 8px 16px;
+            background: rgba(79, 124, 255, 0.2);
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-readme:hover {
+            background: rgba(79, 124, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
         .connection-controls {
             display: flex;
             align-items: center;
@@ -507,6 +554,58 @@
             color: var(--text-primary);
         }
 
+        .live-prices-banner {
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, rgba(0, 208, 132, 0.05) 0%, rgba(79, 124, 255, 0.05) 100%);
+            border: 1px solid rgba(0, 208, 132, 0.2);
+        }
+
+        .price-banner-container {
+            display: flex;
+            gap: 20px;
+            padding: 15px 0;
+            overflow-x: auto;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .price-banner-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 25px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 150px;
+            transition: all 0.3s ease;
+        }
+
+        .price-banner-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .price-banner-symbol {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+
+        .price-banner-price {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 3px;
+        }
+
+        .price-banner-change {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
         .price-grid-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -784,6 +883,105 @@
             font-size: 0.85rem;
         }
 
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(26, 31, 46, 0.95) 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 800px;
+            max-height: 80vh;
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--shadow-lg);
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-body {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .modal-body h3 {
+            color: var(--text-primary);
+            margin: 20px 0 10px 0;
+            font-weight: 600;
+        }
+
+        .modal-body p {
+            margin-bottom: 15px;
+        }
+
+        .modal-body ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .modal-body li {
+            margin-bottom: 5px;
+        }
+
+        .modal-body code {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
         @media (max-width: 768px) {
             .grid {
                 grid-template-columns: 1fr;
@@ -842,6 +1040,21 @@
     <div class="dashboard">
         <div class="header">
             <h1><i class="fas fa-rocket"></i> Advanced Crypto Trading Hub</h1>
+            <div class="system-status-header">
+                <div class="status-item">
+                    <i class="fas fa-circle status-indicator" id="statusIndicator"></i>
+                    <span id="statusText">System: <span id="systemStatus">Starting...</span></span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-clock"></i>
+                    <span>Uptime: <span id="systemUptime">0m</span></span>
+                </div>
+                <div class="status-item">
+                    <button class="btn-readme" onclick="dashboard.showReadme()">
+                        <i class="fas fa-book"></i> Documentation
+                    </button>
+                </div>
+            </div>
             <div class="connection-controls">
                 <div id="connectionStatus" class="connection-status status-connecting">
                     <span class="loading"></span> Connecting to WebSocket...
@@ -867,17 +1080,18 @@
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Live Prices Card with Side-by-Side Layout -->
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-chart-line icon"></i>
-                    Live Prices
-                </div>
-                <div id="livePrices" class="price-grid-container">
-                    <div class="empty-state">Waiting for price data...</div>
-                </div>
+        <!-- Live Prices Banner - Full Width Under Header -->
+        <div class="card wide-grid live-prices-banner">
+            <div class="card-title">
+                <i class="fas fa-chart-line icon"></i>
+                Live Market Prices
             </div>
+            <div id="livePrices" class="price-banner-container">
+                <div class="empty-state">Waiting for price data...</div>
+            </div>
+        </div>
+
+        <div class="grid">
 
             <!-- Positions Section with Tabs -->
             <div class="card wide-grid">
@@ -889,6 +1103,7 @@
                 <div class="tabs" id="positionTabs">
                     <div class="tab active" onclick="dashboard.switchPositionTab('open')">Open Positions</div>
                     <div class="tab" onclick="dashboard.switchPositionTab('closed')">Closed Positions</div>
+                    <div class="tab" onclick="dashboard.switchPositionTab('trades')">Trades</div>
                 </div>
                 
                 <div id="openPositionsTab" class="tab-content active">
@@ -918,6 +1133,29 @@
                         <div class="empty-state">Loading closed positions...</div>
                     </div>
                     <div id="positionsPagination" class="pagination"></div>
+                </div>
+
+                <div id="tradesTab" class="tab-content">
+                    <div class="filters-row">
+                        <input type="date" id="tradesDateFrom" class="filter-input" placeholder="From Date">
+                        <input type="date" id="tradesDateTo" class="filter-input" placeholder="To Date">
+                        <input type="text" id="tradesSymbolFilter" class="filter-input" placeholder="Symbol">
+                        <select id="tradesStrategyFilter" class="filter-select">
+                            <option value="">All Strategies</option>
+                        </select>
+                        <select id="tradesTypeFilter" class="filter-select">
+                            <option value="">All Types</option>
+                            <option value="LONG">Long</option>
+                            <option value="SHORT">Short</option>
+                        </select>
+                        <input type="text" id="tradesSearchFilter" class="filter-input" placeholder="Search...">
+                        <button id="applyTradesFilters" class="btn-primary">Apply Filters</button>
+                        <button id="clearTradesFilters" class="btn-secondary">Clear</button>
+                    </div>
+                    <div id="tradesInTab" class="scroll-container">
+                        <div class="empty-state">No trades found</div>
+                    </div>
+                    <div id="tradesTabPagination" class="pagination"></div>
                 </div>
             </div>
 
@@ -1026,42 +1264,6 @@
                 </div>
             </div>
 
-            <!-- Strategies Performance Card with Tabs -->
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-brain icon"></i>
-                    Strategies Performance
-                </div>
-                <div class="tabs" id="strategyTabs">
-                    <div class="tab active" onclick="dashboard.switchStrategyTab('live')">Live Performance</div>
-                    <div class="tab" onclick="dashboard.switchStrategyTab('historical')">Historical</div>
-                </div>
-                
-                <div id="liveStrategiesTab" class="tab-content active">
-                    <div id="strategiesPerformance" class="scroll-container">
-                        <div class="empty-state">Loading strategies...</div>
-                    </div>
-                </div>
-                
-                <div id="historicalStrategiesTab" class="tab-content">
-                    <div class="filters-row">
-                        <input type="date" id="strategiesDateFrom" class="filter-input" placeholder="From Date">
-                        <input type="date" id="strategiesDateTo" class="filter-input" placeholder="To Date">
-                        <input type="text" id="strategiesNameFilter" class="filter-input" placeholder="Strategy">
-                        <select id="strategiesStatusFilter" class="filter-select">
-                            <option value="">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-                        <button id="applyStrategiesFilters" class="btn-primary">Apply Filters</button>
-                        <button id="clearStrategiesFilters" class="btn-secondary">Clear</button>
-                    </div>
-                    <div id="historicalStrategiesList" class="scroll-container">
-                        <div class="empty-state">Loading historical strategies...</div>
-                    </div>
-                    <div id="strategiesPagination" class="pagination"></div>
-                </div>
-            </div>
 
         </div>
     </div>
@@ -1105,6 +1307,11 @@
                         pagination: {}
                     },
                     positionsTabFilters: {},
+                    tradesTabData: {
+                        data: [],
+                        pagination: {}
+                    },
+                    tradesTabFilters: {},
                     signals: [],
                     signalsData: {
                         historical: {
@@ -1129,7 +1336,8 @@
                             pagination: {},
                             filters: {}
                         }
-                    }
+                    },
+                    systemInfo: {}
                 };
                 
                 // REST API base URL
@@ -1499,7 +1707,13 @@
                     case 'account_summary':
                         this.updateAccountSummary(message.data);
                         break;
+                    case 'system_status':
+                        this.updateSystemStatus(message.data);
+                        break;
                     case 'heartbeat':
+                        if (message.data && message.data.system_info) {
+                            this.updateSystemStatus(message.data.system_info);
+                        }
                         break;
                     default:
                         console.log('Unknown message type:', message.type);
@@ -1565,6 +1779,44 @@
                     this.flashUpdateIndicator('accountUpdateIndicator');
                 } else {
                     console.warn('Invalid account summary data received:', summary);
+                }
+            }
+            
+            updateSystemStatus(systemInfo) {
+                console.log('⚙️ System status updated:', systemInfo);
+                if (systemInfo && typeof systemInfo === 'object') {
+                    // Update system status text
+                    const statusElement = document.getElementById('systemStatus');
+                    const uptimeElement = document.getElementById('systemUptime');
+                    const statusIndicator = document.getElementById('statusIndicator');
+                    
+                    if (statusElement && systemInfo.status) {
+                        statusElement.textContent = systemInfo.status;
+                        
+                        // Update status indicator based on status
+                        if (statusIndicator) {
+                            statusIndicator.classList.remove('offline');
+                            if (systemInfo.status.toLowerCase().includes('error') || 
+                                systemInfo.status.toLowerCase().includes('offline') ||
+                                systemInfo.status.toLowerCase().includes('stopped')) {
+                                statusIndicator.classList.add('offline');
+                            }
+                        }
+                    }
+                    
+                    if (uptimeElement && (systemInfo.uptime || systemInfo.uptime_seconds)) {
+                        // Handle both formatted uptime string and seconds
+                        if (systemInfo.uptime) {
+                            uptimeElement.textContent = systemInfo.uptime;
+                        } else if (systemInfo.uptime_seconds) {
+                            uptimeElement.textContent = this.formatUptime(systemInfo.uptime_seconds);
+                        }
+                    }
+                    
+                    // Store system info for other uses
+                    this.data.systemInfo = systemInfo;
+                } else {
+                    console.warn('Invalid system status data received:', systemInfo);
                 }
             }
             
@@ -1716,6 +1968,38 @@
                 
                 this.data.positionsTabFilters = {};
                 this.loadClosedPositionsForTab(1);
+            }
+            
+            // Trades tab filter methods
+            applyTradesFilters() {
+                const filters = {
+                    date_from: document.getElementById('tradesDateFrom').value,
+                    date_to: document.getElementById('tradesDateTo').value,
+                    symbol: document.getElementById('tradesSymbolFilter').value,
+                    strategy: document.getElementById('tradesStrategyFilter').value,
+                    type: document.getElementById('tradesTypeFilter').value,
+                    search: document.getElementById('tradesSearchFilter').value
+                };
+                
+                // Remove empty filters
+                Object.keys(filters).forEach(key => {
+                    if (!filters[key]) delete filters[key];
+                });
+
+                this.data.tradesTabFilters = filters;
+                this.loadTradesForTab(1);
+            }
+
+            clearTradesFilters() {
+                document.getElementById('tradesDateFrom').value = '';
+                document.getElementById('tradesDateTo').value = '';
+                document.getElementById('tradesSymbolFilter').value = '';
+                document.getElementById('tradesStrategyFilter').value = '';
+                document.getElementById('tradesTypeFilter').value = '';
+                document.getElementById('tradesSearchFilter').value = '';
+                
+                this.data.tradesTabFilters = {};
+                this.loadTradesForTab(1);
             }
             
             // Signal filter methods
@@ -1876,20 +2160,29 @@
                 
                 // Update tab appearance (only for position tabs)
                 const positionTabs = document.querySelectorAll('#positionTabs .tab');
-                const positionTabContents = document.querySelectorAll('#openPositionsTab, #closedPositionsTab');
+                const positionTabContents = document.querySelectorAll('#openPositionsTab, #closedPositionsTab, #tradesTab');
                 
                 positionTabs.forEach(t => t.classList.remove('active'));
                 positionTabContents.forEach(tc => tc.classList.remove('active'));
                 
                 event.target.classList.add('active');
-                document.getElementById(`${tab}PositionsTab`).classList.add('active');
+                
+                // Handle different tab content containers
+                if (tab === 'trades') {
+                    document.getElementById('tradesTab').classList.add('active');
+                } else {
+                    document.getElementById(`${tab}PositionsTab`).classList.add('active');
+                }
                 
                 // Render appropriate content
                 if (tab === 'open') {
                     this.renderOpenPositions();
-                } else {
+                } else if (tab === 'closed') {
                     this.renderClosedPositionsInTab();
                     this.loadClosedPositionsForTab();
+                } else if (tab === 'trades') {
+                    this.renderTradesInTab();
+                    this.loadTradesForTab();
                 }
             }
             
@@ -1954,18 +2247,11 @@
                     const changeSymbol = change >= 0 ? '+' : '';
                     
                     return `
-                        <div class="price-item">
-                            <div>
-                                <div class="symbol">${symbol}</div>
-                                <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                                    Vol: ${this.formatNumber(data.volume || 0)}
-                                </div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div class="price">$${this.formatPrice(price)}</div>
-                                <div class="change ${changeClass}">
-                                    ${changeSymbol}${change.toFixed(2)}%
-                                </div>
+                        <div class="price-banner-item">
+                            <div class="price-banner-symbol">${symbol}</div>
+                            <div class="price-banner-price">$${this.formatPrice(price)}</div>
+                            <div class="price-banner-change ${changeClass}">
+                                ${changeSymbol}${change.toFixed(2)}%
                             </div>
                         </div>
                     `;
@@ -2216,6 +2502,110 @@
                 
                 // Next button
                 paginationHtml += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="dashboard.loadClosedPositionsForTab(${pagination.page + 1})">Next</button>`;
+                
+                container.innerHTML = paginationHtml;
+            }
+            
+            // Trades tab functions
+            async loadTradesForTab(page = 1) {
+                try {
+                    const filters = this.data.tradesTabFilters || {};
+                    const params = new URLSearchParams({
+                        page: page,
+                        per_page: 20,
+                        ...filters
+                    });
+                    
+                    const response = await fetch(`/api/trades?${params}`);
+                    const data = await response.json();
+                    
+                    this.data.tradesTabData = {
+                        data: data.trades,
+                        pagination: data.pagination
+                    };
+                    this.renderTradesInTab();
+                } catch (error) {
+                    console.error('Error loading trades for tab:', error);
+                    document.getElementById('tradesInTab').innerHTML = '<div class="empty-state">Error loading trades</div>';
+                }
+            }
+            
+            renderTradesInTab() {
+                const container = document.getElementById('tradesInTab');
+                const trades = this.data.tradesTabData.data;
+                
+                if (!trades || trades.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No trades found</div>';
+                    return;
+                }
+                
+                const tableHtml = `
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Type</th>
+                                    <th>Side</th>
+                                    <th>Size</th>
+                                    <th>Entry Price</th>
+                                    <th>Exit Price</th>
+                                    <th>P&L</th>
+                                    <th>Strategy</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${trades.map(trade => {
+                                    const pnl = parseFloat(trade.realized_pnl || 0);
+                                    const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                                    const pnlSymbol = pnl >= 0 ? '+' : '';
+                                    const timestamp = new Date(trade.exit_time || trade.timestamp).toLocaleString();
+                                    
+                                    return `
+                                        <tr>
+                                            <td><strong>${trade.symbol}</strong></td>
+                                            <td><span class="badge">${trade.position_type || 'N/A'}</span></td>
+                                            <td><span class="badge ${trade.side === 'BUY' ? 'positive' : 'negative'}">${trade.side}</span></td>
+                                            <td>${this.formatNumber(trade.quantity || 0)}</td>
+                                            <td>$${this.formatPrice(trade.entry_price || 0)}</td>
+                                            <td>$${this.formatPrice(trade.exit_price || 0)}</td>
+                                            <td class="${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</td>
+                                            <td>${trade.strategy || 'Manual'}</td>
+                                            <td>${timestamp}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                container.innerHTML = tableHtml;
+                this.renderTradesInTabPagination();
+            }
+            
+            renderTradesInTabPagination() {
+                const container = document.getElementById('tradesTabPagination');
+                const pagination = this.data.tradesTabData.pagination;
+                
+                if (!pagination || pagination.pages <= 1) {
+                    container.innerHTML = '';
+                    return;
+                }
+                
+                let paginationHtml = '';
+                
+                // Previous button
+                paginationHtml += `<button ${pagination.page <= 1 ? 'disabled' : ''} onclick="dashboard.loadTradesForTab(${pagination.page - 1})">Previous</button>`;
+                
+                // Page numbers
+                for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.pages, pagination.page + 2); i++) {
+                    paginationHtml += `<button class="${i === pagination.page ? 'active' : ''}" onclick="dashboard.loadTradesForTab(${i})">${i}</button>`;
+                }
+                
+                // Next button
+                paginationHtml += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="dashboard.loadTradesForTab(${pagination.page + 1})">Next</button>`;
                 
                 container.innerHTML = paginationHtml;
             }
@@ -2578,12 +2968,8 @@
                             <div class="metric-value">${unrealizedPnl >= 0 ? '+' : ''}$${Math.abs(unrealizedPnl).toFixed(2)}</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-label">Open Positions</div>
-                            <div class="metric-value">${summary.open_positions_count || 0}</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Closed Positions</div>
-                            <div class="metric-value">${summary.closed_positions_count || 0}</div>
+                            <div class="metric-label">Positions (Open/Closed)</div>
+                            <div class="metric-value">${summary.open_positions_count || 0}/${summary.closed_positions_count || 0}</div>
                         </div>
                         <div class="metric-card">
                             <div class="metric-label">Win Rate</div>
@@ -2624,18 +3010,26 @@
                         statusElement.classList.add('pulse');
                         connectBtn.disabled = true;
                         disconnectBtn.disabled = false;
+                        // Update system status to online when WebSocket connects
+                        document.getElementById('systemStatus').textContent = 'Online';
+                        document.getElementById('statusIndicator').classList.remove('offline');
                         break;
                     case 'connecting':
                         statusElement.innerHTML = '<span class="loading"></span> Connecting...';
                         statusElement.classList.remove('pulse');
                         connectBtn.disabled = true;
                         disconnectBtn.disabled = true;
+                        // Update system status when connecting
+                        document.getElementById('systemStatus').textContent = 'Connecting...';
                         break;
                     case 'disconnected':
                         statusElement.innerHTML = '🔴 Disconnected';
                         statusElement.classList.remove('pulse');
                         connectBtn.disabled = false;
                         disconnectBtn.disabled = true;
+                        // Update system status when disconnected
+                        document.getElementById('systemStatus').textContent = 'Offline';
+                        document.getElementById('statusIndicator').classList.add('offline');
                         break;
                 }
             }
@@ -2714,6 +3108,10 @@
                 document.getElementById('applyPositionsFilters').addEventListener('click', () => this.applyPositionsFilters());
                 document.getElementById('clearPositionsFilters').addEventListener('click', () => this.clearPositionsFilters());
                 
+                // Trades tab filter event listeners
+                document.getElementById('applyTradesFilters').addEventListener('click', () => this.applyTradesFilters());
+                document.getElementById('clearTradesFilters').addEventListener('click', () => this.clearTradesFilters());
+                
                 // Signal filter event listeners
                 document.getElementById('applySignalsFilters').addEventListener('click', () => this.applySignalsFilters());
                 document.getElementById('clearSignalsFilters').addEventListener('click', () => this.clearSignalsFilters());
@@ -2721,6 +3119,20 @@
                 // Strategy filter event listeners
                 document.getElementById('applyStrategiesFilters').addEventListener('click', () => this.applyStrategiesFilters());
                 document.getElementById('clearStrategiesFilters').addEventListener('click', () => this.clearStrategiesFilters());
+                
+                // Modal event listeners
+                document.getElementById('readmeModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'readmeModal') {
+                        this.closeReadme();
+                    }
+                });
+                
+                // Close modal on escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closeReadme();
+                    }
+                });
                 
                 // Page visibility and focus handlers - be less aggressive
                 document.addEventListener('visibilitychange', () => {
@@ -2818,6 +3230,19 @@
                     this.renderLiveNotifications();
                 }
             }
+            
+            // Modal functions
+            showReadme() {
+                const modal = document.getElementById('readmeModal');
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            closeReadme() {
+                const modal = document.getElementById('readmeModal');
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
         }
         
         // Initialize dashboard when page loads
@@ -2832,5 +3257,75 @@
             new TradingDashboard();
         });
     </script>
+
+    <!-- README Modal -->
+    <div id="readmeModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-book"></i>
+                    Trading Dashboard Documentation
+                </div>
+                <button class="modal-close" onclick="dashboard.closeReadme()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <h3>Overview</h3>
+                <p>This advanced crypto trading dashboard provides real-time monitoring and management of your automated trading system.</p>
+                
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Live Market Prices:</strong> Real-time price data for monitored cryptocurrency pairs</li>
+                    <li><strong>Account Summary:</strong> Current balance, P&L, margin usage, and performance metrics</li>
+                    <li><strong>Trading Positions:</strong> Track open, closed positions, and completed trades</li>
+                    <li><strong>Live Notifications:</strong> Real-time alerts and system notifications</li>
+                    <li><strong>Strategy Signals:</strong> Monitor trading strategy recommendations and signals</li>
+                </ul>
+                
+                <h3>Navigation</h3>
+                <ul>
+                    <li><strong>Open Positions:</strong> View currently active trading positions</li>
+                    <li><strong>Closed Positions:</strong> Browse historical completed positions with filtering</li>
+                    <li><strong>Trades:</strong> Detailed trade history with comprehensive filtering options</li>
+                    <li><strong>Live Notifications:</strong> Recent system alerts and trading notifications</li>
+                    <li><strong>Historical Data:</strong> Use date filters to analyze past performance</li>
+                </ul>
+                
+                <h3>System Status</h3>
+                <p>The header displays real-time system status including:</p>
+                <ul>
+                    <li><strong>Connection Status:</strong> WebSocket connection state</li>
+                    <li><strong>System Uptime:</strong> How long the trading system has been running</li>
+                    <li><strong>Live Data:</strong> Real-time updates from the trading engine</li>
+                </ul>
+                
+                <h3>Filtering & Search</h3>
+                <p>Most sections support advanced filtering:</p>
+                <ul>
+                    <li><strong>Date Range:</strong> Filter by specific time periods</li>
+                    <li><strong>Symbol:</strong> Filter by specific cryptocurrency pairs</li>
+                    <li><strong>Strategy:</strong> Filter by trading strategy name</li>
+                    <li><strong>Type/Side:</strong> Filter by position type (LONG/SHORT) or trade side (BUY/SELL)</li>
+                    <li><strong>Search:</strong> Text search across relevant fields</li>
+                </ul>
+                
+                <h3>Performance Metrics</h3>
+                <ul>
+                    <li><strong>Realized P&L:</strong> Profits/losses from closed positions</li>
+                    <li><strong>Unrealized P&L:</strong> Current profits/losses from open positions</li>
+                    <li><strong>Win Rate:</strong> Percentage of profitable trades</li>
+                    <li><strong>Account Growth:</strong> Total account performance over time</li>
+                </ul>
+                
+                <h3>Controls</h3>
+                <ul>
+                    <li><strong>Connect/Disconnect:</strong> Manage WebSocket connection to trading system</li>
+                    <li><strong>Refresh:</strong> Click section headers to manually refresh data</li>
+                    <li><strong>Pagination:</strong> Navigate through large datasets efficiently</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

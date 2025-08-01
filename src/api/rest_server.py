@@ -351,63 +351,101 @@ class TradingRestAPI:
                 self.logger.error(f"Error fetching notifications: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        # Strategies Endpoints
-        @self.app.get("/api/strategies")
-        async def get_strategies():
-            """Get all strategies with performance data"""
+        
+        # Trades Endpoints
+        @self.app.get("/api/trades")
+        async def get_trades(
+            date_from: Optional[str] = Query(None),
+            date_to: Optional[str] = Query(None),
+            symbol: Optional[str] = Query(None),
+            strategy: Optional[str] = Query(None),
+            position_type: Optional[str] = Query(None),
+            page: int = Query(1, ge=1),
+            limit: int = Query(50, ge=1, le=200),
+            search: Optional[str] = Query(None)
+        ):
+            """Get all trades (closed positions) with filters and pagination"""
             try:
-                # Get strategy performance from database
+                filters = {}
+                
+                # Add status filter for closed positions
+                filters["status"] = "CLOSED"
+                
+                # Date range filter
+                if date_from or date_to:
+                    date_filter = {}
+                    if date_from:
+                        date_filter["$gte"] = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                    if date_to:
+                        date_filter["$lte"] = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                    filters["exit_time"] = date_filter
+                
+                # Symbol filter
+                if symbol:
+                    filters["symbol"] = {"$regex": symbol, "$options": "i"}
+                
+                # Strategy filter
+                if strategy:
+                    filters["strategy_name"] = {"$regex": strategy, "$options": "i"}
+                
+                # Position type filter
+                if position_type:
+                    filters["position_type"] = position_type.upper()
+                
+                # Search filter
+                if search:
+                    search_filter = {
+                        "$or": [
+                            {"symbol": {"$regex": search, "$options": "i"}},
+                            {"strategy_name": {"$regex": search, "$options": "i"}},
+                            {"notes": {"$regex": search, "$options": "i"}}
+                        ]
+                    }
+                    filters.update(search_filter)
+                
+                # Calculate skip for pagination
+                skip = (page - 1) * limit
+                
+                # Get trades from database using available methods
                 if not await self.mongodb_client.connect():
                     raise HTTPException(status_code=500, detail="Database connection failed")
                 
-                strategies_collection = self.mongodb_client.db["strategy_performance"]
-                strategies_cursor = strategies_collection.find({})
-                strategies = await strategies_cursor.to_list(length=None)
+                positions_collection = self.mongodb_client.db["positions"]
+                positions_cursor = positions_collection.find(filters).sort("exit_time", -1).skip(skip).limit(limit)
+                trades = await positions_cursor.to_list(length=limit)
                 
-                # Get recent signals for each strategy
-                enhanced_strategies = []
-                for strategy in strategies:
-                    # Get recent signals
-                    signals_collection = self.mongodb_client.db["trading_signals"]
-                    recent_signals_cursor = signals_collection.find({
-                        "strategy_name": strategy.get("strategy_name")
-                    }).sort("timestamp", -1).limit(10)
-                    recent_signals = await recent_signals_cursor.to_list(length=10)
-                    
-                    enhanced_strategy = {
-                        "name": strategy.get("strategy_name", "Unknown"),
-                        "symbol": strategy.get("symbol", ""),
-                        "performance": {
-                            "total_signals": strategy.get("total_signals", 0),
-                            "win_rate": strategy.get("win_rate", 0.0),
-                            "total_pnl": strategy.get("total_pnl", 0.0),
-                            "avg_confidence": strategy.get("avg_confidence", 0.0),
-                            "last_signal_time": strategy.get("last_signal_time"),
-                            "signals_today": strategy.get("signals_today", 0)
-                        },
-                        "recent_signals": [
-                            {
-                                "signal": signal.get("signal"),
-                                "confidence": signal.get("confidence", 0.0),
-                                "timestamp": signal.get("timestamp", datetime.now(timezone.utc)).isoformat(),
-                                "price": signal.get("price", 0.0)
-                            }
-                            for signal in recent_signals
-                        ],
-                        "status": "active" if strategy.get("is_active", True) else "inactive"
-                    }
-                    enhanced_strategies.append(enhanced_strategy)
+                # Get total count for pagination
+                total_count = await positions_collection.count_documents(filters)
+                
+                # Enhanced trade data
+                enhanced_trades = []
+                for trade in trades:
+                    enhanced_trade = self._enhance_closed_position_api(trade)
+                    enhanced_trades.append(enhanced_trade)
                 
                 return {
-                    "strategies": enhanced_strategies,
-                    "total_strategies": len(enhanced_strategies),
+                    "trades": enhanced_trades,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "filters_applied": {
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "symbol": symbol,
+                        "strategy": strategy,
+                        "position_type": position_type,
+                        "search": search
+                    },
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 }
                 
             except Exception as e:
-                self.logger.error(f"Error fetching strategies: {e}")
+                self.logger.error(f"Error fetching trades: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
-        
+
         # Signals Endpoints
         @self.app.get("/api/signals")
         async def get_signals(
@@ -490,84 +528,6 @@ class TradingRestAPI:
                 self.logger.error(f"Error fetching signals: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        # Strategies Historical Endpoint
-        @self.app.get("/api/strategies/historical")
-        async def get_strategies_historical(
-            page: int = Query(1, ge=1),
-            limit: int = Query(50, ge=1, le=200),
-            strategy: Optional[str] = Query(None),
-            date_from: Optional[str] = Query(None),
-            date_to: Optional[str] = Query(None)
-        ):
-            """Get historical strategy performance with filters and pagination"""
-            try:
-                if not await self.mongodb_client.connect():
-                    raise HTTPException(status_code=500, detail="Database connection failed")
-                
-                filters = {}
-                
-                # Date range filter
-                if date_from or date_to:
-                    date_filter = {}
-                    if date_from:
-                        date_filter["$gte"] = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
-                    if date_to:
-                        date_filter["$lte"] = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-                    filters["last_signal_time"] = date_filter
-                
-                # Strategy filter
-                if strategy:
-                    filters["strategy_name"] = {"$regex": strategy, "$options": "i"}
-                
-                # Calculate skip for pagination
-                skip = (page - 1) * limit
-                
-                # Get strategy performance from database
-                strategies_collection = self.mongodb_client.db["strategy_performance"]
-                strategies_cursor = strategies_collection.find(filters).sort("last_signal_time", -1).skip(skip).limit(limit)
-                strategies = await strategies_cursor.to_list(length=limit)
-                
-                # Get total count for pagination
-                total_count = await strategies_collection.count_documents(filters)
-                
-                # Format strategies
-                formatted_strategies = []
-                for strategy in strategies:
-                    formatted_strategy = {
-                        "id": str(strategy.get("_id", "")),
-                        "name": strategy.get("strategy_name", "Unknown"),
-                        "symbol": strategy.get("symbol", ""),
-                        "total_signals": strategy.get("total_signals", 0),
-                        "win_rate": strategy.get("win_rate", 0.0),
-                        "total_pnl": strategy.get("total_pnl", 0.0),
-                        "avg_confidence": strategy.get("avg_confidence", 0.0),
-                        "last_signal_time": strategy.get("last_signal_time"),
-                        "signals_today": strategy.get("signals_today", 0),
-                        "is_active": strategy.get("is_active", True),
-                        "created_at": strategy.get("created_at"),
-                        "updated_at": strategy.get("updated_at")
-                    }
-                    formatted_strategies.append(formatted_strategy)
-                
-                return {
-                    "strategies": formatted_strategies,
-                    "pagination": {
-                        "page": page,
-                        "limit": limit,
-                        "total": total_count,
-                        "pages": (total_count + limit - 1) // limit
-                    },
-                    "filters_applied": {
-                        "strategy": strategy,
-                        "date_from": date_from,
-                        "date_to": date_to
-                    },
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
-                
-            except Exception as e:
-                self.logger.error(f"Error fetching historical strategies: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
         
         # Server-Sent Events endpoint for real-time updates
         @self.app.get("/api/events/stream")
