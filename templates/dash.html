@@ -507,13 +507,21 @@
             color: var(--text-primary);
         }
 
+        .price-grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        
         .price-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 16px 20px;
+            padding: 12px 16px;
             border-radius: 12px;
-            margin-bottom: 12px;
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.05) 100%);
             border: 1px solid rgba(255, 255, 255, 0.05);
             transition: all 0.3s ease;
@@ -804,68 +812,6 @@
             }
         }
 
-        .health-indicator {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .health-excellent {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--accent-green);
-        }
-
-        .health-good {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-        }
-
-        .health-fair {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--accent-yellow);
-        }
-
-        .health-poor {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--accent-red);
-        }
-
-        .health-critical {
-            background: rgba(153, 27, 27, 0.3);
-            color: #dc2626;
-        }
-
-        .risk-indicator {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .risk-low {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--accent-green);
-        }
-
-        .risk-medium {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--accent-yellow);
-        }
-
-        .risk-high {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--accent-red);
-        }
-
-        .risk-very-high {
-            background: rgba(153, 27, 27, 0.3);
-            color: #dc2626;
-        }
 
         .scroll-container {
             max-height: 400px;
@@ -909,26 +855,26 @@
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Enhanced Account Summary Card -->
-            <div class="card wide-grid">
-                <div class="update-indicator" id="accountUpdateIndicator"></div>
-                <div class="card-title">
-                    <i class="fas fa-wallet icon"></i>
-                    Account Summary
-                </div>
-                <div id="accountSummary">
-                    <div class="empty-state">Loading account data...</div>
-                </div>
+        <!-- Enhanced Account Summary Card - Moved to Top -->
+        <div class="card wide-grid">
+            <div class="update-indicator" id="accountUpdateIndicator"></div>
+            <div class="card-title">
+                <i class="fas fa-wallet icon"></i>
+                Account Summary
             </div>
+            <div id="accountSummary">
+                <div class="empty-state">Loading account data...</div>
+            </div>
+        </div>
 
-            <!-- Live Prices Card -->
+        <div class="grid">
+            <!-- Live Prices Card with Side-by-Side Layout -->
             <div class="card">
                 <div class="card-title">
                     <i class="fas fa-chart-line icon"></i>
                     Live Prices
                 </div>
-                <div id="livePrices" class="scroll-container">
+                <div id="livePrices" class="price-grid-container">
                     <div class="empty-state">Waiting for price data...</div>
                 </div>
             </div>
@@ -1045,38 +991,78 @@
                 </div>
             </div>
 
-            <!-- Strategy Signals Card -->
+            <!-- Strategy Signals Card with Tabs -->
             <div class="card">
                 <div class="card-title">
                     <i class="fas fa-bullseye icon"></i>
-                    Latest Signals
+                    Strategy Signals
                 </div>
-                <div id="strategySignals" class="scroll-container">
-                    <div class="empty-state">Waiting for signals...</div>
+                <div class="tabs" id="signalTabs">
+                    <div class="tab active" onclick="dashboard.switchSignalTab('live')">Live Signals</div>
+                    <div class="tab" onclick="dashboard.switchSignalTab('historical')">Historical</div>
+                </div>
+                
+                <div id="liveSignalsTab" class="tab-content active">
+                    <div id="strategySignals" class="scroll-container">
+                        <div class="empty-state">Waiting for signals...</div>
+                    </div>
+                </div>
+                
+                <div id="historicalSignalsTab" class="tab-content">
+                    <div class="filters-row">
+                        <input type="date" id="signalsDateFrom" class="filter-input" placeholder="From Date">
+                        <input type="date" id="signalsDateTo" class="filter-input" placeholder="To Date">
+                        <input type="text" id="signalsSymbolFilter" class="filter-input" placeholder="Symbol">
+                        <select id="signalsStrategyFilter" class="filter-select">
+                            <option value="">All Strategies</option>
+                        </select>
+                        <button id="applySignalsFilters" class="btn-primary">Apply Filters</button>
+                        <button id="clearSignalsFilters" class="btn-secondary">Clear</button>
+                    </div>
+                    <div id="historicalSignalsList" class="scroll-container">
+                        <div class="empty-state">Loading historical signals...</div>
+                    </div>
+                    <div id="signalsPagination" class="pagination"></div>
                 </div>
             </div>
 
-            <!-- Strategies Performance Card -->
+            <!-- Strategies Performance Card with Tabs -->
             <div class="card">
                 <div class="card-title">
                     <i class="fas fa-brain icon"></i>
                     Strategies Performance
                 </div>
-                <div id="strategiesPerformance" class="scroll-container">
-                    <div class="empty-state">Loading strategies...</div>
+                <div class="tabs" id="strategyTabs">
+                    <div class="tab active" onclick="dashboard.switchStrategyTab('live')">Live Performance</div>
+                    <div class="tab" onclick="dashboard.switchStrategyTab('historical')">Historical</div>
+                </div>
+                
+                <div id="liveStrategiesTab" class="tab-content active">
+                    <div id="strategiesPerformance" class="scroll-container">
+                        <div class="empty-state">Loading strategies...</div>
+                    </div>
+                </div>
+                
+                <div id="historicalStrategiesTab" class="tab-content">
+                    <div class="filters-row">
+                        <input type="date" id="strategiesDateFrom" class="filter-input" placeholder="From Date">
+                        <input type="date" id="strategiesDateTo" class="filter-input" placeholder="To Date">
+                        <input type="text" id="strategiesNameFilter" class="filter-input" placeholder="Strategy">
+                        <select id="strategiesStatusFilter" class="filter-select">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                        <button id="applyStrategiesFilters" class="btn-primary">Apply Filters</button>
+                        <button id="clearStrategiesFilters" class="btn-secondary">Clear</button>
+                    </div>
+                    <div id="historicalStrategiesList" class="scroll-container">
+                        <div class="empty-state">Loading historical strategies...</div>
+                    </div>
+                    <div id="strategiesPagination" class="pagination"></div>
                 </div>
             </div>
 
-            <!-- System Status Card -->
-            <div class="card">
-                <div class="card-title">
-                    <i class="fas fa-server icon"></i>
-                    System Status
-                </div>
-                <div id="systemStatus">
-                    <div class="empty-state">Loading system status...</div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -1120,6 +1106,13 @@
                     },
                     positionsTabFilters: {},
                     signals: [],
+                    signalsData: {
+                        historical: {
+                            data: [],
+                            pagination: {},
+                            filters: {}
+                        }
+                    },
                     notifications: {
                         live: [],
                         historical: {
@@ -1129,18 +1122,24 @@
                         }
                     },
                     accountSummary: {},
-                    systemStatus: {},
-                    strategies: []
+                    strategies: [],
+                    strategiesData: {
+                        historical: {
+                            data: [],
+                            pagination: {},
+                            filters: {}
+                        }
+                    }
                 };
                 
                 // REST API base URL
                 this.apiBaseUrl = `http://${window.location.hostname}:8766/api`;
                 
-                // Current notification tab
+                // Current tabs
                 this.currentNotificationTab = 'live';
-                
-                // Current position tab
                 this.currentPositionTab = 'open';
+                this.currentSignalTab = 'live';
+                this.currentStrategyTab = 'live';
                 
                 // SSE connection
                 this.sseSource = null;
@@ -1218,6 +1217,17 @@
                 this.loadHistoricalNotifications();
                 this.loadStrategiesPerformance();
                 this.connectSSE();
+                
+                // Add test notification to verify data flow
+                setTimeout(() => {
+                    this.addLiveNotification({
+                        id: 'test_' + Date.now(),
+                        message: 'Dashboard initialized successfully',
+                        level: 'info',
+                        title: 'System',
+                        timestamp: new Date().toISOString()
+                    });
+                }, 2000);
                 
                 // Store reference globally
                 window.dashboard = this;
@@ -1447,7 +1457,6 @@
                             'notifications',
                             'strategy_signals',
                             'account_summary',
-                            'system_status',
                             'heartbeat'
                         ],
                         sessionId: this.sessionId,
@@ -1484,13 +1493,11 @@
                         this.addStrategySignal(message.data);
                         break;
                     case 'notifications':
+                        console.log('📢 Received notification message:', message.data);
                         this.addLiveNotification(message.data);
                         break;
                     case 'account_summary':
                         this.updateAccountSummary(message.data);
-                        break;
-                    case 'system_status':
-                        this.updateSystemStatus(message.data);
                         break;
                     case 'heartbeat':
                         break;
@@ -1529,15 +1536,22 @@
             }
             
             addLiveNotification(notification) {
+                console.log('📢 Adding live notification:', notification);
+                
                 // Handle both single notification and array of notifications
                 if (Array.isArray(notification)) {
                     notification.forEach(notif => {
                         this.data.notifications.live.unshift(notif);
+                        console.log('📢 Added notification to live list:', notif);
                     });
                 } else {
                     this.data.notifications.live.unshift(notification);
+                    console.log('📢 Added notification to live list:', notification);
                 }
+                
                 this.data.notifications.live = this.data.notifications.live.slice(0, 15);
+                console.log('📢 Live notifications count:', this.data.notifications.live.length);
+                
                 if (this.currentNotificationTab === 'live') {
                     this.renderLiveNotifications();
                 }
@@ -1554,14 +1568,6 @@
                 }
             }
             
-            updateSystemStatus(status) {
-                if (status && typeof status === 'object') {
-                    this.data.systemStatus = status;
-                    this.renderSystemStatus();
-                } else {
-                    console.warn('Invalid system status data received:', status);
-                }
-            }
 
             // REST API methods
             async loadClosedPositions(page = 1) {
@@ -1712,6 +1718,116 @@
                 this.loadClosedPositionsForTab(1);
             }
             
+            // Signal filter methods
+            applySignalsFilters() {
+                const filters = {
+                    date_from: document.getElementById('signalsDateFrom').value,
+                    date_to: document.getElementById('signalsDateTo').value,
+                    symbol: document.getElementById('signalsSymbolFilter').value,
+                    strategy: document.getElementById('signalsStrategyFilter').value
+                };
+
+                // Remove empty filters
+                Object.keys(filters).forEach(key => {
+                    if (!filters[key]) delete filters[key];
+                });
+
+                this.data.signalsData.historical.filters = filters;
+                this.loadHistoricalSignals(1);
+            }
+
+            clearSignalsFilters() {
+                document.getElementById('signalsDateFrom').value = '';
+                document.getElementById('signalsDateTo').value = '';
+                document.getElementById('signalsSymbolFilter').value = '';
+                document.getElementById('signalsStrategyFilter').value = '';
+                
+                this.data.signalsData.historical.filters = {};
+                this.loadHistoricalSignals(1);
+            }
+            
+            // Strategy filter methods
+            applyStrategiesFilters() {
+                const filters = {
+                    date_from: document.getElementById('strategiesDateFrom').value,
+                    date_to: document.getElementById('strategiesDateTo').value,
+                    name: document.getElementById('strategiesNameFilter').value,
+                    status: document.getElementById('strategiesStatusFilter').value
+                };
+
+                // Remove empty filters
+                Object.keys(filters).forEach(key => {
+                    if (!filters[key]) delete filters[key];
+                });
+
+                this.data.strategiesData.historical.filters = filters;
+                this.loadHistoricalStrategies(1);
+            }
+
+            clearStrategiesFilters() {
+                document.getElementById('strategiesDateFrom').value = '';
+                document.getElementById('strategiesDateTo').value = '';
+                document.getElementById('strategiesNameFilter').value = '';
+                document.getElementById('strategiesStatusFilter').value = '';
+                
+                this.data.strategiesData.historical.filters = {};
+                this.loadHistoricalStrategies(1);
+            }
+            
+            async loadHistoricalSignals(page = 1) {
+                try {
+                    const filters = this.data.signalsData.historical.filters || {};
+                    const params = new URLSearchParams({
+                        page: page.toString(),
+                        limit: '20',
+                        ...filters
+                    });
+
+                    const response = await fetch(`${this.apiBaseUrl}/signals?${params}`);
+                    const data = await response.json();
+                    
+                    this.data.signalsData.historical.data = data.signals || [];
+                    this.data.signalsData.historical.pagination = data.pagination || {};
+                    
+                    if (this.currentSignalTab === 'historical') {
+                        this.renderHistoricalSignals();
+                    }
+                } catch (error) {
+                    console.error('Error loading historical signals:', error);
+                    this.data.signalsData.historical.data = [];
+                    if (this.currentSignalTab === 'historical') {
+                        this.renderHistoricalSignals();
+                    }
+                }
+            }
+            
+            async loadHistoricalStrategies(page = 1) {
+                try {
+                    const filters = this.data.strategiesData.historical.filters || {};
+                    const params = new URLSearchParams({
+                        page: page.toString(),
+                        limit: '20',
+                        ...filters
+                    });
+
+                    const response = await fetch(`${this.apiBaseUrl}/strategies/historical?${params}`);
+                    const data = await response.json();
+                    
+                    this.data.strategiesData.historical.data = data.strategies || [];
+                    this.data.strategiesData.historical.pagination = data.pagination || {};
+                    
+                    if (this.currentStrategyTab === 'historical') {
+                        this.renderHistoricalStrategies();
+                    }
+                } catch (error) {
+                    console.error('Error loading historical strategies:', error);
+                    this.data.strategiesData.historical.data = [];
+                    if (this.currentStrategyTab === 'historical') {
+                        this.renderHistoricalStrategies();
+                    }
+                }
+            }
+            
             async loadClosedPositionsForTab(page = 1) {
                 try {
                     const filters = this.data.positionsTabFilters || {};
@@ -1774,6 +1890,50 @@
                 } else {
                     this.renderClosedPositionsInTab();
                     this.loadClosedPositionsForTab();
+                }
+            }
+            
+            switchSignalTab(tab) {
+                this.currentSignalTab = tab;
+                
+                // Update tab appearance
+                const signalTabs = document.querySelectorAll('#signalTabs .tab');
+                const signalTabContents = document.querySelectorAll('#liveSignalsTab, #historicalSignalsTab');
+                
+                signalTabs.forEach(t => t.classList.remove('active'));
+                signalTabContents.forEach(tc => tc.classList.remove('active'));
+                
+                event.target.classList.add('active');
+                document.getElementById(`${tab}SignalsTab`).classList.add('active');
+                
+                // Render appropriate content
+                if (tab === 'live') {
+                    this.renderStrategySignals();
+                } else {
+                    this.renderHistoricalSignals();
+                    this.loadHistoricalSignals();
+                }
+            }
+            
+            switchStrategyTab(tab) {
+                this.currentStrategyTab = tab;
+                
+                // Update tab appearance
+                const strategyTabs = document.querySelectorAll('#strategyTabs .tab');
+                const strategyTabContents = document.querySelectorAll('#liveStrategiesTab, #historicalStrategiesTab');
+                
+                strategyTabs.forEach(t => t.classList.remove('active'));
+                strategyTabContents.forEach(tc => tc.classList.remove('active'));
+                
+                event.target.classList.add('active');
+                document.getElementById(`${tab}StrategiesTab`).classList.add('active');
+                
+                // Render appropriate content
+                if (tab === 'live') {
+                    this.renderStrategiesPerformance();
+                } else {
+                    this.renderHistoricalStrategies();
+                    this.loadHistoricalStrategies();
                 }
             }
             
@@ -1870,12 +2030,7 @@
                                             <td><span class="change ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</span></td>
                                             <td style="font-size: 0.85rem;">${position.strategy_name || position.strategy || 'Unknown'}</td>
                                             <td style="font-size: 0.85rem;">${position.holding_time || this.calculateHoldingTime(position.entry_time) || 'N/A'}</td>
-                                            <td>
-                                                <button class="btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" 
-                                                        onclick="dashboard.closePosition('${position.id}', '${position.symbol}')">
-                                                    Close
-                                                </button>
-                                            </td>
+                                            <td style="font-size: 0.85rem; color: var(--text-secondary);">Auto-managed</td>
                                         </tr>
                                     `;
                                 }).join('')}
@@ -2196,8 +2351,8 @@
                 }
                 
                 container.innerHTML = strategies.map(strategy => {
-                    const winRate = strategy.performance.win_rate || 0;
-                    const totalPnl = strategy.performance.total_pnl || 0;
+                    const winRate = strategy.performance?.win_rate || 0;
+                    const totalPnl = strategy.performance?.total_pnl || 0;
                     const pnlClass = totalPnl >= 0 ? 'positive' : 'negative';
                     const statusClass = strategy.status === 'active' ? 'active' : 'inactive';
                     
@@ -2222,16 +2377,158 @@
                                 </div>
                                 <div class="detail-item">
                                     <div class="detail-label">Signals</div>
-                                    <div class="detail-value">${strategy.performance.total_signals}</div>
+                                    <div class="detail-value">${strategy.performance?.total_signals || 0}</div>
                                 </div>
                                 <div class="detail-item">
                                     <div class="detail-label">Today</div>
-                                    <div class="detail-value">${strategy.performance.signals_today || 0}</div>
+                                    <div class="detail-value">${strategy.performance?.signals_today || 0}</div>
                                 </div>
                             </div>
                         </div>
                     `;
                 }).join('');
+            }
+            
+            renderHistoricalSignals() {
+                const container = document.getElementById('historicalSignalsList');
+                const signals = this.data.signalsData.historical.data;
+                
+                if (!signals || signals.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No historical signals found</div>';
+                    return;
+                }
+                
+                container.innerHTML = signals.map(signal => {
+                    const signalClass = signal.signal?.toLowerCase() || 'hold';
+                    const time = new Date(signal.timestamp || signal.created_at).toLocaleString();
+                    
+                    return `
+                        <div class="notification-item" style="border-left-color: var(--accent-yellow);">
+                            <div class="notification-header">
+                                <div>
+                                    <strong>${signal.symbol}</strong>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                                        ${signal.strategy_name} • ${time}
+                                    </div>
+                                </div>
+                                <div class="change signal-${signalClass}">
+                                    ${signal.signal}
+                                </div>
+                            </div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                                Confidence: ${signal.confidence}%
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                this.renderSignalsPagination();
+            }
+            
+            renderHistoricalStrategies() {
+                const container = document.getElementById('historicalStrategiesList');
+                const strategies = this.data.strategiesData.historical.data;
+                
+                if (!strategies || strategies.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No historical strategies found</div>';
+                    return;
+                }
+                
+                container.innerHTML = strategies.map(strategy => {
+                    const winRate = strategy.performance?.win_rate || 0;
+                    const totalPnl = strategy.performance?.total_pnl || 0;
+                    const pnlClass = totalPnl >= 0 ? 'positive' : 'negative';
+                    const statusClass = strategy.status === 'active' ? 'active' : 'inactive';
+                    const date = new Date(strategy.updated_at || strategy.created_at).toLocaleDateString();
+                    
+                    return `
+                        <div class="strategy-item">
+                            <div class="strategy-header">
+                                <div>
+                                    <div class="strategy-name">${strategy.name}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                                        Updated: ${date}
+                                    </div>
+                                </div>
+                                <div class="strategy-status ${statusClass}">${strategy.status}</div>
+                            </div>
+                            <div class="strategy-metrics">
+                                <div class="detail-item">
+                                    <div class="detail-label">Symbol</div>
+                                    <div class="detail-value">${strategy.symbol}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Win Rate</div>
+                                    <div class="detail-value">${winRate.toFixed(1)}%</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Total PnL</div>
+                                    <div class="detail-value change ${pnlClass}">$${Math.abs(totalPnl).toFixed(2)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Total Signals</div>
+                                    <div class="detail-value">${strategy.performance?.total_signals || 0}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Profitable</div>
+                                    <div class="detail-value">${strategy.performance?.profitable_signals || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                this.renderStrategiesPagination();
+            }
+            
+            renderSignalsPagination() {
+                const container = document.getElementById('signalsPagination');
+                const pagination = this.data.signalsData.historical.pagination;
+                
+                if (!pagination || pagination.pages <= 1) {
+                    container.innerHTML = '';
+                    return;
+                }
+                
+                let paginationHtml = '';
+                
+                // Previous button
+                paginationHtml += `<button ${pagination.page <= 1 ? 'disabled' : ''} onclick="dashboard.loadHistoricalSignals(${pagination.page - 1})">Previous</button>`;
+                
+                // Page numbers
+                for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.pages, pagination.page + 2); i++) {
+                    paginationHtml += `<button class="${i === pagination.page ? 'active' : ''}" onclick="dashboard.loadHistoricalSignals(${i})">${i}</button>`;
+                }
+                
+                // Next button
+                paginationHtml += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="dashboard.loadHistoricalSignals(${pagination.page + 1})">Next</button>`;
+                
+                container.innerHTML = paginationHtml;
+            }
+            
+            renderStrategiesPagination() {
+                const container = document.getElementById('strategiesPagination');
+                const pagination = this.data.strategiesData.historical.pagination;
+                
+                if (!pagination || pagination.pages <= 1) {
+                    container.innerHTML = '';
+                    return;
+                }
+                
+                let paginationHtml = '';
+                
+                // Previous button
+                paginationHtml += `<button ${pagination.page <= 1 ? 'disabled' : ''} onclick="dashboard.loadHistoricalStrategies(${pagination.page - 1})">Previous</button>`;
+                
+                // Page numbers
+                for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.pages, pagination.page + 2); i++) {
+                    paginationHtml += `<button class="${i === pagination.page ? 'active' : ''}" onclick="dashboard.loadHistoricalStrategies(${i})">${i}</button>`;
+                }
+                
+                // Next button
+                paginationHtml += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="dashboard.loadHistoricalStrategies(${pagination.page + 1})">Next</button>`;
+                
+                container.innerHTML = paginationHtml;
             }
             
             renderAccountSummary() {
@@ -2249,8 +2546,6 @@
                 const unrealizedPnl = summary.unrealized_pnl || 0;
                 const realizedPnl = summary.realized_pnl || 0;
                 const marginUsagePct = summary.margin_usage_percentage || 0;
-                const accountHealth = summary.account_health || 'Unknown';
-                const riskLevel = summary.risk_level || 'Unknown';
                 
                 container.innerHTML = `
                     <div class="account-summary">
@@ -2311,52 +2606,10 @@
                             <div class="metric-label">Brokerage Charges</div>
                             <div class="metric-value">$${this.formatNumber(summary.brokerage_charges || 0)}</div>
                         </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Account Health</div>
-                            <div class="metric-value">
-                                <span class="health-indicator health-${accountHealth.toLowerCase()}">${accountHealth}</span>
-                            </div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Risk Level</div>
-                            <div class="metric-value">
-                                <span class="risk-indicator risk-${riskLevel.toLowerCase().replace(' ', '-')}">${riskLevel}</span>
-                            </div>
-                        </div>
                     </div>
                 `;
             }
             
-            renderSystemStatus() {
-                const container = document.getElementById('systemStatus');
-                const status = this.data.systemStatus;
-                
-                if (!status || Object.keys(status).length === 0) {
-                    container.innerHTML = '<div class="empty-state">Loading system status...</div>';
-                    return;
-                }
-                
-                container.innerHTML = `
-                    <div class="account-summary">
-                        <div class="metric-card positive">
-                            <div class="metric-label">Status</div>
-                            <div class="metric-value" style="color: var(--accent-green);">${status.status || 'Running'}</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Uptime</div>
-                            <div class="metric-value">${this.formatUptime(status.uptime || 0)}</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Connected Clients</div>
-                            <div class="metric-value">${status.connected_clients || 0}</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-label">Messages Sent</div>
-                            <div class="metric-value">${this.formatNumber(status.messages_sent || 0)}</div>
-                        </div>
-                    </div>
-                `;
-            }
             
             updateConnectionStatus(status) {
                 const statusElement = document.getElementById('connectionStatus');
@@ -2461,6 +2714,14 @@
                 document.getElementById('applyPositionsFilters').addEventListener('click', () => this.applyPositionsFilters());
                 document.getElementById('clearPositionsFilters').addEventListener('click', () => this.clearPositionsFilters());
                 
+                // Signal filter event listeners
+                document.getElementById('applySignalsFilters').addEventListener('click', () => this.applySignalsFilters());
+                document.getElementById('clearSignalsFilters').addEventListener('click', () => this.clearSignalsFilters());
+                
+                // Strategy filter event listeners
+                document.getElementById('applyStrategiesFilters').addEventListener('click', () => this.applyStrategiesFilters());
+                document.getElementById('clearStrategiesFilters').addEventListener('click', () => this.clearStrategiesFilters());
+                
                 // Page visibility and focus handlers - be less aggressive
                 document.addEventListener('visibilitychange', () => {
                     if (!document.hidden && !this.isConnected && !this.isConnecting && !this.isReconnecting && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -2540,41 +2801,6 @@
                 }
             }
             
-            async closePosition(positionId, symbol) {
-                if (!confirm(`Are you sure you want to close position for ${symbol}?`)) {
-                    return;
-                }
-                
-                try {
-                    const response = await fetch(`${this.apiBaseUrl}/positions/${positionId}/close`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            reason: 'Manual close from dashboard'
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        console.log('Position closed successfully:', result);
-                        
-                        // Show success notification
-                        this.showNotification(`Position ${symbol} closed successfully`, 'success');
-                        
-                        // Refresh positions and closed positions
-                        this.loadClosedPositions();
-                    } else {
-                        const error = await response.json();
-                        console.error('Failed to close position:', error);
-                        this.showNotification(`Failed to close position: ${error.detail || error.message}`, 'error');
-                    }
-                } catch (error) {
-                    console.error('Error closing position:', error);
-                    this.showNotification('Error closing position. Please try again.', 'error');
-                }
-            }
             
             showNotification(message, type = 'info') {
                 // Add notification to live notifications

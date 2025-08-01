@@ -8,9 +8,11 @@ import json
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 
@@ -60,13 +62,19 @@ class TradingRestAPI:
             version="1.0.0"
         )
         
-        # Add CORS middleware
+        # Setup templates with absolute path
+        import os
+        template_dir = os.path.join(os.getcwd(), "templates")
+        self.templates = Jinja2Templates(directory=template_dir)
+        
+        # Add CORS middleware with proper configuration
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
             allow_credentials=True,
-            allow_methods=["*"],
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["*"],
+            expose_headers=["*"]
         )
         
         # Setup routes
@@ -80,7 +88,12 @@ class TradingRestAPI:
         
         @self.app.get("/")
         async def root():
-            return {"message": "Trading Dashboard API", "version": "1.0.0"}
+            return {"message": "Trading Dashboard API", "version": "1.0.0", "dashboard_url": "/dashboard"}
+        
+        @self.app.get("/dashboard", response_class=HTMLResponse)
+        async def dashboard(request: Request):
+            """Serve the trading dashboard"""
+            return self.templates.TemplateResponse("dash.html", {"request": request})
         
         @self.app.get("/health")
         async def health_check():
@@ -89,6 +102,19 @@ class TradingRestAPI:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "api_version": "1.0.0"
             }
+        
+        @self.app.options("/{path:path}")
+        async def options_handler(path: str):
+            """Handle preflight CORS requests"""
+            return JSONResponse(
+                content={},
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "86400"
+                }
+            )
         
         # Closed Positions Endpoints
         @self.app.get("/api/positions/closed")
@@ -144,12 +170,16 @@ class TradingRestAPI:
                 # Calculate skip for pagination
                 skip = (page - 1) * limit
                 
-                # Get positions from database
-                positions_cursor = await self.mongodb_client.get_collection("positions").find(filters).sort("exit_time", -1).skip(skip).limit(limit)
+                # Get positions from database using available methods
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                positions_collection = self.mongodb_client.db["positions"]
+                positions_cursor = positions_collection.find(filters).sort("exit_time", -1).skip(skip).limit(limit)
                 positions = await positions_cursor.to_list(length=limit)
                 
                 # Get total count for pagination
-                total_count = await self.mongodb_client.get_collection("positions").count_documents(filters)
+                total_count = await positions_collection.count_documents(filters)
                 
                 # Enhanced position data
                 enhanced_positions = []
@@ -184,7 +214,10 @@ class TradingRestAPI:
         async def get_closed_position(position_id: str):
             """Get specific closed position by ID"""
             try:
-                position = await self.mongodb_client.get_document("positions", {"id": position_id, "status": "CLOSED"})
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                    
+                position = await self.mongodb_client.find_document("positions", {"id": position_id, "status": "CLOSED"})
                 if not position:
                     raise HTTPException(status_code=404, detail="Position not found")
                 
@@ -200,80 +233,21 @@ class TradingRestAPI:
                 self.logger.error(f"Error fetching position {position_id}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.post("/api/positions/{position_id}/close")
-        async def close_position(position_id: str, request: Dict[str, Any]):
-            """Close an open position"""
-            try:
-                # Get the position from database
-                position = await self.mongodb_client.get_document("positions", {"id": position_id, "status": "OPEN"})
-                if not position:
-                    raise HTTPException(status_code=404, detail="Open position not found")
-                
-                # Get the current price for the symbol
-                current_price = await self._get_current_price(position["symbol"])
-                if not current_price:
-                    raise HTTPException(status_code=400, detail="Could not get current price for symbol")
-                
-                # Close the position by updating its status
-                close_reason = request.get("reason", "Manual close via API")
-                close_time = datetime.now(timezone.utc)
-                
-                # Calculate final PnL
-                entry_price = position["entry_price"]
-                quantity = position["quantity"]
-                position_type = position["position_type"]
-                
-                if position_type == "LONG":
-                    pnl = (current_price - entry_price) * quantity
-                else:
-                    pnl = (entry_price - current_price) * quantity
-                
-                pnl_percentage = (pnl / position.get("margin_used", position.get("invested_amount", 1))) * 100
-                
-                # Update position in database
-                update_data = {
-                    "status": "CLOSED",
-                    "exit_price": current_price,
-                    "exit_time": close_time.isoformat(),
-                    "pnl": pnl,
-                    "pnl_percentage": pnl_percentage,
-                    "notes": close_reason,
-                    "last_updated": close_time.isoformat()
-                }
-                
-                await self.mongodb_client.update_document("positions", {"id": position_id}, update_data)
-                
-                # Get updated position
-                updated_position = await self.mongodb_client.get_document("positions", {"id": position_id})
-                
-                self.logger.info(f"Position {position_id} closed successfully: PnL=${pnl:.2f}")
-                
-                return {
-                    "success": True,
-                    "message": f"Position closed successfully",
-                    "position": self._enhance_closed_position_api(updated_position),
-                    "pnl": pnl,
-                    "exit_price": current_price,
-                    "timestamp": close_time.isoformat()
-                }
-                
-            except HTTPException:
-                raise
-            except Exception as e:
-                self.logger.error(f"Error closing position {position_id}: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
         
         # Helper method to get current price
         async def _get_current_price(self, symbol: str) -> Optional[float]:
             """Get current price for a symbol from live prices"""
             try:
+                if not await self.mongodb_client.connect():
+                    return None
+                
                 # Try to get from recent market data
-                recent_data = await self.mongodb_client.get_latest_documents("market_data", {"symbol": symbol}, limit=1)
+                recent_data = await self.mongodb_client.find_documents("market_data", {"symbol": symbol}, limit=1)
                 if recent_data:
                     return recent_data[0].get("price")
                 
                 # Fallback: try to get from live prices collection if available
-                live_price = await self.mongodb_client.get_document("live_prices", {"symbol": symbol})
+                live_price = await self.mongodb_client.find_document("live_prices", {"symbol": symbol})
                 if live_price:
                     return live_price.get("price")
                 
@@ -329,11 +303,15 @@ class TradingRestAPI:
                 skip = (page - 1) * limit
                 
                 # Get notifications from database
-                notifications_cursor = await self.mongodb_client.get_collection("notifications").find(filters).sort("timestamp", -1).skip(skip).limit(limit)
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                notifications_collection = self.mongodb_client.db["notifications"]
+                notifications_cursor = notifications_collection.find(filters).sort("timestamp", -1).skip(skip).limit(limit)
                 notifications = await notifications_cursor.to_list(length=limit)
                 
                 # Get total count for pagination
-                total_count = await self.mongodb_client.get_collection("notifications").count_documents(filters)
+                total_count = await notifications_collection.count_documents(filters)
                 
                 # Format notifications
                 formatted_notifications = []
@@ -379,14 +357,19 @@ class TradingRestAPI:
             """Get all strategies with performance data"""
             try:
                 # Get strategy performance from database
-                strategies_cursor = await self.mongodb_client.get_collection("strategy_performance").find({})
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                strategies_collection = self.mongodb_client.db["strategy_performance"]
+                strategies_cursor = strategies_collection.find({})
                 strategies = await strategies_cursor.to_list(length=None)
                 
                 # Get recent signals for each strategy
                 enhanced_strategies = []
                 for strategy in strategies:
                     # Get recent signals
-                    recent_signals_cursor = await self.mongodb_client.get_collection("trading_signals").find({
+                    signals_collection = self.mongodb_client.db["trading_signals"]
+                    recent_signals_cursor = signals_collection.find({
                         "strategy_name": strategy.get("strategy_name")
                     }).sort("timestamp", -1).limit(10)
                     recent_signals = await recent_signals_cursor.to_list(length=10)
@@ -425,6 +408,167 @@ class TradingRestAPI:
                 self.logger.error(f"Error fetching strategies: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
+        # Signals Endpoints
+        @self.app.get("/api/signals")
+        async def get_signals(
+            page: int = Query(1, ge=1),
+            limit: int = Query(50, ge=1, le=200),
+            strategy: Optional[str] = Query(None),
+            symbol: Optional[str] = Query(None),
+            date_from: Optional[str] = Query(None),
+            date_to: Optional[str] = Query(None)
+        ):
+            """Get trading signals with filters and pagination"""
+            try:
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                filters = {}
+                
+                # Date range filter
+                if date_from or date_to:
+                    date_filter = {}
+                    if date_from:
+                        date_filter["$gte"] = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                    if date_to:
+                        date_filter["$lte"] = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                    filters["timestamp"] = date_filter
+                
+                # Strategy filter
+                if strategy:
+                    filters["strategy_name"] = {"$regex": strategy, "$options": "i"}
+                
+                # Symbol filter
+                if symbol:
+                    filters["symbol"] = {"$regex": symbol, "$options": "i"}
+                
+                # Calculate skip for pagination
+                skip = (page - 1) * limit
+                
+                # Get signals from database
+                signals_collection = self.mongodb_client.db["trading_signals"]
+                signals_cursor = signals_collection.find(filters).sort("timestamp", -1).skip(skip).limit(limit)
+                signals = await signals_cursor.to_list(length=limit)
+                
+                # Get total count for pagination
+                total_count = await signals_collection.count_documents(filters)
+                
+                # Format signals
+                formatted_signals = []
+                for signal in signals:
+                    formatted_signal = {
+                        "id": str(signal.get("_id", "")),
+                        "strategy_name": signal.get("strategy_name", ""),
+                        "symbol": signal.get("symbol", ""),
+                        "signal": signal.get("signal", ""),
+                        "confidence": signal.get("confidence", 0.0),
+                        "price": signal.get("price", 0.0),
+                        "timestamp": signal.get("timestamp", datetime.now(timezone.utc)).isoformat() if isinstance(signal.get("timestamp"), datetime) else signal.get("timestamp"),
+                        "indicators": signal.get("indicators", {}),
+                        "data": signal.get("data", {})
+                    }
+                    formatted_signals.append(formatted_signal)
+                
+                return {
+                    "signals": formatted_signals,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "filters_applied": {
+                        "strategy": strategy,
+                        "symbol": symbol,
+                        "date_from": date_from,
+                        "date_to": date_to
+                    },
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching signals: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        # Strategies Historical Endpoint
+        @self.app.get("/api/strategies/historical")
+        async def get_strategies_historical(
+            page: int = Query(1, ge=1),
+            limit: int = Query(50, ge=1, le=200),
+            strategy: Optional[str] = Query(None),
+            date_from: Optional[str] = Query(None),
+            date_to: Optional[str] = Query(None)
+        ):
+            """Get historical strategy performance with filters and pagination"""
+            try:
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                filters = {}
+                
+                # Date range filter
+                if date_from or date_to:
+                    date_filter = {}
+                    if date_from:
+                        date_filter["$gte"] = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                    if date_to:
+                        date_filter["$lte"] = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                    filters["last_signal_time"] = date_filter
+                
+                # Strategy filter
+                if strategy:
+                    filters["strategy_name"] = {"$regex": strategy, "$options": "i"}
+                
+                # Calculate skip for pagination
+                skip = (page - 1) * limit
+                
+                # Get strategy performance from database
+                strategies_collection = self.mongodb_client.db["strategy_performance"]
+                strategies_cursor = strategies_collection.find(filters).sort("last_signal_time", -1).skip(skip).limit(limit)
+                strategies = await strategies_cursor.to_list(length=limit)
+                
+                # Get total count for pagination
+                total_count = await strategies_collection.count_documents(filters)
+                
+                # Format strategies
+                formatted_strategies = []
+                for strategy in strategies:
+                    formatted_strategy = {
+                        "id": str(strategy.get("_id", "")),
+                        "name": strategy.get("strategy_name", "Unknown"),
+                        "symbol": strategy.get("symbol", ""),
+                        "total_signals": strategy.get("total_signals", 0),
+                        "win_rate": strategy.get("win_rate", 0.0),
+                        "total_pnl": strategy.get("total_pnl", 0.0),
+                        "avg_confidence": strategy.get("avg_confidence", 0.0),
+                        "last_signal_time": strategy.get("last_signal_time"),
+                        "signals_today": strategy.get("signals_today", 0),
+                        "is_active": strategy.get("is_active", True),
+                        "created_at": strategy.get("created_at"),
+                        "updated_at": strategy.get("updated_at")
+                    }
+                    formatted_strategies.append(formatted_strategy)
+                
+                return {
+                    "strategies": formatted_strategies,
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "total": total_count,
+                        "pages": (total_count + limit - 1) // limit
+                    },
+                    "filters_applied": {
+                        "strategy": strategy,
+                        "date_from": date_from,
+                        "date_to": date_to
+                    },
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching historical strategies: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
         # Server-Sent Events endpoint for real-time updates
         @self.app.get("/api/events/stream")
         async def stream_events():
@@ -446,9 +590,8 @@ class TradingRestAPI:
                         except asyncio.TimeoutError:
                             # Send heartbeat
                             yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
-                        
-                except asyncio.CancelledError:
-                    break
+                        except asyncio.CancelledError:
+                            break
                 finally:
                     # Clean up connection
                     if client_id in self.sse_connections:
@@ -475,7 +618,11 @@ class TradingRestAPI:
                 start_date = end_date - timedelta(days=30)
                 
                 # Get closed positions in date range
-                positions_cursor = await self.mongodb_client.get_collection("positions").find({
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                positions_collection = self.mongodb_client.db["positions"]
+                positions_cursor = positions_collection.find({
                     "status": "CLOSED",
                     "exit_time": {"$gte": start_date, "$lte": end_date}
                 })

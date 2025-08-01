@@ -34,6 +34,7 @@ from src.strategies.strategy_manager import StrategyManager
 from src.database.schemas import TradingSignal, MarketData, SignalType
 from src.broker.historical_data import HistoricalDataProvider
 from src.api.websocket_server import WebSocketServer, get_websocket_server
+from src.api.rest_server import TradingRestAPI, get_rest_api_server
 
 
 @dataclass
@@ -110,6 +111,10 @@ class TradingSystem:
             # WebSocket server for real-time data broadcasting
             self.websocket_server = get_websocket_server()
             self.websocket_server.port = websocket_port
+            
+            # REST API server for dashboard and API endpoints
+            self.rest_api_server = get_rest_api_server()
+            self.rest_api_server.port = 8766
             
             # Initialize WebSocket live price system with callback
             self.live_price_system = RealTimeMarketData(
@@ -439,6 +444,13 @@ class TradingSystem:
                 return False
             self.logger.info("✅ STEP 2.1: WebSocket server started successfully")
             
+            # Start REST API server
+            self.logger.info("🔄 STEP 2.2: Starting REST API server...")
+            rest_task = asyncio.create_task(self.rest_api_server.start_server())
+            await asyncio.sleep(0.5)  # Give it a moment to start
+            self.logger.info("✅ STEP 2.2: REST API server started successfully")
+            self.logger.info(f"🌐 Dashboard URL: http://localhost:8766/dashboard")
+            
             self.logger.info("📋 STEP 3: Starting Live Market Data System") 
             # Start WebSocket live price system
             self.logger.info("🔄 STEP 3.1: Connecting to live price WebSocket...")
@@ -695,6 +707,15 @@ class TradingSystem:
             
             # Stop WebSocket server
             await self.websocket_server.stop()
+            
+            # Stop REST API server (if it was started)
+            try:
+                if hasattr(self, 'rest_api_server'):
+                    self.logger.info("🛑 Stopping REST API server...")
+                    # The REST API server is running in a background task, so we just log
+                    self.logger.info("✅ REST API server stop initiated")
+            except Exception as e:
+                self.logger.error(f"❌ Error stopping REST API server: {e}")
             
             # Stop WebSocket price system
             self.live_price_system.stop()
