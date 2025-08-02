@@ -94,6 +94,19 @@ class TradingRestAPI:
         async def dashboard(request: Request):
             """Serve the trading dashboard"""
             return self.templates.TemplateResponse("dash.html", {"request": request})
+
+        @self.app.get("/README.md")
+        async def get_readme():
+            """Serve the README.md file"""
+            try:
+                readme_path = "README.md"
+                with open(readme_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                return content
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="README.md not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error reading README.md: {str(e)}")
         
         @self.app.get("/health")
         async def health_check():
@@ -453,43 +466,28 @@ class TradingRestAPI:
             limit: int = Query(50, ge=1, le=200),
             strategy: Optional[str] = Query(None),
             symbol: Optional[str] = Query(None),
-            date_from: Optional[str] = Query(None),
-            date_to: Optional[str] = Query(None)
+            search: Optional[str] = Query(None)
         ):
             """Get trading signals with filters and pagination"""
             try:
                 if not await self.mongodb_client.connect():
                     raise HTTPException(status_code=500, detail="Database connection failed")
                 
+                # Build filters
                 filters = {}
-                
-                # Date range filter
-                if date_from or date_to:
-                    date_filter = {}
-                    if date_from:
-                        date_filter["$gte"] = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
-                    if date_to:
-                        date_filter["$lte"] = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
-                    filters["timestamp"] = date_filter
-                
-                # Strategy filter
                 if strategy:
-                    filters["strategy_name"] = {"$regex": strategy, "$options": "i"}
-                
-                # Symbol filter
+                    filters['strategy'] = strategy
                 if symbol:
-                    filters["symbol"] = {"$regex": symbol, "$options": "i"}
+                    filters['symbol'] = symbol
+                if search:
+                    filters['search'] = search
                 
                 # Calculate skip for pagination
                 skip = (page - 1) * limit
                 
-                # Get signals from database
-                signals_collection = self.mongodb_client.db["trading_signals"]
-                signals_cursor = signals_collection.find(filters).sort("timestamp", -1).skip(skip).limit(limit)
-                signals = await signals_cursor.to_list(length=limit)
-                
-                # Get total count for pagination
-                total_count = await signals_collection.count_documents(filters)
+                # Get signals from database using new methods
+                signals = await self.mongodb_client.load_signals(limit=limit, skip=skip, filters=filters)
+                total_count = await self.mongodb_client.get_signals_count(filters=filters)
                 
                 # Format signals
                 formatted_signals = []
@@ -501,7 +499,7 @@ class TradingRestAPI:
                         "signal": signal.get("signal", ""),
                         "confidence": signal.get("confidence", 0.0),
                         "price": signal.get("price", 0.0),
-                        "timestamp": signal.get("timestamp", datetime.now(timezone.utc)).isoformat() if isinstance(signal.get("timestamp"), datetime) else signal.get("timestamp"),
+                        "timestamp": signal.get("timestamp", datetime.now(timezone.utc).isoformat()),
                         "indicators": signal.get("indicators", {}),
                         "data": signal.get("data", {})
                     }

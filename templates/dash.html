@@ -202,7 +202,7 @@
                                 <i class="fas fa-clock text-slate-400"></i>
                                 <span>Uptime: <span id="systemUptime" class="font-semibold">0m</span></span>
                             </div>
-                            <button onclick="showReadme()" class="px-4 py-2 bg-primary-600/20 text-primary-400 border border-primary-500/30 rounded-lg hover:bg-primary-600/30 transition-all duration-200 text-sm">
+                            <button onclick="openReadmeInNewPage()" class="px-4 py-2 bg-primary-600/20 text-primary-400 border border-primary-500/30 rounded-lg hover:bg-primary-600/30 transition-all duration-200 text-sm">
                                 <i class="fas fa-book mr-2"></i>Documentation
                             </button>
                         </div>
@@ -259,24 +259,23 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Live Prices -->
-                <div class="glass-card rounded-2xl p-6">
-                    <div class="mb-6">
-                        <h2 class="text-xl font-bold text-slate-100 flex items-center gap-3">
-                            <i class="fas fa-chart-line text-success-400"></i>
-                            Live Prices
-                        </h2>
-                    </div>
-                    <div id="livePrices" class="space-y-3 max-h-96 overflow-y-auto scroll-container">
-                        <div class="text-center text-slate-400 py-8">
-                            <i class="fas fa-spinner animate-spin text-2xl mb-2"></i>
-                            <p>Waiting for price data...</p>
-                        </div>
+            <!-- Live Prices -->
+            <div class="glass-card rounded-2xl p-6">
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold text-slate-100 flex items-center gap-3">
+                        <i class="fas fa-chart-line text-success-400"></i>
+                        Live Prices
+                    </h2>
+                </div>
+                <div id="livePrices" class="space-y-3 max-h-96 overflow-y-auto scroll-container">
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="fas fa-spinner animate-spin text-2xl mb-2"></i>
+                        <p>Waiting for price data...</p>
                     </div>
                 </div>
+            </div>
 
-                <!-- Trading Positions -->
+            <!-- Trading Positions - Full Width Section -->
                 <div class="glass-card rounded-2xl p-6">
                     <div class="relative">
                         <div class="absolute top-0 right-0">
@@ -312,23 +311,16 @@
                         <div id="closedPositionsTab" class="tab-content hidden">
                             <!-- Filters for Closed Positions -->
                             <div class="mb-4 p-4 bg-slate-800/50 rounded-lg">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-3">
-                                    <input type="date" id="positionsDateFrom" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="From Date">
-                                    <input type="date" id="positionsDateTo" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="To Date">
-                                    <input type="text" id="positionsSymbolFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Symbol">
-                                    <select id="positionsStrategyFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                                        <option value="">All Strategies</option>
-                                    </select>
-                                </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <select id="positionsTypeFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                                        <option value="">All Types</option>
-                                        <option value="LONG">Long</option>
-                                        <option value="SHORT">Short</option>
-                                    </select>
+                                    <input type="text" id="positionsSymbolFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Symbol">
                                     <input type="text" id="positionsSearchFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Search...">
+                                    <select id="positionsOrderBy" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+                                        <option value="created_at">Order by Date</option>
+                                        <option value="symbol">Order by Symbol</option>
+                                        <option value="pnl">Order by P&L</option>
+                                        <option value="duration">Order by Duration</option>
+                                    </select>
                                     <button id="applyPositionsFilters" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium">Apply</button>
-                                    <button id="clearPositionsFilters" class="px-4 py-2 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-colors duration-200 text-sm font-medium">Clear</button>
                                 </div>
                             </div>
                             <div id="closedPositionsInTab" class="max-h-96 overflow-y-auto scroll-container">
@@ -343,23 +335,16 @@
                         <div id="tradesTab" class="tab-content hidden">
                             <!-- Filters for Trades -->
                             <div class="mb-4 p-4 bg-slate-800/50 rounded-lg">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-3">
-                                    <input type="date" id="tradesDateFrom" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="From Date">
-                                    <input type="date" id="tradesDateTo" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="To Date">
-                                    <input type="text" id="tradesSymbolFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Symbol">
-                                    <select id="tradesStrategyFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                                        <option value="">All Strategies</option>
-                                    </select>
-                                </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <select id="tradesTypeFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                                        <option value="">All Types</option>
-                                        <option value="LONG">Long</option>
-                                        <option value="SHORT">Short</option>
-                                    </select>
+                                    <input type="text" id="tradesSymbolFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Symbol">
                                     <input type="text" id="tradesSearchFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Search...">
+                                    <select id="tradesOrderBy" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+                                        <option value="created_at">Order by Date</option>
+                                        <option value="symbol">Order by Symbol</option>
+                                        <option value="pnl">Order by P&L</option>
+                                        <option value="duration">Order by Duration</option>
+                                    </select>
                                     <button id="applyTradesFilters" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium">Apply</button>
-                                    <button id="clearTradesFilters" class="px-4 py-2 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-colors duration-200 text-sm font-medium">Clear</button>
                                 </div>
                             </div>
                             <div id="tradesInTab" class="max-h-96 overflow-y-auto scroll-container">
@@ -369,7 +354,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
             <!-- Notifications and Signals -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -401,9 +385,8 @@
                     <div id="historicalNotifications" class="notification-tab-content hidden">
                         <!-- Notification Filters -->
                         <div class="mb-4 p-4 bg-slate-800/50 rounded-lg">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-                                <input type="date" id="notificationDateFrom" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="From Date">
-                                <input type="date" id="notificationDateTo" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="To Date">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <input type="text" id="notificationSearchFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Search...">
                                 <select id="notificationLevelFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                                     <option value="">All Levels</option>
                                     <option value="info">Info</option>
@@ -411,14 +394,7 @@
                                     <option value="error">Error</option>
                                     <option value="success">Success</option>
                                 </select>
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <select id="notificationTypeFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
-                                    <option value="">All Types</option>
-                                </select>
-                                <input type="text" id="notificationSearchFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Search...">
                                 <button id="applyNotificationFilters" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium">Apply</button>
-                                <button id="clearNotificationFilters" class="px-4 py-2 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-colors duration-200 text-sm font-medium">Clear</button>
                             </div>
                         </div>
                         <div id="historicalNotificationsList" class="space-y-3 max-h-96 overflow-y-auto scroll-container">
@@ -459,17 +435,13 @@
                     <div id="historicalSignalsTab" class="signal-tab-content hidden">
                         <!-- Signal Filters -->
                         <div class="mb-4 p-4 bg-slate-800/50 rounded-lg">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-                                <input type="date" id="signalsDateFrom" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="From Date">
-                                <input type="date" id="signalsDateTo" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="To Date">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <input type="text" id="signalsSymbolFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Symbol">
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <select id="signalsStrategyFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
                                     <option value="">All Strategies</option>
                                 </select>
+                                <input type="text" id="signalsSearchFilter" class="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500" placeholder="Search...">
                                 <button id="applySignalsFilters" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors duration-200 text-sm font-medium">Apply</button>
-                                <button id="clearSignalsFilters" class="px-4 py-2 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-colors duration-200 text-sm font-medium">Clear</button>
                             </div>
                         </div>
                         <div id="historicalSignalsList" class="space-y-3 max-h-96 overflow-y-auto scroll-container">
@@ -1763,6 +1735,7 @@
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-primary-500">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Current Balance</div>
                             <div class="text-xl font-bold font-mono">$${this.formatNumber(summary.current_balance || 0)}</div>
+                            <div class="text-xs text-slate-500 mt-1">Initial: $${this.formatNumber(summary.initial_balance || 0)}</div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 ${accountGrowth >= 0 ? 'border-success-500' : 'border-danger-500'}">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Account Growth</div>
@@ -1783,11 +1756,17 @@
                             <div class="text-xl font-bold font-mono ${realizedPnl >= 0 ? 'positive' : 'negative'}">
                                 ${realizedPnl >= 0 ? '+' : ''}$${Math.abs(realizedPnl).toFixed(2)}
                             </div>
+                            <div class="text-xs ${realizedPnl >= 0 ? 'text-success-400' : 'text-danger-400'} mt-1">
+                                ${summary.initial_balance > 0 ? (realizedPnl >= 0 ? '+' : '') + (realizedPnl / summary.initial_balance * 100).toFixed(2) + '%' : 'N/A'}
+                            </div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 ${unrealizedPnl >= 0 ? 'border-success-500' : 'border-danger-500'}">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Unrealized P&L</div>
                             <div class="text-xl font-bold font-mono ${unrealizedPnl >= 0 ? 'positive' : 'negative'}">
                                 ${unrealizedPnl >= 0 ? '+' : ''}$${Math.abs(unrealizedPnl).toFixed(2)}
+                            </div>
+                            <div class="text-xs ${unrealizedPnl >= 0 ? 'text-success-400' : 'text-danger-400'} mt-1">
+                                ${summary.initial_balance > 0 ? (unrealizedPnl >= 0 ? '+' : '') + (unrealizedPnl / summary.initial_balance * 100).toFixed(2) + '%' : 'N/A'}
                             </div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 ${totalPnl >= 0 ? 'border-success-500' : 'border-danger-500'}">
@@ -1811,10 +1790,10 @@
                             <div class="text-xs text-slate-400">of ${summary.daily_trades_limit || 50}</div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-cyan-500">
-                            <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Max Daily P&L</div>
+                            <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Profit/Loss</div>
                             <div class="text-sm font-bold font-mono">
-                                <span class="positive">+$${this.formatNumber(summary.max_daily_profit || 0)}</span> / 
-                                <span class="negative">-$${this.formatNumber(Math.abs(summary.max_daily_loss || 0))}</span>
+                                <span class="positive">+$${this.formatNumber(summary.total_positive_pnl || 0)}</span> / 
+                                <span class="negative">-$${this.formatNumber(Math.abs(summary.total_negative_pnl || 0))}</span>
                             </div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-red-500">
@@ -2297,6 +2276,41 @@
             if (window.dashboard && window.dashboard.closeReadme) {
                 window.dashboard.closeReadme();
             }
+        };
+
+        window.openReadmeInNewPage = function() {
+            // Create a new window/tab with the README content
+            const readmeWindow = window.open('', '_blank');
+            const htmlContent = 
+                '<html>' +
+                '<head>' +
+                '<title>Trading System Documentation</title>' +
+                '<style>' +
+                'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 20px; background: #0f172a; color: #e2e8f0; }' +
+                'h1, h2, h3 { color: #60a5fa; }' +
+                'code { background: #1e293b; padding: 2px 4px; border-radius: 3px; }' +
+                'pre { background: #1e293b; padding: 15px; border-radius: 5px; overflow-x: auto; white-space: pre-wrap; }' +
+                'blockquote { border-left: 4px solid #60a5fa; margin: 0; padding-left: 20px; }' +
+                'a { color: #60a5fa; }' +
+                '</style>' +
+                '</head>' +
+                '<body>' +
+                '<div id="readme-content">Loading README...</div>' +
+                '<script>' +
+                'fetch("/README.md")' +
+                '.then(function(response) { return response.text(); })' +
+                '.then(function(text) {' +
+                'var escapedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");' +
+                'document.getElementById("readme-content").innerHTML = "<pre>" + escapedText + "</pre>";' +
+                '})' +
+                '.catch(function(error) {' +
+                'document.getElementById("readme-content").innerHTML = "<h1>Trading System Documentation</h1><p>Please refer to the README.md file in the project root directory for complete documentation.</p>";' +
+                '});' +
+                '</' + 'script>' +
+                '</body>' +
+                '</html>';
+            readmeWindow.document.write(htmlContent);
+            readmeWindow.document.close();
         };
 
         window.connect = function() {

@@ -368,6 +368,17 @@ class AsyncBroker:
         if self.account.initial_balance > 0:
             total_return_pct = ((total_portfolio_value - self.account.initial_balance) / self.account.initial_balance) * 100
         
+        # Calculate total positive and negative P&L from all positions
+        total_positive_pnl = 0.0
+        total_negative_pnl = 0.0
+        
+        for position in self.positions.values():
+            pnl = position.pnl
+            if pnl > 0:
+                total_positive_pnl += pnl
+            elif pnl < 0:
+                total_negative_pnl += pnl
+        
         summary = {
             "account_id": self.account.id,
             "name": self.account.name,
@@ -386,6 +397,8 @@ class AsyncBroker:
             "daily_trades_count": self.account.daily_trades_count,
             "daily_trades_limit": self.account.daily_trades_limit,
             "total_margin_used": self.account.total_margin_used,
+            "total_positive_pnl": total_positive_pnl,
+            "total_negative_pnl": total_negative_pnl,
             "brokerage_charges": self.account.brokerage_charges,
             "open_positions": len(open_positions),  # Frontend compatible
             "open_positions_count": len(open_positions),

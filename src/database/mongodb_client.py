@@ -43,6 +43,7 @@ class AsyncMongoDBClient:
         self.trades_collection = "trades"
         self.liveprice = "liveprice"
         self.notifications  = "notifications"
+        self.signals_collection = "signals"
         
         self._initialized = True
         
@@ -347,6 +348,82 @@ class AsyncMongoDBClient:
         except Exception as e:
             self.log_message(f"Error loading trades: {e}", "error")
             return []
+
+    # Signal Management
+    async def save_signal(self, signal_data: Dict[str, Any]) -> bool:
+        """Save strategy signal data to MongoDB"""
+        try:
+            # Ensure signal has timestamp
+            if "timestamp" not in signal_data:
+                signal_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            
+            return await self.insert_document(self.signals_collection, signal_data)
+        except Exception as e:
+            self.log_message(f"Error saving signal: {e}", "error")
+            return False
+
+    async def load_signals(self, limit: int = 100, skip: int = 0, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """Load strategy signals from MongoDB with filtering"""
+        try:
+            if not self.is_connected:
+                if not await self.connect():
+                    return []
+                
+            # Build query filters
+            query = {}
+            if filters:
+                if filters.get('symbol'):
+                    query['symbol'] = {'$regex': filters['symbol'], '$options': 'i'}
+                if filters.get('strategy'):
+                    query['strategy_name'] = {'$regex': filters['strategy'], '$options': 'i'}
+                if filters.get('search'):
+                    search_term = filters['search']
+                    query['$or'] = [
+                        {'symbol': {'$regex': search_term, '$options': 'i'}},
+                        {'strategy_name': {'$regex': search_term, '$options': 'i'}},
+                        {'signal': {'$regex': search_term, '$options': 'i'}}
+                    ]
+            
+            # Execute query with pagination
+            cursor = self.db[self.signals_collection].find(query).sort("timestamp", -1).skip(skip).limit(limit)
+            signals = await cursor.to_list(length=None)
+            
+            # Convert ObjectId to string
+            for signal in signals:
+                if '_id' in signal:
+                    signal['_id'] = str(signal['_id'])
+            
+            return signals
+        except Exception as e:
+            self.log_message(f"Error loading signals: {e}", "error")
+            return []
+
+    async def get_signals_count(self, filters: Dict[str, Any] = None) -> int:
+        """Get total count of signals matching filters"""
+        try:
+            if not self.is_connected:
+                if not await self.connect():
+                    return 0
+            
+            # Build query filters (same as in load_signals)
+            query = {}
+            if filters:
+                if filters.get('symbol'):
+                    query['symbol'] = {'$regex': filters['symbol'], '$options': 'i'}
+                if filters.get('strategy'):
+                    query['strategy_name'] = {'$regex': filters['strategy'], '$options': 'i'}
+                if filters.get('search'):
+                    search_term = filters['search']
+                    query['$or'] = [
+                        {'symbol': {'$regex': search_term, '$options': 'i'}},
+                        {'strategy_name': {'$regex': search_term, '$options': 'i'}},
+                        {'signal': {'$regex': search_term, '$options': 'i'}}
+                    ]
+            
+            return await self.db[self.signals_collection].count_documents(query)
+        except Exception as e:
+            self.log_message(f"Error counting signals: {e}", "error")
+            return 0
 
     # Analysis Management
     async def save_analysis_result(self, analysis_data: Dict[str, Any]) -> Optional[str]:

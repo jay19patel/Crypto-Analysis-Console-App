@@ -610,20 +610,31 @@ class WebSocketServer:
         await self._broadcast_to_subscribers(MessageType.NOTIFICATIONS, notification_data)
 
     async def broadcast_strategy_signal(self, signal: TradingSignal):
-        """Broadcast strategy signal to all subscribed clients"""
+        """Broadcast strategy signal to all subscribed clients and store in database"""
         signal_data = {
             "strategy_name": signal.strategy_name,
             "symbol": signal.symbol,
             "signal": signal.signal.value if hasattr(signal.signal, 'value') else str(signal.signal),
             "confidence": signal.confidence,
+            "price": signal.price,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+        
+        # Store signal in database
+        try:
+            await self.mongodb_client.save_signal(signal_data)
+        except Exception as e:
+            self.logger.error(f"Failed to save strategy signal to database: {e}")
         
         await self._broadcast_to_subscribers(MessageType.STRATEGY_SIGNALS, signal_data)
 
     async def broadcast_account_summary(self, account_summary: Dict):
         """Broadcast account summary to all subscribed clients"""
         await self._broadcast_to_subscribers(MessageType.ACCOUNT_SUMMARY, account_summary)
+
+    async def broadcast_system_status(self, status_data: Dict):
+        """Broadcast system status to all subscribed clients"""
+        await self._broadcast_to_subscribers(MessageType.SYSTEM_STATUS, status_data)
 
     async def broadcast_positions_update_direct(self, positions: List[Dict]):
         """Direct broadcast positions update to all subscribed clients"""

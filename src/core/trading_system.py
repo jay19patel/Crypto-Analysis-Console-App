@@ -1012,21 +1012,30 @@ class TradingSystem:
     async def _broadcast_system_status(self, health_status: SystemHealth):
         """Broadcast system status to WebSocket clients"""
         try:
+            uptime_seconds = health_status.uptime
+            hours = int(uptime_seconds // 3600)
+            minutes = int((uptime_seconds % 3600) // 60)
+            seconds = int(uptime_seconds % 60)
+            
+            if hours > 0:
+                uptime_str = f"{hours}h {minutes}m {seconds}s"
+            elif minutes > 0:
+                uptime_str = f"{minutes}m {seconds}s"
+            else:
+                uptime_str = f"{uptime_seconds:.1f}s"
+            
             status_data = {
                 "healthy": health_status.is_healthy,
-                "uptime": health_status.uptime,
+                "uptime": uptime_str,
+                "uptime_seconds": uptime_seconds,
                 "error_count": health_status.error_count,
                 "memory_usage": health_status.memory_usage,
                 "components": health_status.components,
                 "stats": self.get_system_stats()
             }
             
-            # Broadcast to WebSocket clients
-            from src.api.websocket_server import MessageType
-            await self.websocket_server._broadcast_to_subscribers(
-                MessageType.SYSTEM_STATUS,
-                status_data
-            )
+            # Broadcast to WebSocket clients using the new method
+            await self.websocket_server.broadcast_system_status(status_data)
             
         except Exception as e:
             self.logger.error(f"❌ Error broadcasting system status: {e}")
