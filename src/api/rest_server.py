@@ -466,7 +466,9 @@ class TradingRestAPI:
             limit: int = Query(50, ge=1, le=200),
             strategy: Optional[str] = Query(None),
             symbol: Optional[str] = Query(None),
-            search: Optional[str] = Query(None)
+            search: Optional[str] = Query(None),
+            date_from: Optional[str] = Query(None),
+            date_to: Optional[str] = Query(None)
         ):
             """Get trading signals with filters and pagination"""
             try:
@@ -481,6 +483,10 @@ class TradingRestAPI:
                     filters['symbol'] = symbol
                 if search:
                     filters['search'] = search
+                if date_from:
+                    filters['date_from'] = date_from
+                if date_to:
+                    filters['date_to'] = date_to
                 
                 # Calculate skip for pagination
                 skip = (page - 1) * limit

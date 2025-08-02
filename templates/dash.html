@@ -193,18 +193,49 @@
                         </h1>
                         
                         <!-- System Status -->
-                        <div class="flex flex-wrap justify-center items-center gap-4 sm:gap-6 mb-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                            <div class="flex items-center gap-2 text-sm">
-                                <i class="fas fa-circle text-success-500 animate-pulse" id="statusIndicator"></i>
-                                <span>System: <span id="systemStatus" class="font-semibold">Starting...</span></span>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <!-- Health Status -->
+                            <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <i class="fas fa-circle text-success-500 animate-pulse" id="statusIndicator"></i>
+                                    <span>Status: <span id="systemStatus" class="font-semibold">Starting...</span></span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                    <i class="fas fa-heartbeat"></i>
+                                    <span>Health: <span id="systemHealth" class="font-semibold text-success-400">Checking...</span></span>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 text-sm">
-                                <i class="fas fa-clock text-slate-400"></i>
-                                <span>Uptime: <span id="systemUptime" class="font-semibold">0m</span></span>
+                            
+                            <!-- Uptime & Memory -->
+                            <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <i class="fas fa-clock text-slate-400"></i>
+                                    <span>Uptime: <span id="systemUptime" class="font-semibold">0m</span></span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                    <i class="fas fa-memory"></i>
+                                    <span>Memory: <span id="systemMemory" class="font-semibold">0 MB</span></span>
+                                </div>
                             </div>
-                            <button onclick="openReadmeInNewPage()" class="px-4 py-2 bg-primary-600/20 text-primary-400 border border-primary-500/30 rounded-lg hover:bg-primary-600/30 transition-all duration-200 text-sm">
-                                <i class="fas fa-book mr-2"></i>Documentation
-                            </button>
+                            
+                            <!-- Errors & Components -->
+                            <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+                                    <span>Errors: <span id="systemErrors" class="font-semibold text-yellow-400">0</span></span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                                    <i class="fas fa-puzzle-piece"></i>
+                                    <span>Components: <span id="systemComponents" class="font-semibold text-green-400">0/0</span></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Documentation -->
+                            <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50 flex items-center justify-center">
+                                <button onclick="openReadmeInNewPage()" class="w-full px-4 py-2 bg-primary-600/20 text-primary-400 border border-primary-500/30 rounded-lg hover:bg-primary-600/30 transition-all duration-200 text-sm">
+                                    <i class="fas fa-book mr-2"></i>Documentation
+                                </button>
+                            </div>
                         </div>
                         
                         <!-- Connection Controls -->
@@ -974,7 +1005,12 @@
                     const statusElement = document.getElementById('systemStatus');
                     const uptimeElement = document.getElementById('systemUptime');
                     const statusIndicator = document.getElementById('statusIndicator');
+                    const healthElement = document.getElementById('systemHealth');
+                    const memoryElement = document.getElementById('systemMemory');
+                    const errorsElement = document.getElementById('systemErrors');
+                    const componentsElement = document.getElementById('systemComponents');
                     
+                    // Update status
                     if (statusElement && systemInfo.status) {
                         statusElement.textContent = systemInfo.status;
                         
@@ -990,11 +1026,67 @@
                         }
                     }
                     
+                    // Update uptime
                     if (uptimeElement && (systemInfo.uptime || systemInfo.uptime_seconds)) {
                         if (systemInfo.uptime) {
                             uptimeElement.textContent = systemInfo.uptime;
                         } else if (systemInfo.uptime_seconds) {
                             uptimeElement.textContent = this.formatUptime(systemInfo.uptime_seconds);
+                        }
+                    }
+                    
+                    // Update health status
+                    if (healthElement && typeof systemInfo.healthy !== 'undefined') {
+                        const isHealthy = systemInfo.healthy;
+                        healthElement.textContent = isHealthy ? 'Healthy' : 'Unhealthy';
+                        healthElement.className = isHealthy ? 'font-semibold text-success-400' : 'font-semibold text-danger-400';
+                    }
+                    
+                    // Update memory usage
+                    if (memoryElement && typeof systemInfo.memory_usage !== 'undefined') {
+                        const memoryMB = parseFloat(systemInfo.memory_usage);
+                        memoryElement.textContent = `${memoryMB.toFixed(1)} MB`;
+                        
+                        // Color coding based on memory usage
+                        if (memoryMB > 500) {
+                            memoryElement.className = 'font-semibold text-danger-400';
+                        } else if (memoryMB > 200) {
+                            memoryElement.className = 'font-semibold text-yellow-400';
+                        } else {
+                            memoryElement.className = 'font-semibold text-success-400';
+                        }
+                    }
+                    
+                    // Update error count
+                    if (errorsElement && typeof systemInfo.error_count !== 'undefined') {
+                        const errorCount = parseInt(systemInfo.error_count);
+                        errorsElement.textContent = errorCount.toString();
+                        
+                        // Color coding based on error count
+                        if (errorCount > 10) {
+                            errorsElement.className = 'font-semibold text-danger-400';
+                        } else if (errorCount > 0) {
+                            errorsElement.className = 'font-semibold text-yellow-400';
+                        } else {
+                            errorsElement.className = 'font-semibold text-success-400';
+                        }
+                    }
+                    
+                    // Update components status
+                    if (componentsElement && systemInfo.components) {
+                        const components = systemInfo.components;
+                        const totalComponents = Object.keys(components).length;
+                        const healthyComponents = Object.values(components).filter(status => status === true).length;
+                        
+                        componentsElement.textContent = `${healthyComponents}/${totalComponents}`;
+                        
+                        // Color coding based on component health
+                        if (healthyComponents === totalComponents && totalComponents > 0) {
+                            componentsElement.className = 'font-semibold text-success-400';
+                        } else if (healthyComponents > 0) {
+                            componentsElement.className = 'font-semibold text-yellow-400';
+                        } else {
+                            componentsElement.className = 'font-semibold text-danger-400';
                         }
                     }
                     
@@ -1243,15 +1335,19 @@
                 container.innerHTML = Object.entries(prices).map(([symbol, data]) => {
                     const price = parseFloat(data.price || 0);
                     const change = parseFloat(data.change_24h || 0);
+                    const volume = parseFloat(data.volume || 0);
                     const changeClass = change >= 0 ? 'positive' : 'negative';
                     const changeSymbol = change >= 0 ? '+' : '';
                     
                     return `
                         <div class="glass-effect rounded-xl p-4 hover:bg-slate-700/50 transition-all duration-200">
                             <div class="flex justify-between items-center">
-                                <div>
+                                <div class="flex-1">
                                     <div class="font-bold text-slate-100 font-mono">${symbol}</div>
                                     <div class="text-2xl font-bold font-mono text-primary-400">$${this.formatPrice(price)}</div>
+                                    <div class="text-xs text-slate-400 mt-1">
+                                        <i class="fas fa-chart-bar mr-1"></i>Vol: ${this.formatVolume(volume)}
+                                    </div>
                                 </div>
                                 <div class="text-right">
                                     <div class="px-3 py-1 rounded-full text-sm font-bold ${changeClass === 'positive' ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">
@@ -1331,6 +1427,8 @@
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Entry</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Current</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Quantity</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">StopLoss</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Target</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">PnL</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">PnL %</th>
                                     </tr>
@@ -1343,13 +1441,48 @@
                                         const positionType = position.position_type || position.type || position.side || 'LONG';
                                         const sideClass = positionType === 'LONG' ? 'positive' : 'negative';
                                         
+                                        // Calculate stop loss and target percentages
+                                        const entryPrice = parseFloat(position.entry_price || 0);
+                                        const stopLossPrice = parseFloat(position.stop_loss || 0);
+                                        const targetPrice = parseFloat(position.target || 0);
+                                        
+                                        let stopLossPct = '';
+                                        let targetPct = '';
+                                        
+                                        if (stopLossPrice > 0 && entryPrice > 0) {
+                                            const stopLossPercent = ((stopLossPrice - entryPrice) / entryPrice * 100);
+                                            stopLossPct = `${stopLossPercent >= 0 ? '+' : ''}${stopLossPercent.toFixed(2)}%`;
+                                        }
+                                        
+                                        if (targetPrice > 0 && entryPrice > 0) {
+                                            const targetPercent = ((targetPrice - entryPrice) / entryPrice * 100);
+                                            targetPct = `${targetPercent >= 0 ? '+' : ''}${targetPercent.toFixed(2)}%`;
+                                        }
+                                        
+                                        // Format entry time
+                                        const entryTime = position.entry_time || position.created_at || '';
+                                        const entryDateTime = entryTime ? new Date(entryTime).toLocaleString('en-US', {
+                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        }) : 'N/A';
+                                        
                                         return `
                                             <tr class="border-b border-slate-800 hover:bg-slate-800/50">
                                                 <td class="py-3 px-2 font-bold">${position.symbol}</td>
                                                 <td class="py-3 px-2"><span class="px-2 py-1 rounded text-xs font-bold ${sideClass === 'positive' ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">${positionType}</span></td>
-                                                <td class="py-3 px-2 font-mono">$${this.formatPrice(position.entry_price || 0)}</td>
+                                                <td class="py-3 px-2 font-mono">
+                                                    <div>$${this.formatPrice(position.entry_price || 0)}</div>
+                                                    <div class="text-xs text-slate-400">${entryDateTime}</div>
+                                                </td>
                                                 <td class="py-3 px-2 font-mono">$${this.formatPrice(position.current_price || position.entry_price || 0)}</td>
                                                 <td class="py-3 px-2 font-mono">${this.formatNumber(position.quantity || 0)}</td>
+                                                <td class="py-3 px-2 font-mono text-sm">
+                                                    <div>${stopLossPrice > 0 ? '$' + this.formatPrice(stopLossPrice) : 'N/A'}</div>
+                                                    <div class="text-xs ${stopLossPrice > 0 ? 'text-danger-400' : 'text-slate-500'}">${stopLossPct || 'N/A'}</div>
+                                                </td>
+                                                <td class="py-3 px-2 font-mono text-sm">
+                                                    <div>${targetPrice > 0 ? '$' + this.formatPrice(targetPrice) : 'N/A'}</div>
+                                                    <div class="text-xs ${targetPrice > 0 ? 'text-success-400' : 'text-slate-500'}">${targetPct || 'N/A'}</div>
+                                                </td>
                                                 <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</td>
                                                 <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</td>
                                             </tr>
@@ -1437,12 +1570,30 @@
                                         const positionType = position.position_type || position.type || 'LONG';
                                         const typeClass = positionType === 'LONG' ? 'positive' : 'negative';
                                         
+                                        // Format entry and exit times
+                                        const entryTime = position.entry_time || position.created_at || '';
+                                        const exitTime = position.exit_time || position.updated_at || '';
+                                        
+                                        const entryDateTime = entryTime ? new Date(entryTime).toLocaleString('en-US', {
+                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        }) : 'N/A';
+                                        
+                                        const exitDateTime = exitTime ? new Date(exitTime).toLocaleString('en-US', {
+                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        }) : 'N/A';
+                                        
                                         return `
                                             <tr class="border-b border-slate-800 hover:bg-slate-800/50">
                                                 <td class="py-3 px-2 font-bold">${position.symbol}</td>
                                                 <td class="py-3 px-2"><span class="px-2 py-1 rounded text-xs font-bold ${typeClass === 'positive' ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">${positionType}</span></td>
-                                                <td class="py-3 px-2 font-mono">$${this.formatPrice(position.entry_price || 0)}</td>
-                                                <td class="py-3 px-2 font-mono">$${this.formatPrice(position.exit_price || 0)}</td>
+                                                <td class="py-3 px-2 font-mono">
+                                                    <div>$${this.formatPrice(position.entry_price || 0)}</div>
+                                                    <div class="text-xs text-slate-400">${entryDateTime}</div>
+                                                </td>
+                                                <td class="py-3 px-2 font-mono">
+                                                    <div>$${this.formatPrice(position.exit_price || 0)}</div>
+                                                    <div class="text-xs text-slate-400">${exitDateTime}</div>
+                                                </td>
                                                 <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</td>
                                                 <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</td>
                                                 <td class="py-3 px-2 text-sm">${position.duration || position.holding_time || 'N/A'}</td>
@@ -1739,17 +1890,17 @@
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 ${accountGrowth >= 0 ? 'border-success-500' : 'border-danger-500'}">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Account Growth</div>
-                            <div class="text-xl font-bold font-mono ${accountGrowth >= 0 ? 'positive' : 'negative'}">
+                            <div class="text-xl font-bold font-mono ${accountGrowth >= 0 ? 'text-success-400' : 'text-danger-400'}">
                                 ${accountGrowth >= 0 ? '+' : ''}$${Math.abs(accountGrowth).toFixed(2)}
                             </div>
-                            <div class="text-xs ${accountGrowth >= 0 ? 'positive' : 'negative'}">
+                            <div class="text-xs ${accountGrowth >= 0 ? 'text-success-400' : 'text-danger-400'}">
                                 ${accountGrowthPct >= 0 ? '+' : ''}${accountGrowthPct.toFixed(2)}%
                             </div>
                         </div>
-                        <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-yellow-500">
+                        <div class="glass-effect rounded-xl p-4 text-center border-l-4 ${marginUsagePct > 80 ? 'border-danger-500' : marginUsagePct > 60 ? 'border-yellow-500' : 'border-success-500'}">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Margin Used</div>
-                            <div class="text-xl font-bold font-mono">$${this.formatNumber(summary.margin_used || 0)}</div>
-                            <div class="text-xs text-slate-400">${marginUsagePct.toFixed(1)}% of balance</div>
+                            <div class="text-xl font-bold font-mono ${marginUsagePct > 80 ? 'text-danger-400' : marginUsagePct > 60 ? 'text-yellow-400' : 'text-slate-100'}">$${this.formatNumber(summary.total_margin_used || 0)}</div>
+                            <div class="text-xs ${marginUsagePct > 80 ? 'text-danger-400' : marginUsagePct > 60 ? 'text-yellow-400' : 'text-slate-400'}">${marginUsagePct.toFixed(1)}% of balance</div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 ${realizedPnl >= 0 ? 'border-success-500' : 'border-danger-500'}">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Realized P&L</div>
@@ -1777,8 +1928,13 @@
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-slate-500">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Positions</div>
-                            <div class="text-xl font-bold font-mono">${summary.open_positions_count || 0}/${summary.closed_positions_count || 0}</div>
+                            <div class="text-lg font-bold font-mono">
+                                <span class="text-success-400">${summary.open_positions_count || 0}</span>
+                                <span class="text-slate-400">/</span>
+                                <span class="text-slate-300">${summary.closed_positions_count || 0}</span>
+                            </div>
                             <div class="text-xs text-slate-400">Open/Closed</div>
+                            <div class="text-xs text-slate-500 mt-1">Total: ${(summary.open_positions_count || 0) + (summary.closed_positions_count || 0)}</div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-purple-500">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</div>
@@ -2195,6 +2351,20 @@
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const secs = Math.floor(seconds % 60);
                 return `${hours}h ${minutes}m ${secs}s`;
+            }
+            
+            formatVolume(volume) {
+                if (volume === 0) return '0';
+                
+                if (volume >= 1e9) {
+                    return (volume / 1e9).toFixed(1) + 'B';
+                } else if (volume >= 1e6) {
+                    return (volume / 1e6).toFixed(1) + 'M';
+                } else if (volume >= 1e3) {
+                    return (volume / 1e3).toFixed(1) + 'K';
+                } else {
+                    return volume.toFixed(0);
+                }
             }
             
             flashUpdateIndicator(indicatorId) {

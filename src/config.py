@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     BALANCE_PER_TRADE_PCT: float = Field(default=0.15)  # 15% of balance per trade (optimized from 20%)
     DEFAULT_LEVERAGE: float = Field(default=30.0)  # 30x leverage (optimized from 50x for better risk management)
     MAX_LEVERAGE: float = Field(default=50.0)  # Keep max at 50x for flexibility
-    DAILY_TRADES_LIMIT: int = Field(default=50)
+    DAILY_TRADES_LIMIT: int = Field(default=5)
     MIN_CONFIDENCE: float = Field(default=50.0)
     
     # Risk Management - Basic Settings

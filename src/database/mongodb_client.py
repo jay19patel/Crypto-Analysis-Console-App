@@ -383,6 +383,21 @@ class AsyncMongoDBClient:
                         {'strategy_name': {'$regex': search_term, '$options': 'i'}},
                         {'signal': {'$regex': search_term, '$options': 'i'}}
                     ]
+                # Date range filter
+                if filters.get('date_from') or filters.get('date_to'):
+                    date_filter = {}
+                    if filters.get('date_from'):
+                        try:
+                            date_filter['$gte'] = datetime.fromisoformat(filters['date_from'].replace('Z', '+00:00'))
+                        except ValueError:
+                            pass  # Skip invalid date format
+                    if filters.get('date_to'):
+                        try:
+                            date_filter['$lte'] = datetime.fromisoformat(filters['date_to'].replace('Z', '+00:00'))
+                        except ValueError:
+                            pass  # Skip invalid date format
+                    if date_filter:
+                        query['timestamp'] = date_filter
             
             # Execute query with pagination
             cursor = self.db[self.signals_collection].find(query).sort("timestamp", -1).skip(skip).limit(limit)
@@ -419,6 +434,21 @@ class AsyncMongoDBClient:
                         {'strategy_name': {'$regex': search_term, '$options': 'i'}},
                         {'signal': {'$regex': search_term, '$options': 'i'}}
                     ]
+                # Date range filter
+                if filters.get('date_from') or filters.get('date_to'):
+                    date_filter = {}
+                    if filters.get('date_from'):
+                        try:
+                            date_filter['$gte'] = datetime.fromisoformat(filters['date_from'].replace('Z', '+00:00'))
+                        except ValueError:
+                            pass  # Skip invalid date format
+                    if filters.get('date_to'):
+                        try:
+                            date_filter['$lte'] = datetime.fromisoformat(filters['date_to'].replace('Z', '+00:00'))
+                        except ValueError:
+                            pass  # Skip invalid date format
+                    if date_filter:
+                        query['timestamp'] = date_filter
             
             return await self.db[self.signals_collection].count_documents(query)
         except Exception as e:
