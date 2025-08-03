@@ -368,6 +368,31 @@ class AsyncBroker:
         if self.account.initial_balance > 0:
             total_return_pct = ((total_portfolio_value - self.account.initial_balance) / self.account.initial_balance) * 100
         
+        # Calculate account growth (can be negative)
+        account_growth = total_portfolio_value - self.account.initial_balance
+        account_growth_pct = 0.0
+        if self.account.initial_balance > 0:
+            account_growth_pct = (account_growth / self.account.initial_balance) * 100
+        
+        # Calculate daily win rate from today's closed positions
+        today_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        today_closed_positions = []
+        daily_profitable_trades = 0
+        daily_total_trades = 0
+        
+        for position in self.positions.values():
+            if (position.status == PositionStatus.CLOSED and 
+                position.exit_time and 
+                position.exit_time.strftime('%Y-%m-%d') == today_date):
+                today_closed_positions.append(position)
+                daily_total_trades += 1
+                if position.pnl > 0:
+                    daily_profitable_trades += 1
+        
+        daily_win_rate = 0.0
+        if daily_total_trades > 0:
+            daily_win_rate = (daily_profitable_trades / daily_total_trades) * 100
+        
         # Calculate total positive and negative P&L from all positions
         total_positive_pnl = 0.0
         total_negative_pnl = 0.0
@@ -390,10 +415,15 @@ class AsyncBroker:
             "profitable_trades": self.account.profitable_trades,
             "losing_trades": self.account.losing_trades,
             "win_rate": self.account.win_rate,
+            "daily_win_rate": daily_win_rate,
+            "daily_profitable_trades": daily_profitable_trades,
+            "daily_losing_trades": daily_total_trades - daily_profitable_trades,
             "realized_pnl": self.account.realized_pnl,
             "unrealized_pnl": total_unrealized_pnl,
             "total_pnl": total_pnl,  # Realized + Unrealized
             "total_return_percentage": total_return_pct,
+            "account_growth": account_growth,  # Can be negative
+            "account_growth_percentage": account_growth_pct,  # Can be negative
             "daily_trades_count": self.account.daily_trades_count,
             "daily_trades_limit": self.account.daily_trades_limit,
             "total_margin_used": self.account.total_margin_used,

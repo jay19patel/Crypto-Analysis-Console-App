@@ -642,13 +642,11 @@
             
             init() {
                 if (window.dashboardInitializing) {
-                    console.warn('⚠️ Dashboard initialization already in progress, skipping...');
                     return;
                 }
                 window.dashboardInitializing = true;
                 
                 if (window.dashboard) {
-                    console.log('⚠️ Dashboard already initialized, cleaning up...');
                     try {
                         window.dashboard.cleanupConnection();
                         if (window.dashboard.sseSource) {
@@ -684,17 +682,14 @@
             
             connectWebSocket() {
                 if (this.isConnecting || this.isReconnecting || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
-                    console.log('🔄 Connection attempt already in progress, skipping...');
                     return false;
                 }
                 
                 if (this.isConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    console.log('✅ Already connected to WebSocket');
                     return true;
                 }
                 
                 if (this.connectionMutex) {
-                    console.log('🔒 Connection mutex active, skipping...');
                     return false;
                 }
                 
@@ -874,7 +869,6 @@
             
             subscribeToChannels() {
                 if (this.subscribed) {
-                    console.log('🔄 Already subscribed to channels, skipping...');
                     return;
                 }
                 
@@ -888,6 +882,7 @@
                             'notifications',
                             'strategy_signals',
                             'account_summary',
+                            'system_status',
                             'heartbeat'
                         ],
                         sessionId: this.sessionId,
@@ -1182,7 +1177,7 @@
                     const filters = this.data.tradesTabFilters || {};
                     const params = new URLSearchParams({
                         page: page.toString(),
-                        per_page: '20',
+                        per_page: '5',  // Limit to 5 trades only
                         ...filters
                     });
                     
@@ -1939,6 +1934,7 @@
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-purple-500">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</div>
                             <div class="text-xl font-bold font-mono">${(summary.win_rate || 0).toFixed(1)}%</div>
+                            <div class="text-xs text-slate-400 mt-1">Daily: ${(summary.daily_win_rate || 0).toFixed(1)}%</div>
                         </div>
                         <div class="glass-effect rounded-xl p-4 text-center border-l-4 border-orange-500">
                             <div class="text-xs text-slate-400 uppercase tracking-wider mb-1">Daily Trades</div>

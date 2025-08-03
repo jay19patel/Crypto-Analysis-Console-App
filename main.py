@@ -192,7 +192,7 @@ class GracefulShutdownHandler:
         self.shutdown_requested = False
     
     def signal_handler(self, signum: int, frame):
-        """Handle shutdown signals"""
+        """Handle shutdown signals with improved robustness"""
         signal_names = {
             signal.SIGINT: "SIGINT (Ctrl+C)",
             signal.SIGTERM: "SIGTERM (Termination)"
@@ -207,23 +207,41 @@ class GracefulShutdownHandler:
             # Set shutdown event to stop threads
             self.trading_system._shutdown_event.set()
             
-            # Schedule async shutdown
+            # Schedule async shutdown with timeout protection
             try:
                 import asyncio
                 loop = asyncio.get_running_loop()
                 if loop and not loop.is_closed():
-                    # Schedule the shutdown coroutine
-                    asyncio.create_task(self._async_shutdown())
+                    # Create shutdown task with timeout
+                    task = asyncio.create_task(self._async_shutdown())
+                    
+                    # Set up a fallback timer in case shutdown hangs
+                    import threading
+                    def force_exit():
+                        import time
+                        time.sleep(15)  # Wait 15 seconds max
+                        if not task.done():
+                            self.logger.error("⚠️ Shutdown timeout - forcing exit")
+                            import os
+                            os._exit(1)
+                    
+                    threading.Thread(target=force_exit, daemon=True).start()
+                    
             except Exception as e:
                 self.logger.error(f"Failed to schedule async shutdown: {e}")
                 # Fallback to immediate shutdown
                 self.trading_system._shutdown_event.set()
+                import time
+                time.sleep(3)
+                import os
+                os._exit(1)
         else:
             self.logger.warning(f"⚠️ Received {signal_name} again - Forcing immediate shutdown...")
-            # Give some time for pending email notifications
+            # Give some time for pending operations
             import time
-            time.sleep(2)
-            sys.exit(1)
+            time.sleep(1)
+            import os
+            os._exit(1)
     
     async def _async_shutdown(self):
         """Perform async shutdown operations"""
@@ -242,15 +260,21 @@ class GracefulShutdownHandler:
         finally:
             # Exit the event loop gracefully
             try:
-                loop = asyncio.get_running_loop()
-                # Give a moment for any final operations
-                await asyncio.sleep(0.5)
-                loop.stop()
+                # Give a moment for any final operations to complete
+                await asyncio.sleep(0.1)
+                
+                # Don't call loop.stop() here as it can cause issues
+                # The event loop will exit naturally when the main coroutine completes
+                self.logger.info("✅ Async shutdown sequence completed")
+                
             except Exception as e:
-                self.logger.error(f"Error stopping event loop: {e}")
-                # Force exit if needed
+                self.logger.error(f"Error in final shutdown operations: {e}")
+            finally:
+                # Force exit if needed - this ensures clean termination
                 import sys
-                sys.exit(0)
+                import os
+                self.logger.info("🏁 Forcing clean exit")
+                os._exit(0)
     
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""

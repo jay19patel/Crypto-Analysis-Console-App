@@ -246,6 +246,43 @@ class TradingRestAPI:
                 self.logger.error(f"Error fetching position {position_id}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
+        # Open Positions Endpoints
+        @self.app.get("/api/positions/open")
+        async def get_open_positions():
+            """Get all open positions"""
+            try:
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                # Get open positions from MongoDB
+                positions_collection = self.mongodb_client.db["positions"]
+                positions_cursor = positions_collection.find({"status": "OPEN"})
+                positions = await positions_cursor.to_list(length=None)
+                
+                # Get all positions for total count
+                all_positions_cursor = positions_collection.find({"status": "CLOSED"})
+                all_closed_positions = await all_positions_cursor.to_list(length=None)
+                
+                # Process and enhance positions
+                enhanced_positions = []
+                for position in positions:
+                    enhanced_position = self._enhance_open_position_api(position)
+                    enhanced_positions.append(enhanced_position)
+                
+                # Sort by entry time (newest first)
+                enhanced_positions.sort(key=lambda x: x.get("entry_time", ""), reverse=True)
+                
+                return {
+                    "positions": enhanced_positions,
+                    "total_open": len(enhanced_positions),
+                    "total_closed": len(all_closed_positions),
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching open positions: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
         
         # Helper method to get current price
         async def _get_current_price(self, symbol: str) -> Optional[float]:
@@ -682,15 +719,19 @@ class TradingRestAPI:
             'type': position.get('position_type', 'LONG'),
             'entry_price': position.get('entry_price', 0.0),
             'exit_price': position.get('exit_price', 0.0),
-            'entry_datetime': entry_time.isoformat() if isinstance(entry_time, datetime) else entry_time,
-            'exit_datetime': exit_time.isoformat() if isinstance(exit_time, datetime) else exit_time,
+            'entry_time': entry_time.isoformat() if isinstance(entry_time, datetime) else entry_time,
+            'exit_time': exit_time.isoformat() if isinstance(exit_time, datetime) else exit_time,
+            'entry_datetime': entry_time.isoformat() if isinstance(entry_time, datetime) else entry_time,  # Alias for compatibility
+            'exit_datetime': exit_time.isoformat() if isinstance(exit_time, datetime) else exit_time,  # Alias for compatibility
             'quantity': position.get('quantity', 0.0),
             'leverage': leverage,
             'margin_used': margin_used,
             'total_investment': total_investment,
             'pnl': position.get('pnl', 0.0),
+            'realized_pnl': position.get('pnl', 0.0),  # Alias for frontend compatibility
             'pnl_percentage': position.get('pnl_percentage', 0.0),
             'strategy': position.get('strategy_name', 'Unknown'),
+            'side': position.get('position_type', 'LONG'),  # Alias for frontend compatibility
             'holding_time': holding_time,
             'holding_seconds': holding_seconds,
             'trading_fee': position.get('trading_fee', 0.0),
@@ -699,6 +740,63 @@ class TradingRestAPI:
             'stop_loss': position.get('stop_loss'),
             'target': position.get('target'),
             'status': position.get('status', 'CLOSED')
+        }
+    
+    def _enhance_open_position_api(self, position: Dict) -> Dict:
+        """Enhance open position data for API response"""
+        entry_time = position.get('entry_time')
+        
+        # Calculate holding time (since entry)
+        holding_time = None
+        holding_seconds = None
+        if entry_time:
+            if isinstance(entry_time, str):
+                entry_dt = datetime.fromisoformat(entry_time.replace('Z', '+00:00'))
+            else:
+                entry_dt = entry_time
+            
+            current_dt = datetime.now(timezone.utc)
+            duration = current_dt - entry_dt
+            holding_seconds = duration.total_seconds()
+            
+            days = duration.days
+            hours, remainder = divmod(duration.seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
+            
+            if days > 0:
+                holding_time = f"{days}d {hours}h {minutes}m"
+            elif hours > 0:
+                holding_time = f"{hours}h {minutes}m"
+            else:
+                holding_time = f"{minutes}m"
+        
+        # Calculate total investment
+        margin_used = position.get('margin_used', 0.0)
+        leverage = position.get('leverage', 1.0)
+        total_investment = margin_used * leverage
+        
+        return {
+            'id': position.get('id'),
+            'symbol': position.get('symbol'),
+            'type': position.get('position_type', 'LONG'),
+            'entry_price': position.get('entry_price', 0.0),
+            'current_price': position.get('current_price', position.get('entry_price', 0.0)),
+            'entry_time': entry_time.isoformat() if isinstance(entry_time, datetime) else entry_time,
+            'entry_datetime': entry_time.isoformat() if isinstance(entry_time, datetime) else entry_time,  # Alias for compatibility
+            'quantity': position.get('quantity', 0.0),
+            'leverage': leverage,
+            'margin_used': margin_used,
+            'total_investment': total_investment,
+            'pnl': position.get('pnl', 0.0),
+            'pnl_percentage': position.get('pnl_percentage', 0.0),
+            'strategy': position.get('strategy_name', 'Unknown'),
+            'side': position.get('position_type', 'LONG'),  # Alias for frontend compatibility
+            'holding_time': holding_time,
+            'holding_seconds': holding_seconds,
+            'trading_fee': position.get('trading_fee', 0.0),
+            'stop_loss': position.get('stop_loss'),
+            'target': position.get('target'),
+            'status': position.get('status', 'OPEN')
         }
     
     async def send_sse_event(self, event_type: str, data: Dict):
