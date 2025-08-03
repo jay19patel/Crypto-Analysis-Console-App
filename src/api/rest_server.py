@@ -737,6 +737,7 @@ class TradingRestAPI:
             'trading_fee': position.get('trading_fee', 0.0),
             'net_pnl': position.get('pnl', 0.0) - position.get('trading_fee', 0.0),
             'close_reason': position.get('notes', 'Manual Close'),
+            'notes': position.get('notes', 'Manual Close'),  # Alias for frontend compatibility
             'stop_loss': position.get('stop_loss'),
             'target': position.get('target'),
             'status': position.get('status', 'CLOSED')

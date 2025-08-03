@@ -219,13 +219,15 @@ class GracefulShutdownHandler:
                     import threading
                     def force_exit():
                         import time
-                        time.sleep(15)  # Wait 15 seconds max
+                        time.sleep(12)  # Wait 12 seconds max for shutdown
                         if not task.done():
-                            self.logger.error("⚠️ Shutdown timeout - forcing exit")
+                            self.logger.error("⚠️ Shutdown timeout (12s) - forcing immediate exit")
                             import os
                             os._exit(1)
                     
-                    threading.Thread(target=force_exit, daemon=True).start()
+                    # Start the timeout thread
+                    timeout_thread = threading.Thread(target=force_exit, daemon=True)
+                    timeout_thread.start()
                     
             except Exception as e:
                 self.logger.error(f"Failed to schedule async shutdown: {e}")
@@ -244,37 +246,36 @@ class GracefulShutdownHandler:
             os._exit(1)
     
     async def _async_shutdown(self):
-        """Perform async shutdown operations"""
+        """Perform async shutdown operations with improved reliability"""
+        shutdown_start = time.time()
         try:
-            self.logger.info("🔄 Starting async shutdown sequence...")
-            await self.trading_system.stop()
-            self.logger.info("✅ Async shutdown completed")
+            self.logger.info("🔄 Starting comprehensive shutdown sequence...")
             
-            # Additional wait to ensure all emails are sent
-            self.logger.info("📧 Final wait for email notifications...")
-            await asyncio.sleep(3)
-            self.logger.info("✅ Final email wait completed")
+            # Stop the trading system and ensure all components shutdown
+            self.logger.info("🛑 Stopping trading system components...")
+            await self.trading_system.stop()
+            self.logger.info("✅ Trading system stopped successfully")
+            
+            # Give final time for email notifications if enabled
+            if hasattr(self.trading_system, 'notification_manager') and self.trading_system.notification_manager:
+                self.logger.info("📧 Waiting for final email notifications...")
+                await asyncio.sleep(5)  # Give more time for email delivery
+                self.logger.info("✅ Email notification wait completed")
+            
+            shutdown_duration = time.time() - shutdown_start
+            self.logger.info(f"✅ Shutdown completed successfully in {shutdown_duration:.2f}s")
             
         except Exception as e:
-            self.logger.error(f"❌ Error during async shutdown: {e}")
+            self.logger.error(f"❌ Error during shutdown: {e}")
         finally:
-            # Exit the event loop gracefully
-            try:
-                # Give a moment for any final operations to complete
-                await asyncio.sleep(0.1)
-                
-                # Don't call loop.stop() here as it can cause issues
-                # The event loop will exit naturally when the main coroutine completes
-                self.logger.info("✅ Async shutdown sequence completed")
-                
-            except Exception as e:
-                self.logger.error(f"Error in final shutdown operations: {e}")
-            finally:
-                # Force exit if needed - this ensures clean termination
-                import sys
-                import os
-                self.logger.info("🏁 Forcing clean exit")
-                os._exit(0)
+            # Force clean exit
+            self.logger.info("🏁 Initiating final system exit...")
+            await asyncio.sleep(0.2)  # Brief pause for log output
+            
+            # Use os._exit for immediate termination
+            import os
+            self.logger.info("🔚 System shutdown complete")
+            os._exit(0)
     
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
@@ -448,11 +449,15 @@ async def main():
         logger.info("🔄 Main monitoring loop starting...")
         logger.info("💡 Press Ctrl+C to stop the system gracefully")
         
-        # Run main monitoring loop
+        # Run main monitoring loop with improved shutdown handling
         try:
             await trading_system.run_main_loop()
         except KeyboardInterrupt:
             logger.info("🛑 Main loop interrupted by KeyboardInterrupt")
+        except asyncio.CancelledError:
+            logger.info("🛑 Main loop cancelled during shutdown")
+        except Exception as e:
+            logger.error(f"❌ Error in main loop: {e}")
         
         return 0
         
@@ -469,34 +474,45 @@ async def main():
             logger.error(f"❌ Fatal error in main application: {e}", exc_info=True)
         return 1
     finally:
-        # Ensure proper shutdown
-        if trading_system:
+        # Ensure proper shutdown even if signal handler didn't work
+        if trading_system and trading_system._running:
             try:
-                logger.info("🛑 Shutting down trading system...")
+                logger.info("🛑 Final shutdown attempt in main() finally block...")
                 await trading_system.stop()
+                logger.info("✅ Final shutdown completed successfully")
                 
-                # Final statistics are logged by trading_system.stop() - no need to duplicate
-                logger.info("✅ Shutdown completed successfully")
-                
+                # Extra time for email delivery if notifications enabled
+                if hasattr(trading_system, 'notification_manager') and trading_system.notification_manager:
+                    logger.info("📧 Final email delivery wait...")
+                    await asyncio.sleep(2)
+                    
             except Exception as e:
                 if hasattr(args, 'debug') and args.debug:
-                    logger.error(f"❌ SHUTDOWN ERROR: {e}")
+                    logger.error(f"❌ FINAL SHUTDOWN ERROR: {e}")
                     logger.error(f"❌ Error Type: {type(e).__name__}")
                     logger.error("❌ Shutdown Traceback:")
                     traceback.print_exc()
                 else:
-                    logger.error(f"❌ Error during shutdown: {e}")
+                    logger.error(f"❌ Error during final shutdown: {e}")
+        
+        # Ensure we exit the process completely
+        logger.info("🔚 Main function exiting...")
+        import sys
+        sys.exit(0)
 
 
 if __name__ == "__main__":
     """Entry point for the application with enhanced error handling"""
     try:
-        # Run the main application
+        # Run the main application with timeout to prevent hanging
         exit_code = asyncio.run(main())
+        print("🏁 Application completed successfully")
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\n🛑 Interrupted by user")
-        sys.exit(0)
+        print("\n🛑 Interrupted by user - exiting immediately")
+        # Force exit to ensure we don't hang
+        import os
+        os._exit(0)
     except ImportError as e:
         print(f"❌ Import Error: {e}")
         print("💡 Solution: Check if all dependencies are installed")
@@ -514,4 +530,7 @@ if __name__ == "__main__":
         else:
             print(f"❌ Critical error: {e}")
             print("💡 Run with --debug for detailed error information")
-        sys.exit(1)
+        
+        # Force exit in case of critical errors
+        import os
+        os._exit(1)

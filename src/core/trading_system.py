@@ -720,13 +720,17 @@ class TradingSystem:
             # Stop WebSocket price system
             self.live_price_system.stop()
             
-            # Wait for threads to finish
+            # Wait for threads to finish with improved handling
+            self.logger.info("🧵 Waiting for background threads to stop...")
             threads = [self.strategy_thread, self.monitoring_thread]
             for thread in threads:
                 if thread and thread.is_alive():
-                    thread.join(timeout=10)
+                    self.logger.info(f"⏳ Waiting for {thread.name} thread to stop...")
+                    thread.join(timeout=8)  # Reduced timeout for faster shutdown
                     if thread.is_alive():
-                        self.logger.warning(f"⚠️ Thread {thread.name} did not stop gracefully")
+                        self.logger.warning(f"⚠️ Thread {thread.name} did not stop gracefully within 8s")
+                    else:
+                        self.logger.info(f"✅ Thread {thread.name} stopped successfully")
             
             # Shutdown strategy manager
             self.strategy_manager.shutdown()

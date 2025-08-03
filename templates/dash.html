@@ -1406,6 +1406,14 @@
                                         <div class="text-slate-400">Leverage</div>
                                         <div class="font-semibold">${position.leverage || 1}x</div>
                                     </div>
+                                    <div>
+                                        <div class="text-slate-400">Strategy</div>
+                                        <div class="font-semibold">${position.strategy || position.strategy_name || 'Manual'}</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-400">Margin Used</div>
+                                        <div class="font-semibold">$${this.formatNumber(position.margin_used || 0)}</div>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -1419,13 +1427,15 @@
                                     <tr class="border-b border-slate-700">
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Symbol</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Type</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Strategy</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Entry</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Current</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Quantity</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Leverage</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Margin</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">StopLoss</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Target</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">PnL</th>
-                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">PnL %</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1464,12 +1474,15 @@
                                             <tr class="border-b border-slate-800 hover:bg-slate-800/50">
                                                 <td class="py-3 px-2 font-bold">${position.symbol}</td>
                                                 <td class="py-3 px-2"><span class="px-2 py-1 rounded text-xs font-bold ${sideClass === 'positive' ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">${positionType}</span></td>
+                                                <td class="py-3 px-2 text-sm">${position.strategy || position.strategy_name || 'Manual'}</td>
                                                 <td class="py-3 px-2 font-mono">
                                                     <div>$${this.formatPrice(position.entry_price || 0)}</div>
                                                     <div class="text-xs text-slate-400">${entryDateTime}</div>
                                                 </td>
                                                 <td class="py-3 px-2 font-mono">$${this.formatPrice(position.current_price || position.entry_price || 0)}</td>
                                                 <td class="py-3 px-2 font-mono">${this.formatNumber(position.quantity || 0)}</td>
+                                                <td class="py-3 px-2 font-mono text-sm">${position.leverage || 1}x</td>
+                                                <td class="py-3 px-2 font-mono text-sm">$${this.formatNumber(position.margin_used || 0)}</td>
                                                 <td class="py-3 px-2 font-mono text-sm">
                                                     <div>${stopLossPrice > 0 ? '$' + this.formatPrice(stopLossPrice) : 'N/A'}</div>
                                                     <div class="text-xs ${stopLossPrice > 0 ? 'text-danger-400' : 'text-slate-500'}">${stopLossPct || 'N/A'}</div>
@@ -1478,8 +1491,10 @@
                                                     <div>${targetPrice > 0 ? '$' + this.formatPrice(targetPrice) : 'N/A'}</div>
                                                     <div class="text-xs ${targetPrice > 0 ? 'text-success-400' : 'text-slate-500'}">${targetPct || 'N/A'}</div>
                                                 </td>
-                                                <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</td>
-                                                <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</td>
+                                                <td class="py-3 px-2 font-mono font-bold ${pnlClass}">
+                                                    <div>${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</div>
+                                                    <div class="text-xs">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</div>
+                                                </td>
                                             </tr>
                                         `;
                                     }).join('')}
@@ -1537,6 +1552,22 @@
                                         <div class="text-slate-400">Duration</div>
                                         <div class="font-semibold">${position.duration || position.holding_time || 'N/A'}</div>
                                     </div>
+                                    <div>
+                                        <div class="text-slate-400">Strategy</div>
+                                        <div class="font-semibold">${position.strategy || position.strategy_name || 'Manual'}</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-400">Leverage</div>
+                                        <div class="font-semibold">${position.leverage || 1}x</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-400">Margin Used</div>
+                                        <div class="font-semibold">$${this.formatNumber(position.margin_used || 0)}</div>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <div class="text-slate-400">Notes</div>
+                                        <div class="font-semibold text-xs">${position.notes || position.close_reason || 'N/A'}</div>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -1550,11 +1581,14 @@
                                     <tr class="border-b border-slate-700">
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Symbol</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Type</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Strategy</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Entry</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Exit</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Leverage</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Margin</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">PnL</th>
-                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">PnL %</th>
                                         <th class="text-left py-3 px-2 text-slate-400 font-medium">Duration</th>
+                                        <th class="text-left py-3 px-2 text-slate-400 font-medium">Notes</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1581,6 +1615,7 @@
                                             <tr class="border-b border-slate-800 hover:bg-slate-800/50">
                                                 <td class="py-3 px-2 font-bold">${position.symbol}</td>
                                                 <td class="py-3 px-2"><span class="px-2 py-1 rounded text-xs font-bold ${typeClass === 'positive' ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">${positionType}</span></td>
+                                                <td class="py-3 px-2 text-sm">${position.strategy || position.strategy_name || 'Manual'}</td>
                                                 <td class="py-3 px-2 font-mono">
                                                     <div>$${this.formatPrice(position.entry_price || 0)}</div>
                                                     <div class="text-xs text-slate-400">${entryDateTime}</div>
@@ -1589,9 +1624,14 @@
                                                     <div>$${this.formatPrice(position.exit_price || 0)}</div>
                                                     <div class="text-xs text-slate-400">${exitDateTime}</div>
                                                 </td>
-                                                <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</td>
-                                                <td class="py-3 px-2 font-mono font-bold ${pnlClass}">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</td>
+                                                <td class="py-3 px-2 font-mono text-sm">${position.leverage || 1}x</td>
+                                                <td class="py-3 px-2 font-mono text-sm">$${this.formatNumber(position.margin_used || 0)}</td>
+                                                <td class="py-3 px-2 font-mono font-bold ${pnlClass}">
+                                                    <div>${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</div>
+                                                    <div class="text-xs">${pnlSymbol}${(position.pnl_percentage || 0).toFixed(2)}%</div>
+                                                </td>
                                                 <td class="py-3 px-2 text-sm">${position.duration || position.holding_time || 'N/A'}</td>
+                                                <td class="py-3 px-2 text-xs">${position.notes || position.close_reason || 'N/A'}</td>
                                             </tr>
                                         `;
                                     }).join('')}
