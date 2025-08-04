@@ -44,8 +44,8 @@ class EMAStrategy(BaseStrategy):
             signal = SignalType.SELL
             confidence = 90.0
         return TradingSignal(
-            # signal=signal,
-            signal=SignalType.BUY,
+            signal=signal,
+            # signal=SignalType.BUY,
             symbol=self.symbol,
             confidence=confidence,
             strategy_name=self.name,
