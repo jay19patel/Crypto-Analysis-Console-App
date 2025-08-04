@@ -449,7 +449,7 @@ class TradingSystem:
             rest_task = asyncio.create_task(self.rest_api_server.start_server())
             await asyncio.sleep(0.5)  # Give it a moment to start
             self.logger.info("✅ STEP 2.2: REST API server started successfully")
-            self.logger.info(f"🌐 Dashboard URL: http://localhost:8766/dashboard")
+            self.logger.info(f"🌐 Dashboard URL: http://0.0.0.0:8766/dashboard")
             
             self.logger.info("📋 STEP 3: Starting Live Market Data System") 
             # Start WebSocket live price system

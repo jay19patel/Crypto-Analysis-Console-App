@@ -93,7 +93,7 @@ class ClientConnection:
 class WebSocketServer:
     """Real-time WebSocket server for trading system frontend integration"""
 
-    def __init__(self, host: str = "localhost", port: int = 8765):
+    def __init__(self, host: str = "0.0.0.0", port: int = 8765):
         """Initialize WebSocket server"""
         self.host = host
         self.port = port
@@ -861,7 +861,7 @@ def get_websocket_server() -> WebSocketServer:
     return _websocket_server
 
 
-async def start_websocket_server(host: str = "localhost", port: int = 8765) -> WebSocketServer:
+async def start_websocket_server(host: str = "0.0.0.0", port: int = 8765) -> WebSocketServer:
     """Start the WebSocket server"""
     server = get_websocket_server()
     server.host = host

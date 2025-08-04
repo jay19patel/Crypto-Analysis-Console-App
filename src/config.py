@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Simplified application settings"""
     
     # Database Settings
-    MONGODB_URI: str = Field(default="mongodb://localhost:27017")
+    MONGODB_URI: str = Field(default="mongodb://0.0.0.0:27017")
     DATABASE_NAME: str = Field(default="trading_system")
     MONGODB_TIMEOUT: int = Field(default=5)
     

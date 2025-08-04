@@ -48,7 +48,7 @@ class NotificationFilter(BaseModel):
 class TradingRestAPI:
     """REST API server for trading dashboard"""
     
-    def __init__(self, host: str = "localhost", port: int = 8766):
+    def __init__(self, host: str = "0.0.0.0", port: int = 8766):
         self.host = host
         self.port = port
         self.settings = get_settings()
@@ -858,7 +858,7 @@ def get_rest_api_server() -> TradingRestAPI:
     return _rest_api_server
 
 
-async def start_rest_api_server(host: str = "localhost", port: int = 8766) -> TradingRestAPI:
+async def start_rest_api_server(host: str = "0.0.0.0", port: int = 8766) -> TradingRestAPI:
     """Start the REST API server"""
     server = get_rest_api_server()
     server.host = host
