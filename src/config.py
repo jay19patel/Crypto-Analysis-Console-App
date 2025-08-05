@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     FASTAPI_MAIL_SSL_TLS: bool = Field(default=False)
     
     # Active Strategies
-    STRATEGY_CLASSES: List[str] = Field(default=["EMAStrategy"])
+    STRATEGY_CLASSES: List[str] = Field(default=["EMAStrategy", "RSIStrategy"])
     TRADING_SYMBOLS: List[str] = Field(default=["BTCUSD", "ETHUSD"])
     
     # Logging
