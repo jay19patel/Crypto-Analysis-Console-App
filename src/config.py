@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     HISTORICAL_DATA_UPDATE_INTERVAL: int = Field(default=900)  # 15 minutes
     RISK_CHECK_INTERVAL: int = Field(default=60)  # 1 minute
     LIVE_PRICE_UPDATE: str = Field(default="realtime")
+    LIVE_SAVE_RATE_LIMIT_SECONDS: int = Field(default=20)  # Rate limit for live save: once per 20 seconds
     
     # WebSocket Settings
     WEBSOCKET_PORT: int = Field(default=8765)
@@ -151,7 +152,8 @@ def get_system_intervals() -> dict:
         "strategy_execution": settings.STRATEGY_EXECUTION_INTERVAL,
         "historical_data_update": settings.HISTORICAL_DATA_UPDATE_INTERVAL,
         "risk_check": settings.RISK_CHECK_INTERVAL,
-        "live_price_update": settings.LIVE_PRICE_UPDATE
+        "live_price_update": settings.LIVE_PRICE_UPDATE,
+        "live_save_rate_limit_seconds": settings.LIVE_SAVE_RATE_LIMIT_SECONDS
     }
 
 

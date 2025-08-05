@@ -318,7 +318,8 @@ class RealTimeMarketData:
                         price_summaries.append(f"{symbol_name}: ${price_data['price']:.2f}")
                     
                     if price_summaries:
-                        self.logger.info(f"📊 Live Prices - {', '.join(price_summaries)}")
+                        pass
+                        # self.logger.info(f"📊 Live Prices - {', '.join(price_summaries)}")
                     
                     # Notify callback with current prices
                     if self.price_callback:

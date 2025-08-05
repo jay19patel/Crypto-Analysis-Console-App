@@ -293,8 +293,9 @@ class TradingSystem:
         try:
             now = time.time()
             last_save = self._last_live_save_time.get(market_data.symbol, 0)
+            rate_limit_seconds = self.intervals.get('live_save_rate_limit_seconds', 20)
             
-            if now - last_save >= 20:  # Rate limit: once per 20 seconds
+            if now - last_save >= rate_limit_seconds:
                 from src.database.mongodb_client import AsyncMongoDBClient
                 
                 if self._main_loop is not None:
@@ -579,18 +580,10 @@ class TradingSystem:
                                            f"qty={existing_pos.quantity} entry=${existing_pos.entry_price:.2f}")
                 else:
                     self.logger.info("📊 No existing open positions found")
-                self.logger.info("💡 IMPORTANT: Only ONE position per symbol allowed")
             except Exception as e:
                 self.logger.warning(f"⚠️ Error checking existing positions: {e}")
             
             self.logger.info("🎉 ALL STEPS COMPLETED: Trading system started successfully")
-            self.logger.info("📧 Startup notification email sent with complete system configuration")
-            self.logger.info("🔔 System will send shutdown notification with final statistics when stopped")
-            self.logger.info("🚨 POSITION LIMIT: Only ONE position per symbol is allowed")
-            self.logger.info("💡 EMAIL FEATURES:")
-            self.logger.info("   📧 Startup: System config + Account summary + Position status")
-            self.logger.info("   📧 Shutdown: Final statistics + Account summary + Complete session data")
-            self.logger.info("   ⏱️ Email delivery: 3-second wait for proper processing")
             return True
             
         except Exception as e:
@@ -928,13 +921,13 @@ class TradingSystem:
                 # Perform health checks
                 health_status = self._perform_health_check()
                 
-                # Log system summary periodically
-                if not self._shutdown_event.is_set():
-                    if self._main_loop is not None:
-                        asyncio.run_coroutine_threadsafe(
-                            self._log_system_summary(),
-                            self._main_loop
-                        )
+                # # Log system summary periodically
+                # if not self._shutdown_event.is_set():
+                #     if self._main_loop is not None:
+                #         asyncio.run_coroutine_threadsafe(
+                #             self._log_system_summary(),
+                #             self._main_loop
+                #         )
                 
                 # Broadcast system status
                 if self._main_loop is not None:
@@ -1483,13 +1476,6 @@ class TradingSystem:
     async def run_main_loop(self):
         """Main monitoring loop with enhanced error handling"""
         self.logger.info("🔄 Starting main monitoring loop")
-        self.logger.info("📋 MAIN LOOP FLOW:")
-        self.logger.info("   1. Live price data collection (WebSocket)")
-        self.logger.info("   2. Strategy execution every 30s")
-        self.logger.info("   3. Risk management checks")
-        self.logger.info("   4. Performance monitoring")
-        self.logger.info("   5. WebSocket broadcasts")
-        self.logger.info("   6. System maintenance every 60s")
         
         loop_iteration = 0
         while self._running and not self._shutdown_event.is_set():
