@@ -87,6 +87,10 @@ class AsyncRiskManager:
         self._risk_decisions = []
         self._execution_times = {}
         
+        # Warning spam prevention
+        self._last_warning_time = {}  # Track last warning time per symbol/type
+        self._warning_cooldown = 300  # 5 minutes between same warnings
+        
         # Notification system
         self.notification_manager = NotificationManager()
         
@@ -224,9 +228,23 @@ class AsyncRiskManager:
                     # Update trailing stop
                     self._update_trailing_stop(position, current_price, risk_metrics.trailing_stop_price)
             
-            # Handle critical risk situations
+            # LIQUIDATION PROTECTION - AUTO-CLOSE CRITICAL POSITIONS
             if risk_metrics.risk_level == RiskLevel.CRITICAL:
-                if risk_metrics.recommendation in [RiskAction.CLOSE_POSITION, RiskAction.EMERGENCY_CLOSE]:
+                # Calculate liquidation distance for this position
+                liquidation_distance = self._calculate_liquidation_distance(position, current_price)
+                
+                if liquidation_distance <= 5.0:  # Within 5% of liquidation
+                    self.logger.warning(f"🚨 EMERGENCY AUTO-CLOSE: {position.symbol} - Liquidation risk {liquidation_distance:.1f}%")
+                    if await self.broker.close_position_async(position.id, current_price, f"LIQUIDATION PROTECTION - Emergency Close"):
+                        await self.notification_manager.notify_risk_alert(
+                            symbol=position.symbol,
+                            alert_type="LIQUIDATION PROTECTION - Auto Close",
+                            current_price=current_price,
+                            risk_level="EMERGENCY"
+                        )
+                        action_taken = True
+                
+                elif risk_metrics.recommendation in [RiskAction.CLOSE_POSITION, RiskAction.EMERGENCY_CLOSE]:
                     if await self.broker.close_position_async(position.id, current_price, f"Risk Management: {risk_metrics.recommendation.value}"):
                         await self.notification_manager.notify_risk_alert(
                             symbol=position.symbol,
@@ -236,18 +254,37 @@ class AsyncRiskManager:
                         )
                         action_taken = True
             
-            # Handle high risk situations
+            # Handle HIGH RISK situations (liquidation approaching)
             elif risk_metrics.risk_level == RiskLevel.HIGH:
-                if risk_metrics.recommendation == RiskAction.TIGHTEN_STOP_LOSS:
-                    new_stop_loss = self._calculate_tighter_stop_loss(position, current_price)
-                    if new_stop_loss != position.stop_loss:
+                # Calculate liquidation distance for warning
+                liquidation_distance = self._calculate_liquidation_distance(position, current_price)
+                
+                if liquidation_distance <= 15.0:  # Within 15% of liquidation - WARNING
+                    warning_key = f"{position.symbol}_liquidation_warning"
+                    if self._should_send_warning(warning_key):
+                        self.logger.warning(f"⚠️ LIQUIDATION WARNING: {position.symbol} - {liquidation_distance:.1f}% from liquidation")
                         await self.notification_manager.notify_risk_alert(
                             symbol=position.symbol,
-                            alert_type="Stop Loss Tightened",
+                            alert_type=f"LIQUIDATION WARNING - {liquidation_distance:.1f}% away",
                             current_price=current_price,
-                            risk_level=risk_metrics.risk_level.value
+                            risk_level="HIGH"
                         )
+                        self._mark_warning_sent(warning_key)
                         action_taken = True
+                
+                elif risk_metrics.recommendation == RiskAction.TIGHTEN_STOP_LOSS:
+                    new_stop_loss = self._calculate_tighter_stop_loss(position, current_price)
+                    if new_stop_loss != position.stop_loss:
+                        warning_key = f"{position.symbol}_stop_loss_tighten"
+                        if self._should_send_warning(warning_key):
+                            await self.notification_manager.notify_risk_alert(
+                                symbol=position.symbol,
+                                alert_type="Stop Loss Tightened",
+                                current_price=current_price,
+                                risk_level=risk_metrics.risk_level.value
+                            )
+                            self._mark_warning_sent(warning_key)
+                            action_taken = True
             
             # Handle profit protection
             if risk_metrics.pnl_percentage > 10.0:  # More than 10% profit
@@ -318,11 +355,15 @@ class AsyncRiskManager:
                 elif risk_metrics.risk_level == RiskLevel.HIGH:
                     high_risk_positions += 1
             
-            # Calculate portfolio risk percentage (margin used as % of account balance)
+            # Calculate portfolio risk percentage (PURE margin used as % of account balance)
             portfolio_margin_usage = (total_margin_used / account_balance) * 100 if account_balance > 0 else 0
             
-            # Calculate portfolio PnL percentage
+            # Calculate portfolio PnL percentage (separate from margin usage)
             portfolio_pnl_percentage = (total_unrealized_pnl / account_balance) * 100 if account_balance > 0 else 0
+            
+            # Calculate effective portfolio risk (combines margin + PnL risk with proper weighting)
+            portfolio_pnl_risk = abs(portfolio_pnl_percentage) if portfolio_pnl_percentage < 0 else 0
+            effective_portfolio_risk = portfolio_margin_usage + (portfolio_pnl_risk * 0.5)  # PnL risk gets 50% weight
             
             # Calculate total portfolio value (balance + unrealized PnL)
             total_portfolio_value = account_balance + total_unrealized_pnl
@@ -331,10 +372,11 @@ class AsyncRiskManager:
             initial_balance = self.broker.account.initial_balance
             portfolio_return_pct = ((total_portfolio_value - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
             
-            # Smart portfolio risk level determination
+            # Smart portfolio risk level determination (now uses improved calculation)
             overall_risk = self._determine_portfolio_risk_level(
                 portfolio_margin_usage, portfolio_pnl_percentage, portfolio_return_pct,
-                critical_positions, high_risk_positions, len(open_positions)
+                critical_positions, high_risk_positions, len(open_positions),
+                effective_portfolio_risk  # Pass the new combined risk metric
             )
             
             # Count positions by risk level
@@ -353,8 +395,9 @@ class AsyncRiskManager:
             return {
                 "status": "analyzed",
                 "overall_risk_level": overall_risk.value,
-                "portfolio_margin_usage": portfolio_margin_usage,
-                "portfolio_pnl_percentage": portfolio_pnl_percentage,
+                "portfolio_margin_usage": portfolio_margin_usage,  # Pure margin usage only
+                "portfolio_pnl_percentage": portfolio_pnl_percentage,  # PnL impact only
+                "effective_portfolio_risk": effective_portfolio_risk,  # Combined risk with proper weighting
                 "portfolio_return_percentage": portfolio_return_pct,
                 "total_margin_used": total_margin_used,
                 "total_unrealized_pnl": total_unrealized_pnl,
@@ -630,6 +673,43 @@ class AsyncRiskManager:
         
         return min(risk_score, 100)
     
+    def _should_send_warning(self, warning_key: str) -> bool:
+        """Check if enough time has passed since last warning of this type"""
+        import time
+        current_time = time.time()
+        last_warning = self._last_warning_time.get(warning_key, 0)
+        return (current_time - last_warning) >= self._warning_cooldown
+    
+    def _mark_warning_sent(self, warning_key: str):
+        """Mark that a warning was sent for this type/symbol"""
+        import time
+        self._last_warning_time[warning_key] = time.time()
+    
+    def _calculate_liquidation_distance(self, position: Position, current_price: float) -> float:
+        """Calculate how close position is to liquidation (percentage)"""
+        try:
+            if position.leverage <= 1 or position.margin_used <= 0:
+                return 100.0  # No liquidation risk for non-leveraged positions
+            
+            # Calculate liquidation price based on position type and leverage
+            if position.position_type == PositionType.LONG:
+                # For LONG: liquidation when price drops and margin is exhausted
+                # Liquidation price = entry_price * (1 - (margin_used / position_value))
+                margin_ratio = position.margin_used / (position.quantity * position.entry_price)
+                liquidation_price = position.entry_price * (1 - margin_ratio * 0.95)  # 95% of margin (5% buffer)
+                distance_pct = ((current_price - liquidation_price) / current_price) * 100
+            else:
+                # For SHORT: liquidation when price rises and margin is exhausted
+                margin_ratio = position.margin_used / (position.quantity * position.entry_price)
+                liquidation_price = position.entry_price * (1 + margin_ratio * 0.95)
+                distance_pct = ((liquidation_price - current_price) / current_price) * 100
+            
+            return max(distance_pct, 0.0)  # Never negative
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating liquidation distance for {position.symbol}: {e}")
+            return 100.0  # Safe default
+    
     def _calculate_trailing_stop(self, position: Position, current_price: float) -> Optional[float]:
         """Calculate trailing stop price"""
         # Simplified trailing stop calculation
@@ -702,35 +782,55 @@ class AsyncRiskManager:
     
     def _determine_portfolio_risk_level(self, portfolio_margin_usage: float, portfolio_pnl_percentage: float, 
                                        portfolio_return_pct: float, critical_positions: int, 
-                                       high_risk_positions: int, total_positions: int) -> RiskLevel:
-        """Smart portfolio risk level determination based on configurable thresholds"""
+                                       high_risk_positions: int, total_positions: int, 
+                                       effective_portfolio_risk: float = None) -> RiskLevel:
+        """Smart portfolio risk level determination based on CORRECTED thresholds
+        
+        FIXED: Now uses pure margin usage for more accurate risk assessment.
+        Effective risk is used only when needed for comprehensive analysis.
+        """
         try:
             # Get configurable thresholds
             config = self.trading_config
             max_portfolio_risk = config.get("max_portfolio_risk_pct", 80.0)
-            high_risk_margin = config.get("high_risk_margin_pct", 85.0)
+            high_risk_margin = config.get("portfolio_high_risk_margin_pct", 80.0)  # Use portfolio-specific threshold
             
-            # Critical risk conditions (immediate action needed)
-            if (critical_positions > 0 or 
-                portfolio_margin_usage >= config.get("critical_risk_margin_pct", 90.0) or 
-                portfolio_pnl_percentage < -config.get("critical_risk_loss_pct", 12.0) or
-                portfolio_return_pct < -20.0):
+            # Use effective risk if available, otherwise pure margin usage
+            primary_risk_metric = effective_portfolio_risk if effective_portfolio_risk is not None else portfolio_margin_usage
+            
+            self.logger.debug(f"Portfolio risk assessment:")
+            self.logger.debug(f"  Pure margin usage: {portfolio_margin_usage:.1f}%")
+            self.logger.debug(f"  PnL impact: {portfolio_pnl_percentage:.1f}%")
+            self.logger.debug(f"  Effective risk: {primary_risk_metric:.1f}%")
+            self.logger.debug(f"  High risk threshold: {high_risk_margin:.1f}%")
+            
+            # LIQUIDATION PROTECTION - CRITICAL RISK CONDITIONS
+            liquidation_threshold = 92.0  # Very close to liquidation (95%+ = liquidation)
+            emergency_loss_threshold = config.get("critical_risk_loss_pct", 35.0)  # 35% loss = emergency
+            
+            if (portfolio_margin_usage >= liquidation_threshold or  # Near liquidation - EMERGENCY
+                portfolio_pnl_percentage < -emergency_loss_threshold or  # Major losses - EMERGENCY
+                portfolio_return_pct < -40.0):  # Severe portfolio decline
+                self.logger.warning(f"🚨 LIQUIDATION RISK - CRITICAL: margin={portfolio_margin_usage:.1f}%, pnl={portfolio_pnl_percentage:.1f}%")
                 return RiskLevel.CRITICAL
             
-            # High risk conditions - now includes the new high_risk_margin_pct threshold
-            if (high_risk_positions > 1 or 
-                portfolio_margin_usage >= high_risk_margin or 
-                portfolio_margin_usage >= max_portfolio_risk or  # Anti-overtrade threshold
-                portfolio_pnl_percentage < -config.get("high_risk_loss_pct", 8.0) or
-                portfolio_return_pct < -12.0 or
-                (high_risk_positions > 0 and total_positions <= 2)):
+            # LIQUIDATION-BASED HIGH RISK CONDITIONS
+            liquidation_risk_threshold = 85.0  # Close to liquidation
+            significant_loss_threshold = config.get("high_risk_loss_pct", 25.0)  # 25% loss is significant
+            
+            if (portfolio_margin_usage >= liquidation_risk_threshold or  # Near liquidation
+                portfolio_pnl_percentage < -significant_loss_threshold or  # Major loss
+                portfolio_return_pct < -30.0):  # Severe portfolio decline
+                self.logger.info(f"HIGH RISK triggered: margin={portfolio_margin_usage:.1f}%, pnl={portfolio_pnl_percentage:.1f}%")
                 return RiskLevel.HIGH
             
-            # Medium risk conditions
-            if (high_risk_positions > 0 or 
-                portfolio_margin_usage >= config.get("medium_risk_margin_pct", 70.0) or 
-                portfolio_pnl_percentage < -config.get("medium_risk_loss_pct", 5.0) or
-                portfolio_return_pct < -8.0):
+            # LIQUIDATION-BASED MEDIUM RISK CONDITIONS  
+            medium_risk_margin = 70.0  # Approaching higher margin usage
+            moderate_loss_threshold = config.get("medium_risk_loss_pct", 15.0)  # 15% loss needs attention
+            
+            if (portfolio_margin_usage >= medium_risk_margin or  # High margin usage
+                portfolio_pnl_percentage < -moderate_loss_threshold or  # Moderate losses
+                portfolio_return_pct < -20.0):  # Portfolio decline
                 return RiskLevel.MEDIUM
             
             # Low risk (healthy portfolio)

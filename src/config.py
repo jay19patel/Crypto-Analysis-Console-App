@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Safe Position Sizing for Small Balance
     SAFE_BALANCE_PER_TRADE_PCT: float = Field(default=0.05)  # 5% of balance per trade for safety
     MAX_POSITIONS_OPEN: int = Field(default=2)               # Max 2 positions open simultaneously (optimized)
-    HIGH_RISK_MARGIN_PCT: float = Field(default=85.0)        # Portfolio high risk threshold at 85% margin
+    PORTFOLIO_HIGH_RISK_MARGIN_PCT: float = Field(default=80.0)  # Portfolio high risk threshold (RENAMED to avoid duplicate)
     MAX_PORTFOLIO_RISK_PCT: float = Field(default=80.0)      # Maximum portfolio risk percentage (anti-overtrade)
     
     # Trading Fee Settings
@@ -141,7 +141,8 @@ def get_trading_config() -> dict:
         "medium_risk_time_hours": settings.MEDIUM_RISK_TIME_HOURS,
         
         "max_portfolio_risk_pct": settings.MAX_PORTFOLIO_RISK_PCT,
-        "high_risk_margin_pct": settings.HIGH_RISK_MARGIN_PCT
+        "high_risk_margin_pct": settings.HIGH_RISK_MARGIN_PCT,  # Individual position risk
+        "portfolio_high_risk_margin_pct": settings.PORTFOLIO_HIGH_RISK_MARGIN_PCT  # Portfolio level risk
     }
 
 

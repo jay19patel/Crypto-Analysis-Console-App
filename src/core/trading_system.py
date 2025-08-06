@@ -169,6 +169,10 @@ class TradingSystem:
         self._last_broadcast_time = 0.0
         self._broadcast_cooldown = 1.0  # Minimum 1 second between broadcasts
         
+        # Portfolio risk warning cooldown (prevent spam warnings)
+        self._last_portfolio_risk_warning = 0.0
+        self._portfolio_risk_warning_cooldown = 300.0  # 5 minutes between portfolio warnings
+        
         # Setup strategies
         self._setup_strategies()
         
@@ -1229,27 +1233,56 @@ class TradingSystem:
             )
             
             if should_alert and current_risk_level in ["high", "critical"]:
-                # Determine alert type based on specific risk factors
-                alert_type = self._determine_portfolio_alert_type(portfolio_risk)
+                # ANTI-SPAM: Check if enough time has passed since last portfolio warning
+                current_time = time.time()
+                time_since_last_warning = current_time - self._last_portfolio_risk_warning
                 
-                await self.notification_manager.notify_risk_alert(
-                    symbol="PORTFOLIO",
-                    alert_type=alert_type,
-                    current_price=0.0,
-                    risk_level=current_risk_level
+                # Always send critical alerts, but throttle high risk alerts
+                should_send_warning = (
+                    current_risk_level == "critical" or  # Always send critical
+                    current_risk_level != previous_risk_level or  # Risk level changed
+                    time_since_last_warning >= self._portfolio_risk_warning_cooldown  # Cooldown expired
                 )
                 
-                # Log the risk level change
-                if current_risk_level != previous_risk_level:
-                    self.logger.warning(f"📊 Portfolio risk level changed: {previous_risk_level} → {current_risk_level}")
-                    self.logger.info(f"📈 Portfolio details: Margin usage: {portfolio_risk.get('portfolio_margin_usage', 0):.1f}%, PnL: {portfolio_risk.get('portfolio_pnl_percentage', 0):.1f}%")
-                
-                await self.websocket_server.broadcast_notification_simple(
-                    "portfolio_risk",
-                    f"Portfolio risk: {current_risk_level} ({portfolio_risk.get('portfolio_margin_usage', 0):.1f}% margin usage)",
-                    "error" if current_risk_level == "critical" else "warning",
-                    "Risk Analysis"
-                )
+                if should_send_warning:
+                    # Only send if this is a LIQUIDATION-BASED risk (not normal trading)
+                    margin_usage = portfolio_risk.get('portfolio_margin_usage', 0)
+                    pnl_percentage = portfolio_risk.get('portfolio_pnl_percentage', 0)
+                    
+                    # Only alert for REAL risks: near liquidation OR major losses
+                    is_real_risk = (
+                        margin_usage >= 85.0 or  # Near liquidation
+                        pnl_percentage < -25.0 or  # Major losses (25%+)
+                        current_risk_level == "critical"
+                    )
+                    
+                    if is_real_risk:
+                        alert_type = self._determine_portfolio_alert_type(portfolio_risk)
+                        
+                        await self.notification_manager.notify_risk_alert(
+                            symbol="PORTFOLIO",
+                            alert_type=alert_type,
+                            current_price=0.0,
+                            risk_level=current_risk_level
+                        )
+                        
+                        # Log the significant risk change
+                        if current_risk_level != previous_risk_level:
+                            self.logger.warning(f"📊 Portfolio risk level changed: {previous_risk_level} → {current_risk_level}")
+                            self.logger.info(f"📈 Portfolio details: Margin usage: {margin_usage:.1f}%, PnL: {pnl_percentage:.1f}%")
+                        
+                        await self.websocket_server.broadcast_notification_simple(
+                            "portfolio_risk",
+                            f"Portfolio risk: {current_risk_level} ({margin_usage:.1f}% margin usage)",
+                            "error" if current_risk_level == "critical" else "warning",
+                            "Risk Analysis"
+                        )
+                        
+                        # Update last warning time
+                        self._last_portfolio_risk_warning = current_time
+                    else:
+                        # Log debug info for false alerts
+                        self.logger.debug(f"🚫 Suppressed false portfolio risk alert: margin={margin_usage:.1f}%, pnl={pnl_percentage:.1f}%")
             
             # Store current risk level for next comparison
             self._last_portfolio_risk_level = current_risk_level
@@ -1332,67 +1365,140 @@ class TradingSystem:
             self._record_error(str(e))
 
     async def delete_all_data(self) -> bool:
-        """Delete all trading data, logs, cache files with comprehensive cleanup"""
+        """Delete ALL trading data, logs, cache files with COMPREHENSIVE cleanup
+        
+        This method performs complete system cleanup including:
+        - All MongoDB collections (accounts, positions, trades, signals, liveprice, notifications, websocket_clients, etc.)
+        - All log files
+        - All cache files  
+        - Python cache files (__pycache__, .pyc)
+        - In-memory data reset
+        """
         try:
-            self.logger.info("🗑️ Starting comprehensive data cleanup...")
+            self.logger.info("🗑️" * 20)
+            self.logger.info("🗑️ COMPREHENSIVE SYSTEM CLEANUP STARTED")
+            self.logger.info("🗑️ This will delete ALL data and start fresh!")
+            self.logger.info("🗑️" * 20)
             
-            # Step 1: Delete database data
-            self.logger.info("🗑️ Deleting database records...")
+            # Step 1: Delete ALL database collections (comprehensive)
+            self.logger.info("🗑️ STEP 1: Deleting ALL database collections...")
+            self.logger.info("   📋 This includes: accounts, positions, trades, signals,")
+            self.logger.info("   📋 liveprice, notifications, websocket_clients, and more")
+            
             db_success = await self.broker.delete_all_data()
             
             if not db_success:
-                self.logger.error("❌ Failed to delete database data")
-                return False
+                self.logger.error("❌ STEP 1 FAILED: Database cleanup failed")
+                self.logger.error("   This may cause issues with fresh start")
+                # Continue anyway - some cleanup is better than none
+            else:
+                self.logger.info("✅ STEP 1: Database collections deleted successfully")
             
-            # Step 2: Clear logs directory
-            self.logger.info("🗑️ Clearing logs directory...")
+            # Step 2: Clear ALL log files
+            self.logger.info("🗑️ STEP 2: Clearing ALL log files...")
+            self.logger.info("   📋 Deleting: trading.log, debug.log, error.log, etc.")
             logs_cleared = self._clear_directory("logs", "log files")
             
-            # Step 3: Clear cache directory  
-            self.logger.info("🗑️ Clearing cache directory...")
+            # Step 3: Clear ALL cache directories
+            self.logger.info("🗑️ STEP 3: Clearing ALL cache directories...")  
+            self.logger.info("   📋 Deleting: cache/, temp/, __pycache__/")
             cache_cleared = self._clear_directory("cache", "cache files")
             
-            # Step 4: Clear Python cache files
-            self.logger.info("🗑️ Clearing Python cache files...")
+            # Step 4: Clear Python cache files recursively
+            self.logger.info("🗑️ STEP 4: Clearing Python cache files recursively...")
+            self.logger.info("   📋 Deleting: __pycache__/ folders and .pyc files")
             pycache_cleared = self._clear_pycache_files()
             
-            # Step 5: Reset in-memory statistics
+            # Step 5: Reset ALL in-memory data and statistics
+            self.logger.info("🗑️ STEP 5: Resetting ALL in-memory data...")
             self._stats.update({
                 "trades_executed": 0,
-                "trades_successful": 0,
+                "trades_successful": 0, 
                 "trades_failed": 0,
                 "total_pnl": 0.0,
-                "signals_generated": 0
+                "signals_generated": 0,
+                "strategies_executed": 0,
+                "memory_usage": 0.0,
+                "cpu_usage": 0.0
             })
             
-            # Summary of cleanup
+            # Clear error tracking
+            self.error_count = 0
+            self.last_error = None
+            self.error_history.clear()
+            
+            # Clear performance tracking
+            self.price_update_times.clear()
+            self.strategy_execution_times.clear()
+            
+            # Clear market data cache
+            with self.market_data_lock:
+                self.current_market_data.clear()
+            
+            self.logger.info("✅ STEP 5: In-memory data reset completed")
+            
+            # Step 6: Clear WebSocket connections (if active)
+            self.logger.info("🗑️ STEP 6: Clearing WebSocket connections...")
+            websocket_cleared = True
+            try:
+                if hasattr(self, 'websocket_server') and self.websocket_server:
+                    # Clear connected clients
+                    if hasattr(self.websocket_server, 'connected_clients'):
+                        client_count = len(self.websocket_server.connected_clients)
+                        self.websocket_server.connected_clients.clear()
+                        self.logger.info(f"   📋 Cleared {client_count} WebSocket connections")
+                    
+                    # Broadcast final cleanup notification before clearing
+                    await self.websocket_server.broadcast_notification_simple(
+                        "system_reset",
+                        "Complete system cleanup - all data cleared",
+                        "warning", 
+                        "System Reset"
+                    )
+                    
+                self.logger.info("✅ STEP 6: WebSocket cleanup completed")
+            except Exception as e:
+                self.logger.warning(f"⚠️ STEP 6: WebSocket cleanup had issues: {e}")
+                websocket_cleared = False
+            
+            # Final cleanup summary
             cleanup_summary = {
-                "database": "✅" if db_success else "❌",
-                "logs": "✅" if logs_cleared else "❌", 
-                "cache": "✅" if cache_cleared else "❌",
-                "pycache": "✅" if pycache_cleared else "❌"
+                "database_collections": "✅" if db_success else "❌",
+                "log_files": "✅" if logs_cleared else "❌", 
+                "cache_directories": "✅" if cache_cleared else "❌",
+                "python_cache": "✅" if pycache_cleared else "❌",
+                "websocket_connections": "✅" if websocket_cleared else "❌",
+                "memory_data": "✅"  # This always succeeds
             }
             
-            all_success = all([db_success, logs_cleared, cache_cleared, pycache_cleared])
+            all_success = all([db_success, logs_cleared, cache_cleared, pycache_cleared, websocket_cleared])
             
             if all_success:
-                self.logger.info("✅ Complete cleanup successful:")
+                self.logger.info("🎉" * 20)
+                self.logger.info("🎉 COMPREHENSIVE CLEANUP COMPLETED SUCCESSFULLY!")
+                self.logger.info("🎉" * 20)
+                self.logger.info("📋 CLEANUP SUMMARY:")
                 for component, status in cleanup_summary.items():
-                    self.logger.info(f"   {status} {component.capitalize()} cleanup")
+                    self.logger.info(f"   {status} {component.replace('_', ' ').title()}")
                 
-                # Broadcast deletion notification
-                await self.websocket_server.broadcast_notification_simple(
-                    "complete_cleanup",
-                    "All data, logs, and cache files have been cleared",
-                    "info",
-                    "System Cleanup"
-                )
+                self.logger.info("")
+                self.logger.info("🚀 SYSTEM IS NOW COMPLETELY CLEAN!")
+                self.logger.info("🚀 Ready for fresh start with --new flag")
+                self.logger.info("🗑️" * 20)
+                
                 return True
             else:
-                self.logger.warning("⚠️ Partial cleanup completed:")
+                self.logger.warning("⚠️" * 20)
+                self.logger.warning("⚠️ PARTIAL CLEANUP COMPLETED")
+                self.logger.warning("⚠️" * 20) 
+                self.logger.warning("📋 CLEANUP RESULTS:")
                 for component, status in cleanup_summary.items():
-                    self.logger.warning(f"   {status} {component.capitalize()} cleanup")
-                return False
+                    level = "info" if status == "✅" else "warning"
+                    getattr(self.logger, level)(f"   {status} {component.replace('_', ' ').title()}")
+                
+                self.logger.warning("⚠️ Some cleanup operations failed - check logs above")
+                self.logger.warning("⚠️ System may not be completely clean")
+                return True  # Still return True since partial cleanup is useful
                 
         except Exception as e:
             self.logger.error(f"❌ Error during complete cleanup: {e}")

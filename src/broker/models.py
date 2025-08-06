@@ -114,27 +114,59 @@ class Position:
         return self.pnl
     
     def calculate_margin_usage(self, current_price: float, account_balance: float = None) -> float:
-        """Calculate current margin usage percentage - now correctly implemented"""
+        """Calculate pure margin usage percentage (without PnL impact)
+        
+        FIXED: Previously was incorrectly adding PnL losses to margin usage.
+        Now returns pure margin usage only. PnL risk is handled separately at portfolio level.
+        """
         if self.margin_used <= 0:
             return 0.0
         
-        # Primary calculation: Margin used as percentage of account balance
+        # Pure margin calculation: Margin used as percentage of account balance
         if account_balance and account_balance > 0:
-            base_margin_pct = (self.margin_used / account_balance) * 100
-            
-            # Adjust for current PnL impact on available margin
-            unrealized_pnl = self.calculate_pnl(current_price)
-            
-            # If losing money, effective margin usage increases
-            if unrealized_pnl < 0:
-                loss_impact = abs(unrealized_pnl) / account_balance * 100
-                return min(base_margin_pct + loss_impact, 100.0)
-            
-            # If making profit, margin usage remains same (profit adds to available balance)
-            return base_margin_pct
+            pure_margin_pct = (self.margin_used / account_balance) * 100
+            return min(pure_margin_pct, 100.0)
         
         # Fallback: If no account balance, return conservative estimate
         return 50.0  # Conservative 50% usage estimate
+    
+    def calculate_effective_risk(self, current_price: float, account_balance: float = None) -> dict:
+        """Calculate comprehensive position risk including margin + PnL impact
+        
+        This method provides both pure margin usage and PnL risk separately
+        for better risk management decisions.
+        """
+        if account_balance is None or account_balance <= 0:
+            return {
+                "pure_margin_usage": 50.0,
+                "pnl_risk": 0.0,
+                "combined_risk": 50.0,
+                "risk_components": {
+                    "margin": 50.0,
+                    "pnl_impact": 0.0
+                }
+            }
+        
+        # Pure margin usage (what we actually borrowed)
+        pure_margin_usage = (self.margin_used / account_balance) * 100
+        
+        # PnL risk (how much we could lose as % of account)
+        unrealized_pnl = self.calculate_pnl(current_price)
+        pnl_risk = (abs(unrealized_pnl) / account_balance) * 100 if unrealized_pnl < 0 else 0.0
+        
+        # Combined risk (for comprehensive risk assessment)
+        combined_risk = min(pure_margin_usage + (pnl_risk * 0.3), 100.0)  # PnL gets 30% weight
+        
+        return {
+            "pure_margin_usage": min(pure_margin_usage, 100.0),
+            "pnl_risk": pnl_risk,
+            "combined_risk": combined_risk,
+            "pnl_amount": unrealized_pnl,
+            "risk_components": {
+                "margin": pure_margin_usage,
+                "pnl_impact": pnl_risk
+            }
+        }
     
     def close_position(self, exit_price: float, reason: str = "Manual Close"):
         """Close the position"""
