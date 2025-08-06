@@ -1073,7 +1073,6 @@ class NotificationManager:
                 system_config = {
                     "strategy_execution_interval": f"{intervals['strategy_execution']}s ({intervals['strategy_execution']//60} minutes)",
                     "historical_data_update": f"{intervals['historical_data_update']}s ({intervals['historical_data_update']//60} minutes)",
-                    "live_price_updates": intervals['live_price_update'],
                     "risk_check_interval": f"{intervals['risk_check']}s"
                 }
             
@@ -1177,7 +1176,6 @@ class NotificationManager:
                     "successful_trades": "0",
                     "failed_trades": "0",
                     "signals_generated": "0",
-                    "websocket_updates": "0",
                     "strategy_executions": "0",
                     "total_errors": "0"
                 }

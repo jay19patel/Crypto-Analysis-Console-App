@@ -151,9 +151,7 @@ class TradingSystem:
             "trades_failed": 0,
             "total_pnl": 0.0,
             "signals_generated": 0,
-            "price_updates": 0,
             "strategies_executed": 0,
-            "websocket_updates": 0,
             "memory_usage": 0.0,
             "cpu_usage": 0.0
         }
@@ -273,9 +271,7 @@ class TradingSystem:
                     self._record_error(str(e))
                     continue
             
-            # Update statistics
-            self._stats["websocket_updates"] += 1
-            self._stats["price_updates"] += 1
+            # Update statistics - removed websocket_updates and price_updates counting
             
             # Record performance
             processing_time = time.time() - start_time
@@ -653,7 +649,6 @@ class TradingSystem:
                 "successful_trades": str(self._stats.get('trades_successful', 0)),
                 "failed_trades": str(self._stats.get('trades_failed', 0)),
                 "signals_generated": str(self._stats.get('signals_generated', 0)),
-                "websocket_updates": str(self._stats.get('websocket_updates', 0)),
                 "strategy_executions": str(self._stats.get('strategies_executed', 0)),
                 "total_errors": str(self.error_count)
             }
@@ -665,7 +660,6 @@ class TradingSystem:
             self.logger.info(f"   ✅ Successful Trades: {self._stats.get('trades_successful', 0)}")
             self.logger.info(f"   ❌ Failed Trades: {self._stats.get('trades_failed', 0)}")
             self.logger.info(f"   🎯 Signals Generated: {self._stats.get('signals_generated', 0)}")
-            self.logger.info(f"   📡 WebSocket Updates: {self._stats.get('websocket_updates', 0)}")
             self.logger.info(f"   🧠 Strategy Executions: {self._stats.get('strategies_executed', 0)}")
             self.logger.info(f"   ❌ Total Errors: {self.error_count}")
 
@@ -1323,7 +1317,6 @@ class TradingSystem:
             self.logger.info(f"   🎯 Win Rate: {account_summary.get('win_rate', 0):.1f}%")
             self.logger.info(f"   📊 Open Positions: {positions_summary.get('total_open', 0)}")
             self.logger.info(f"   🚀 Signals Generated: {self._stats['signals_generated']}")
-            self.logger.info(f"   📡 WebSocket Updates: {self._stats['websocket_updates']}")
             self.logger.info(f"   ⚡ Avg Price Update: {avg_price_update_time:.3f}s")
             self.logger.info(f"   🧠 Avg Strategy Time: {avg_strategy_time:.3f}s")
             self.logger.info(f"   🔌 WebSocket Status: {websocket_stats.get('status', 'unknown')}")
