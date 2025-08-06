@@ -445,8 +445,15 @@ class AsyncRiskManager:
             liquidation_buffer = self.trading_config.get("liquidation_buffer_pct", 0.10)  # 10% buffer
             safe_quantity = calculated_quantity * (1 - liquidation_buffer)
             
-            # Step 8: Take minimum of requested and safe quantity
-            final_quantity = min(requested_quantity, safe_quantity)
+            # Step 8: Use calculated safe quantity (ignore requested if it's 0 or too small)
+            if requested_quantity <= 0 or requested_quantity < safe_quantity * 0.1:
+                # Strategy didn't specify quantity or specified tiny amount - use calculated safe quantity
+                final_quantity = safe_quantity
+                self.logger.info(f"🎯 Using calculated quantity: {safe_quantity:.6f} (strategy requested: {requested_quantity:.6f})")
+            else:
+                # Strategy specified reasonable quantity - take minimum for safety
+                final_quantity = min(requested_quantity, safe_quantity)
+                self.logger.info(f"🎯 Using safer quantity: {final_quantity:.6f} (requested: {requested_quantity:.6f}, calculated: {safe_quantity:.6f})")
             
             # Step 9: Ensure minimum viable trade size
             min_trade_size = 0.001  

@@ -18,7 +18,7 @@ class TradingSignal(BaseModel):
     confidence: float = Field(ge=0.0, le=100.0)
     strategy_name: str
     price: float
-    quantity: float = 0.01
+    quantity: float = 0.0
     leverage: float = 1.0
     timestamp: datetime = Field(default_factory=lambda: datetime.now())
     
