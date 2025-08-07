@@ -8,9 +8,10 @@ Features:
 - Production-ready architecture
 
 Usage:
-    python main.py                          # Start trading system (INFO level)
+    python main.py                          # Start trading system (INFO level, no email)
     python main.py --new                    # Complete cleanup (data, logs, cache)
-    python main.py --liveSave               # Enable live price saving
+    python main.py --emailon                # Enable email notifications (disabled by default)
+    python main.py --livesaveon             # Enable live price saving (disabled by default)
     python main.py --websocket-port 8765    # Custom WebSocket port
     python main.py --log-level DEBUG        # Debug mode with detailed logs
     python main.py --debug                  # Full debug mode with traceback
@@ -112,9 +113,10 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    python main.py                          # Start with default settings (INFO level)
+    python main.py                          # Start with default settings (INFO level, no email)
     python main.py --new                    # Complete cleanup (data, logs, cache)
-    python main.py --liveSave               # Enable live price saving
+    python main.py --emailon                # Start with email notifications enabled
+    python main.py --livesaveon             # Enable live price saving
     python main.py --websocket-port 8080    # Use port 8080 for WebSocket
     python main.py --log-level DEBUG        # Enable debug logging with file save
     python main.py --debug                  # Full debug mode (console only, detailed traces)
@@ -130,7 +132,7 @@ Examples:
     )
     
     parser.add_argument(
-        "--liveSave",
+        "--livesaveon",
         action="store_true",
         help="Enable live saving of WebSocket price data to MongoDB"
     )
@@ -163,9 +165,9 @@ Examples:
     )
     
     parser.add_argument(
-        "--emailoff",
+        "--emailon",
         action="store_true",
-        help="Disable email notifications (only store in database)"
+        help="Enable email notifications (disabled by default)"
     )
     
     parser.add_argument(
@@ -401,7 +403,8 @@ async def main():
     logger.info("")
     logger.info("⚙️  SYSTEM STATUS:")
     logger.info(f"   🔌 WebSocket Port: {args.websocket_port}")
-    logger.info(f"   📧 Email Notifications: {'Enabled' if not args.emailoff else 'Disabled'}")
+    logger.info(f"   📧 Email Notifications: {'Enabled' if args.emailon else 'Disabled'}")
+    logger.info(f"   💾 Live Save: {'Enabled' if args.livesaveon else 'Disabled'}")
     logger.info(f"   📊 Log Level: {final_log_level}")
     logger.info("=" * 80)
     
@@ -416,9 +419,9 @@ async def main():
     try:
         logger.info("🔧 Initializing trading system...")
         trading_system = TradingSystem(
-            live_save=args.liveSave,
+            live_save=args.livesaveon,
             websocket_port=args.websocket_port,
-            email_enabled=not args.emailoff
+            email_enabled=args.emailon
         )
         
         # Setup graceful shutdown handling

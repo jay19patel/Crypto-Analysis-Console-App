@@ -824,9 +824,9 @@ class NotificationManager:
         }
         
         if self.email_enabled:
-            self.logger.info("✅ Email notifications enabled")
+            self.logger.info("✅ Email notifications enabled (--emailon flag)")
         else:
-            self.logger.info("📧 Email notifications disabled (--emailoff mode)")
+            self.logger.info("📧 Email notifications disabled (default mode)")
     
     async def start(self):
         """Start notification manager"""

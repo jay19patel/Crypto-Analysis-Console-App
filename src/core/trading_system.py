@@ -85,7 +85,7 @@ class CircuitBreaker:
 class TradingSystem:
     """Professional trading system with WebSocket server integration"""
     
-    def __init__(self, live_save: bool = False, websocket_port: int = 8765, email_enabled: bool = True):
+    def __init__(self, live_save: bool = False, websocket_port: int = 8765, email_enabled: bool = False):
         """Initialize the trading system with all components"""
         self.settings = get_settings()
         self.trading_config = get_trading_config()
