@@ -47,10 +47,9 @@ class EMAStrategy(BaseStrategy):
         # self.logger.debug(f"RSI Strategy {self.symbol}: RSI={current_rsi:.2f}, Signal={signal.value}, Confidence={confidence:.1f}%")
         
         return TradingSignal(
-            # signal=signal,
-            signal=SignalType.BUY,
+            signal=signal,
             symbol=self.symbol,
-            confidence=90.0,
+            confidence=confidence,
             strategy_name=self.name,
             price=market_data.price,
             quantity=0.0,  # Risk manager will calculate proper quantity based on balance
