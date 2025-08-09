@@ -306,6 +306,104 @@ class TradingRestAPI:
                 self.logger.error(f"Error getting current price for {symbol}: {e}")
                 return None
         
+        # Orders Endpoints
+        @self.app.get("/api/orders")
+        async def get_orders(
+            position_id: Optional[str] = Query(None),
+            symbol: Optional[str] = Query(None),
+            order_type: Optional[str] = Query(None),
+            status: Optional[str] = Query(None),
+            limit: int = Query(100, ge=1, le=500)
+        ):
+            """Get orders with optional filters"""
+            try:
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                # Build query
+                query = {}
+                if position_id:
+                    query["position_id"] = position_id
+                if symbol:
+                    query["symbol"] = symbol
+                if order_type:
+                    query["order_type"] = order_type
+                if status:
+                    query["status"] = status
+                
+                # Get orders from MongoDB
+                orders = await self.mongodb_client.load_orders(
+                    position_id=position_id if position_id else None, 
+                    limit=limit
+                )
+                
+                # Apply additional filters if needed
+                if symbol and not position_id:
+                    orders = [order for order in orders if order.get("symbol") == symbol]
+                if order_type:
+                    orders = [order for order in orders if order.get("order_type") == order_type]
+                if status:
+                    orders = [order for order in orders if order.get("status") == status]
+                
+                return {
+                    "orders": orders,
+                    "total": len(orders),
+                    "filters": {
+                        "position_id": position_id,
+                        "symbol": symbol,
+                        "order_type": order_type,
+                        "status": status
+                    },
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching orders: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/api/orders/position/{position_id}")
+        async def get_position_orders(position_id: str):
+            """Get all orders for a specific position"""
+            try:
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                orders = await self.mongodb_client.load_orders(position_id=position_id)
+                
+                # Sort by order time
+                orders.sort(key=lambda x: x.get("order_time", ""), reverse=False)
+                
+                return {
+                    "orders": orders,
+                    "position_id": position_id,
+                    "total": len(orders),
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching orders for position {position_id}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        @self.app.get("/api/orders/symbol/{symbol}")
+        async def get_symbol_orders(symbol: str, limit: int = Query(50, ge=1, le=200)):
+            """Get all orders for a specific symbol"""
+            try:
+                if not await self.mongodb_client.connect():
+                    raise HTTPException(status_code=500, detail="Database connection failed")
+                
+                orders = await self.mongodb_client.load_orders_by_symbol(symbol, limit)
+                
+                return {
+                    "orders": orders,
+                    "symbol": symbol,
+                    "total": len(orders),
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Error fetching orders for symbol {symbol}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+        
         # Notifications Endpoints
         @self.app.get("/api/notifications")
         async def get_notifications(

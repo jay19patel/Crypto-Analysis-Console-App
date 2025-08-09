@@ -35,6 +35,7 @@ from src.database.schemas import TradingSignal, MarketData, SignalType
 from src.broker.historical_data import HistoricalDataProvider
 from src.api.websocket_server import WebSocketServer, get_websocket_server
 from src.api.rest_server import TradingRestAPI, get_rest_api_server
+from src.broker.models import PositionType
 
 
 @dataclass
@@ -266,6 +267,13 @@ class TradingSystem:
                     
                     # Broadcast to WebSocket clients
                     self._broadcast_price_update_safe(live_prices)
+                    
+                    # Check trailing conditions on price updates
+                    if self._main_loop is not None:
+                        asyncio.run_coroutine_threadsafe(
+                            self._check_trailing_conditions(),
+                            self._main_loop
+                        )
                     
                     # Immediately broadcast updated account and position data
                     self._broadcast_account_and_positions_safe()
@@ -881,15 +889,47 @@ class TradingSystem:
             
             # Execute trade if signal is actionable
             if selected_signal.signal in (SignalType.BUY, SignalType.SELL):
-                # Check if position already exists before attempting trade
+                # Check if position already exists
                 has_open_position = self.broker.has_open_position_for_symbol(symbol)
-                if has_open_position:
+                
+                if has_open_position and self.trading_config.get("pyramiding_enabled", False):
+                    # Pyramiding logic - check if we should add to existing position
+                    existing_position = self.broker.get_open_position_for_symbol(symbol)
+                    
+                    # Check if signal is in same direction and confidence is high enough
+                    same_direction = (
+                        (existing_position.position_type == PositionType.LONG and selected_signal.signal == SignalType.BUY) or
+                        (existing_position.position_type == PositionType.SHORT and selected_signal.signal == SignalType.SELL)
+                    )
+                    
+                    high_confidence = selected_signal.confidence >= self.trading_config.get("pyramiding_min_confidence", 90.0)
+                    
+                    if same_direction and high_confidence:
+                        self.logger.info(f"🔺 Pyramiding opportunity for {symbol}: {selected_signal.signal}")
+                        self.logger.info(f"   📊 Existing: {existing_position.position_type.value} {existing_position.quantity} at ${existing_position.entry_price:.2f}")
+                        self.logger.info(f"   🎯 Adding: {selected_signal.confidence:.1f}% confidence signal at ${selected_signal.price:.2f}")
+                        
+                        if self._main_loop is not None:
+                            future = asyncio.run_coroutine_threadsafe(
+                                self._execute_pyramiding(existing_position, selected_signal),
+                                self._main_loop
+                            )
+                    else:
+                        self.logger.info(f"⏸️ Pyramiding SKIPPED for {symbol}: {selected_signal.signal}")
+                        if not same_direction:
+                            self.logger.info(f"   📊 Reason: Different direction (existing: {existing_position.position_type.value})")
+                        if not high_confidence:
+                            self.logger.info(f"   📊 Reason: Low confidence {selected_signal.confidence:.1f}% < {self.trading_config.get('pyramiding_min_confidence', 90.0)}%")
+                        
+                elif has_open_position:
+                    # Original behavior - skip if position exists and pyramiding disabled
                     existing_position = self.broker.get_open_position_for_symbol(symbol)
                     self.logger.info(f"⏸️ Signal SKIPPED for {symbol}: {selected_signal.signal}")
                     self.logger.info(f"   📊 Reason: Position already open ({existing_position.position_type.value})")
                     self.logger.info(f"   💰 Existing: {existing_position.quantity} units at ${existing_position.entry_price:.2f}")
                     self.logger.info(f"   🎯 New Signal: {selected_signal.signal.value} at ${selected_signal.price:.2f}")
                 else:
+                    # No existing position - create new position
                     self.logger.info(f"💰 Actionable signal detected for {symbol}: {selected_signal.signal}")
                     self.logger.info(f"   📊 Signal Details: price=${selected_signal.price:.2f}, quantity={selected_signal.quantity}, confidence={selected_signal.confidence:.1f}%")
                     if self._main_loop is not None:
@@ -1049,6 +1089,21 @@ class TradingSystem:
             if has_open_position:
                 existing_position = self.broker.get_open_position_for_symbol(signal.symbol)
                 
+                # Check for pyramiding opportunity if it's a BUY signal
+                if signal.signal.value == "BUY":
+                    pyramid_success = await self.broker.execute_pyramiding(existing_position, signal.price, signal.confidence)
+                    if pyramid_success:
+                        self.logger.info(f"🔺 Pyramiding executed for {signal.symbol} with {signal.confidence:.1f}% confidence")
+                        await self.websocket_server.broadcast_notification_simple(
+                            "pyramiding_executed",
+                            f"Added to position: {signal.symbol} at ${signal.price:.2f} (Confidence: {signal.confidence:.1f}%)",
+                            "success",
+                            "Pyramiding"
+                        )
+                        return
+                    else:
+                        self.logger.info(f"❌ Pyramiding conditions not met for {signal.symbol}")
+                
                 self.logger.warning(f"🚫 Trade REJECTED: {signal.symbol} already has an open position")
                 self.logger.warning(f"   📊 Existing Position: {existing_position.position_type.value} "
                                   f"qty={existing_position.quantity} entry=${existing_position.entry_price:.2f}")
@@ -1196,6 +1251,225 @@ class TradingSystem:
         except Exception as e:
             self.logger.error(f"❌ Error executing signal: {e}")
             self._stats["trades_failed"] += 1
+            self._record_error(str(e))
+
+    async def _execute_pyramiding(self, existing_position, signal: TradingSignal):
+        """Execute pyramiding - add to existing position"""
+        try:
+            self.logger.info(f"🔺 Executing pyramiding for {signal.symbol}")
+            
+            # Calculate add quantity as percentage of original position
+            add_percentage = self.trading_config.get("pyramiding_add_percentage", 0.5)
+            original_quantity = existing_position.original_quantity if existing_position.original_quantity > 0 else existing_position.quantity
+            add_quantity = original_quantity * add_percentage
+            
+            self.logger.info(f"   📊 Original quantity: {original_quantity}")
+            self.logger.info(f"   🔺 Adding {add_percentage*100}%: {add_quantity} units at ${signal.price:.2f}")
+            
+            # Calculate margin needed for additional quantity
+            add_margin = (add_quantity * signal.price) / existing_position.leverage
+            add_trading_fee = add_margin * self.trading_config["trading_fee_pct"]
+            
+            # Check if we have sufficient balance for pyramiding
+            if self.broker.account.current_balance < (add_margin + add_trading_fee):
+                self.logger.warning(f"⚠️ Insufficient balance for pyramiding {signal.symbol}")
+                await self.websocket_server.broadcast_notification_simple(
+                    "pyramiding_failed",
+                    f"Insufficient balance for pyramiding {signal.symbol}",
+                    "warning",
+                    "Pyramiding"
+                )
+                return False
+            
+            # Add to position
+            existing_position.add_to_position(add_quantity, signal.price, add_margin)
+            
+            # Update account balance
+            self.broker.account.current_balance -= (add_margin + add_trading_fee)
+            self.broker.account.brokerage_charges += add_trading_fee
+            
+            # Save updated position
+            await self.broker.mongodb_client.save_position(existing_position.to_dict())
+            await self.broker.mongodb_client.save_account(self.broker.account.to_dict())
+            
+            # Create order record for pyramiding
+            from src.broker.models import Order, OrderType, OrderStatus
+            pyramid_order = Order(
+                position_id=existing_position.id,
+                symbol=signal.symbol,
+                order_type=OrderType.PYRAMID_ADD,
+                status=OrderStatus.EXECUTED,
+                price=signal.price,
+                quantity=add_quantity,
+                executed_price=signal.price,
+                executed_quantity=add_quantity,
+                leverage=existing_position.leverage,
+                margin_used=add_margin,
+                trading_fee=add_trading_fee,
+                strategy_name=signal.strategy_name,
+                confidence=signal.confidence,
+                execution_time=datetime.now(timezone.utc),
+                notes=f"Pyramiding add #{existing_position.pyramid_count} - {add_percentage*100}% of original position"
+            )
+            
+            # Save order
+            await self.broker.mongodb_client.save_order(pyramid_order.to_dict())
+            
+            self.logger.info(f"✅ Pyramiding executed: Added {add_quantity} to {signal.symbol} at ${signal.price:.2f}")
+            self.logger.info(f"   📊 New total quantity: {existing_position.total_quantity}")
+            self.logger.info(f"   📊 New average entry: ${existing_position.average_entry_price:.2f}")
+            self.logger.info(f"   📊 Pyramid count: {existing_position.pyramid_count}")
+            
+            # Broadcast notification
+            await self.websocket_server.broadcast_notification_simple(
+                "pyramiding_executed",
+                f"Added to {signal.symbol}: {add_quantity} units at ${signal.price:.2f} (Pyramid #{existing_position.pyramid_count})",
+                "success",
+                "Pyramiding"
+            )
+            
+            # Broadcast updated positions
+            positions_summary = await self.broker.get_positions_summary_async()
+            open_positions = positions_summary.get("open_positions", [])
+            account_summary = await self.broker.get_account_summary_async()
+            
+            await self.websocket_server.broadcast_positions_update(open_positions)
+            await self.websocket_server.broadcast_account_summary(account_summary)
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error executing pyramiding: {e}")
+            self._record_error(str(e))
+            return False
+
+    async def _check_trailing_conditions(self):
+        """Check all positions for trailing conditions"""
+        try:
+            if not self.trading_config.get("enable_trailing", False):
+                return
+            
+            for position_id, position in self.broker.positions.items():
+                if position.status.value != "OPEN":
+                    continue
+                
+                # Get current price for the symbol
+                with self.market_data_lock:
+                    market_data = self.current_market_data.get(position.symbol)
+                
+                if not market_data:
+                    continue
+                
+                current_price = market_data.price
+                
+                # Use broker's trailing logic
+                await self.broker.execute_trailing(position, current_price)
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error checking trailing conditions: {e}")
+            self._record_error(str(e))
+
+    async def _should_trigger_trailing(self, position, current_price: float) -> bool:
+        """Check if position should trigger trailing"""
+        try:
+            # Calculate current PnL percentage
+            effective_entry_price = position.average_entry_price if position.average_entry_price > 0 else position.entry_price
+            
+            if position.position_type == PositionType.LONG:
+                pnl_pct = ((current_price - effective_entry_price) / effective_entry_price) * 100
+            else:
+                pnl_pct = ((effective_entry_price - current_price) / effective_entry_price) * 100
+            
+            # Check if we've hit the target percentage (10% by default)
+            target_pct = self.trading_config.get("target_pct", 0.10) * 100
+            
+            return pnl_pct >= target_pct
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error checking trailing trigger: {e}")
+            return False
+
+    async def _execute_trailing(self, position, current_price: float):
+        """Execute trailing - reduce position by configured percentage"""
+        try:
+            self.logger.info(f"🎯 Executing trailing for {position.symbol} at ${current_price:.2f}")
+            
+            # Calculate quantity to close
+            reduce_percentage = self.trading_config.get("trailing_reduce_percentage", 0.5)
+            effective_quantity = position.remaining_quantity if position.remaining_quantity > 0 else position.quantity
+            close_quantity = effective_quantity * reduce_percentage
+            
+            self.logger.info(f"   📊 Reducing {reduce_percentage*100}% of position: {close_quantity} units")
+            
+            # Execute partial close
+            position.partial_close_position(close_quantity, current_price, "Target Hit - Trailing")
+            
+            # Update account balance with realized profit
+            realized_profit = position.realized_pnl - (position.realized_pnl - close_quantity * current_price * 0.001)  # Approximate fees
+            self.broker.account.current_balance += realized_profit
+            
+            # Set new stop loss and target for remaining position
+            stop_loss_pct = self.trading_config.get("trailing_stop_loss_pct", 0.005)  # 0.5%
+            target_pct = self.trading_config.get("trailing_target_pct", 0.01)  # 1%
+            
+            if position.position_type == PositionType.LONG:
+                new_stop_loss = current_price * (1 - stop_loss_pct)
+                new_target = current_price * (1 + target_pct)
+            else:
+                new_stop_loss = current_price * (1 + stop_loss_pct)
+                new_target = current_price * (1 - target_pct)
+            
+            position.stop_loss = new_stop_loss
+            position.target = new_target
+            
+            # Save updated position
+            await self.broker.mongodb_client.save_position(position.to_dict())
+            await self.broker.mongodb_client.save_account(self.broker.account.to_dict())
+            
+            # Create order record for trailing
+            from src.broker.models import Order, OrderType, OrderStatus
+            trailing_order = Order(
+                position_id=position.id,
+                symbol=position.symbol,
+                order_type=OrderType.TRAILING_CLOSE,
+                status=OrderStatus.EXECUTED,
+                price=current_price,
+                quantity=close_quantity,
+                executed_price=current_price,
+                executed_quantity=close_quantity,
+                leverage=position.leverage,
+                execution_time=datetime.now(timezone.utc),
+                notes=f"Trailing close #{position.trailing_count} - {reduce_percentage*100}% reduction"
+            )
+            
+            # Save order
+            await self.broker.mongodb_client.save_order(trailing_order.to_dict())
+            
+            self.logger.info(f"✅ Trailing executed: Sold {close_quantity} of {position.symbol} at ${current_price:.2f}")
+            self.logger.info(f"   📊 Remaining quantity: {position.remaining_quantity}")
+            self.logger.info(f"   📊 New stop loss: ${position.stop_loss:.2f}")
+            self.logger.info(f"   📊 New target: ${position.target:.2f}")
+            self.logger.info(f"   💰 Realized PnL: ${position.realized_pnl:.2f}")
+            self.logger.info(f"   📊 Trailing count: {position.trailing_count}")
+            
+            # Broadcast notification
+            await self.websocket_server.broadcast_notification_simple(
+                "trailing_executed",
+                f"Trailing {position.symbol}: Sold {close_quantity} at ${current_price:.2f} (Trail #{position.trailing_count})",
+                "success",
+                "Trailing"
+            )
+            
+            # Broadcast updated positions
+            positions_summary = await self.broker.get_positions_summary_async()
+            open_positions = positions_summary.get("open_positions", [])
+            account_summary = await self.broker.get_account_summary_async()
+            
+            await self.websocket_server.broadcast_positions_update(open_positions)
+            await self.websocket_server.broadcast_account_summary(account_summary)
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error executing trailing: {e}")
             self._record_error(str(e))
 
     async def _update_risk_management(self):

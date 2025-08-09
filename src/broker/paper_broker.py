@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import OrderedDict
 
-from src.broker.models import Account, Position, PositionType, PositionStatus
+from src.broker.models import Account, Position, PositionType, PositionStatus, Order, OrderType, OrderStatus
 from src.config import get_settings, get_trading_config
 from src.database.mongodb_client import AsyncMongoDBClient
 
@@ -469,7 +469,23 @@ class AsyncBroker:
                 "open_time": position.entry_time.isoformat() if position.entry_time else None,
                 "exit_time": position.exit_time.isoformat() if position.exit_time else None,
                 "running_time": self._calculate_running_time(position) if position.status == PositionStatus.OPEN else None,
-                "margin_usage_pct": position.calculate_margin_usage(pos_data["current_price"], self.account.current_balance) if position.status == PositionStatus.OPEN else 0.0
+                "margin_usage_pct": position.calculate_margin_usage(pos_data["current_price"], self.account.current_balance) if position.status == PositionStatus.OPEN else 0.0,
+                
+                # Pyramiding and Trailing data
+                "original_quantity": position.original_quantity,
+                "total_quantity": position.total_quantity,
+                "average_entry_price": position.average_entry_price,
+                "pyramid_count": position.pyramid_count,
+                "trailing_count": position.trailing_count,
+                "remaining_quantity": position.remaining_quantity,
+                "realized_pnl": position.realized_pnl,
+                "unrealized_pnl": position.unrealized_pnl,
+                "average_exit_price": position.average_exit_price,
+                
+                # Enhanced display info
+                "is_pyramided": position.pyramid_count > 0,
+                "is_trailed": position.trailing_count > 0,
+                "has_partial_closes": position.trailing_count > 0 or position.realized_pnl != 0.0
             })
             
             if position.status == PositionStatus.OPEN:
@@ -542,6 +558,22 @@ class AsyncBroker:
         except Exception as e:
             self.logger.error(f"Error getting position counts by symbol: {e}")
             return {}
+
+    async def get_position_orders(self, position_id: str) -> List[Dict[str, Any]]:
+        """Get all orders for a specific position"""
+        try:
+            return await self.mongodb_client.load_orders(position_id=position_id)
+        except Exception as e:
+            self.logger.error(f"Error loading position orders: {e}")
+            return []
+
+    async def get_symbol_orders(self, symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get all orders for a specific symbol"""
+        try:
+            return await self.mongodb_client.load_orders_by_symbol(symbol=symbol, limit=limit)
+        except Exception as e:
+            self.logger.error(f"Error loading symbol orders: {e}")
+            return []
     
     async def delete_all_data(self) -> bool:
         """Delete all trading data from MongoDB"""
@@ -650,13 +682,26 @@ class AsyncBroker:
             position.margin_used = margin_required
             position.trading_fee = trading_fee
             
-            # Calculate risk levels using config settings
+            # Initialize pyramiding fields
+            position.original_quantity = trade_request.quantity
+            position.total_quantity = trade_request.quantity
+            position.average_entry_price = trade_request.price
+            position.pyramid_count = 0
+            
+            # Initialize trailing fields
+            position.trailing_count = 0
+            position.remaining_quantity = trade_request.quantity
+            position.realized_pnl = 0.0
+            position.unrealized_pnl = 0.0
+            position.average_exit_price = 0.0
+            
+            # Calculate risk levels - 1% SL and 3% Target
             if position.position_type == PositionType.LONG:
-                position.stop_loss = trade_request.price * (1 - self.trading_config["stop_loss_pct"])
-                position.target = trade_request.price * (1 + self.trading_config["target_pct"])
+                position.stop_loss = trade_request.price * (1 - 0.01)  # 1% below entry
+                position.target = trade_request.price * (1 + 0.03)     # 3% above entry
             else:
-                position.stop_loss = trade_request.price * (1 + self.trading_config["stop_loss_pct"])
-                position.target = trade_request.price * (1 - self.trading_config["target_pct"])
+                position.stop_loss = trade_request.price * (1 + 0.01)  # 1% above entry  
+                position.target = trade_request.price * (1 - 0.03)     # 3% below entry
             
             # Calculate initial PnL
             position.calculate_pnl(trade_request.price)
@@ -674,6 +719,9 @@ class AsyncBroker:
             # Save position to memory
             self.positions[position.id] = position
             trade_request.position_id = position.id
+            
+            # Create initial trade orders
+            await self._create_initial_trade_orders(position)
             
             return True
             
@@ -741,4 +789,289 @@ class AsyncBroker:
             "open_positions": len([p for p in self.positions.values() if p.status == PositionStatus.OPEN]),
             "account_balance": self.account.current_balance if self.account else 0.0,
             "mongodb_connected": self.mongodb_client.is_connected
-        } 
+        }
+    
+    # ==================== INITIAL TRADE ORDERS ====================
+    
+    async def _create_initial_trade_orders(self, position: Position):
+        """Create initial BUY, STOP_LOSS, and TARGET orders for new position"""
+        try:
+            # Create BUY order (already executed)
+            buy_order = Order(
+                position_id=position.id,
+                symbol=position.symbol,
+                order_type=OrderType.BUY,
+                status=OrderStatus.EXECUTED,
+                price=position.entry_price,
+                quantity=position.quantity,
+                executed_price=position.entry_price,
+                executed_quantity=position.quantity,
+                leverage=position.leverage,
+                margin_used=position.margin_used,
+                trading_fee=position.trading_fee,
+                strategy_name=position.strategy_name,
+                confidence=100.0,
+                execution_time=position.entry_time,
+                notes=f"Initial {position.position_type.value} entry"
+            )
+            await self.mongodb_client.save_order(buy_order.to_dict())
+            
+            # Create STOP_LOSS order (pending)
+            if position.stop_loss:
+                sl_order = Order(
+                    position_id=position.id,
+                    symbol=position.symbol,
+                    order_type=OrderType.STOP_LOSS,
+                    status=OrderStatus.PENDING,
+                    price=position.stop_loss,
+                    quantity=position.quantity,
+                    leverage=position.leverage,
+                    strategy_name=position.strategy_name,
+                    confidence=100.0,
+                    notes=f"Initial SL @ ${position.stop_loss:.2f} (-1%)"
+                )
+                await self.mongodb_client.save_order(sl_order.to_dict())
+            
+            # Create TARGET order (pending)
+            if position.target:
+                target_order = Order(
+                    position_id=position.id,
+                    symbol=position.symbol,
+                    order_type=OrderType.TARGET,
+                    status=OrderStatus.PENDING,
+                    price=position.target,
+                    quantity=position.quantity,
+                    leverage=position.leverage,
+                    strategy_name=position.strategy_name,
+                    confidence=100.0,
+                    notes=f"Initial Target @ ${position.target:.2f} (+3%)"
+                )
+                await self.mongodb_client.save_order(target_order.to_dict())
+            
+            self.logger.info(f"📋 Created initial orders for {position.symbol}: BUY, SL, TARGET")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create initial trade orders: {e}")
+    
+    
+    async def _update_trailing_orders(self, position: Position, current_price: float):
+        """Update stop loss and target for trailing - using config values"""
+        try:
+            stop_offset = self.trading_config.get("trailing_stop_offset", 0.5) / 100.0  # 0.5%
+            target_offset = self.trading_config.get("trailing_target_offset", 1.0) / 100.0  # 1%
+            
+            if position.position_type == PositionType.LONG:
+                new_stop_loss = current_price * (1 - stop_offset)  # current - 0.5%
+                new_target = current_price * (1 + target_offset)   # current + 1%
+            else:
+                new_stop_loss = current_price * (1 + stop_offset)  # current + 0.5%
+                new_target = current_price * (1 - target_offset)   # current - 1%
+            
+            # Update position stop loss and target
+            position.stop_loss = new_stop_loss
+            position.target = new_target
+            
+            # Create stop loss update order
+            sl_order = Order(
+                position_id=position.id,
+                symbol=position.symbol,
+                order_type=OrderType.STOP_LOSS,
+                status=OrderStatus.PENDING,
+                price=new_stop_loss,
+                quantity=position.remaining_quantity,
+                leverage=position.leverage,
+                strategy_name=position.strategy_name,
+                confidence=100.0,
+                notes=f"Trailing SL #{position.trailing_count} @ ${new_stop_loss:.2f} (current-0.5%)"
+            )
+            await self.mongodb_client.save_order(sl_order.to_dict())
+            
+            # Create target update order  
+            target_order = Order(
+                position_id=position.id,
+                symbol=position.symbol,
+                order_type=OrderType.TARGET,
+                status=OrderStatus.PENDING,
+                price=new_target,
+                quantity=position.remaining_quantity,
+                leverage=position.leverage,
+                strategy_name=position.strategy_name,
+                confidence=100.0,
+                notes=f"Trailing Target #{position.trailing_count} @ ${new_target:.2f} (current+1%)"
+            )
+            await self.mongodb_client.save_order(target_order.to_dict())
+            
+            self.logger.info(f"🎯 Trailing updated: SL=${new_stop_loss:.2f} (-0.5%), Target=${new_target:.2f} (+1%)")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update trailing orders: {e}")
+    
+    # ==================== PYRAMIDING & TRAILING LOGIC ====================
+    
+    async def check_pyramiding_opportunity(self, position: Position, signal_confidence: float) -> bool:
+        """Check if we should add to position (pyramiding)"""
+        try:
+            # Check if pyramiding is enabled
+            if not self.trading_config.get("enable_pyramiding", True):
+                return False
+            
+            # Check confidence threshold
+            min_confidence = self.trading_config.get("pyramiding_min_confidence", 90.0)
+            if signal_confidence < min_confidence:
+                return False
+            
+            # Check pyramid limits
+            max_adds = self.trading_config.get("pyramiding_max_adds", 3)
+            if position.pyramid_count >= max_adds:
+                return False
+            
+            # Check if position is profitable (optional safety check)
+            current_price = self._price_cache.get(position.symbol, {}).get("price", 0.0)
+            if current_price > 0:
+                position.calculate_pnl(current_price)
+                # Only pyramid if position is profitable
+                if position.unrealized_pnl <= 0:
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error checking pyramiding opportunity: {e}")
+            return False
+    
+    async def execute_pyramiding(self, position: Position, current_price: float, signal_confidence: float):
+        """Execute pyramiding - add to existing position"""
+        try:
+            # Check if we should pyramid
+            if not await self.check_pyramiding_opportunity(position, signal_confidence):
+                return False
+            
+            # Calculate quantity to add (percentage of original quantity)
+            add_percentage = self.trading_config.get("pyramiding_add_percentage", 50.0) / 100.0
+            add_quantity = position.original_quantity * add_percentage
+            
+            # Calculate margin required
+            add_margin = (add_quantity * current_price) / position.leverage
+            
+            # Check if we have enough balance
+            if self.account.current_balance < add_margin:
+                self.logger.warning(f"Insufficient balance for pyramiding {position.symbol}")
+                return False
+            
+            # Create and execute pyramid add order
+            pyramid_order = Order(
+                position_id=position.id,
+                symbol=position.symbol,
+                order_type=OrderType.PYRAMID_ADD,
+                status=OrderStatus.EXECUTED,
+                price=current_price,
+                quantity=add_quantity,
+                executed_price=current_price,
+                executed_quantity=add_quantity,
+                leverage=position.leverage,
+                margin_used=add_margin,
+                strategy_name=position.strategy_name,
+                confidence=signal_confidence,
+                execution_time=datetime.now(timezone.utc),
+                notes=f"Pyramid add #{position.pyramid_count + 1} with {signal_confidence:.1f}% confidence"
+            )
+            await self.mongodb_client.save_order(pyramid_order.to_dict())
+            
+            # Update position with pyramiding
+            position.add_to_position(add_quantity, current_price, add_margin)
+            
+            # Update account balance
+            self.account.current_balance -= add_margin
+            
+            # Save updated position and account
+            await self.mongodb_client.save_position(position.to_dict())
+            await self.mongodb_client.save_account(self.account.to_dict())
+            
+            self.logger.info(f"🔺 Pyramiding executed: Added {add_quantity} to {position.symbol} at ${current_price:.2f}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Pyramiding execution error: {e}")
+            return False
+    
+    async def check_trailing_opportunity(self, position: Position, current_price: float) -> bool:
+        """Check if we should partially close position (trailing)"""
+        try:
+            # Check if trailing is enabled
+            if not self.trading_config.get("enable_trailing", True):
+                return False
+            
+            # Check if we have remaining quantity to close
+            remaining_qty = position.remaining_quantity if position.remaining_quantity > 0 else position.total_quantity
+            if remaining_qty <= 0:
+                return False
+            
+            # Check trailing limits
+            max_trailing = self.trading_config.get("trailing_max_count", 5)
+            if position.trailing_count >= max_trailing:
+                return False
+            
+            # Check if target price is hit
+            if position.target and current_price >= position.target:
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error checking trailing opportunity: {e}")
+            return False
+    
+    async def execute_trailing(self, position: Position, current_price: float):
+        """Execute trailing - partially close position"""
+        try:
+            # Check if we should trail
+            if not await self.check_trailing_opportunity(position, current_price):
+                return False
+            
+            # Calculate quantity to close (percentage of remaining quantity)
+            exit_percentage = self.trading_config.get("trailing_exit_percentage", 50.0) / 100.0
+            remaining_qty = position.remaining_quantity if position.remaining_quantity > 0 else position.quantity
+            close_quantity = remaining_qty * exit_percentage
+            
+            # Create and execute trailing close order
+            trailing_order = Order(
+                position_id=position.id,
+                symbol=position.symbol,
+                order_type=OrderType.TRAILING_CLOSE,
+                status=OrderStatus.EXECUTED,
+                price=current_price,
+                quantity=close_quantity,
+                executed_price=current_price,
+                executed_quantity=close_quantity,
+                leverage=position.leverage,
+                strategy_name=position.strategy_name,
+                confidence=100.0,
+                execution_time=datetime.now(timezone.utc),
+                notes=f"Trailing close #{position.trailing_count + 1} - target hit ({exit_percentage*100:.0f}% exit)"
+            )
+            await self.mongodb_client.save_order(trailing_order.to_dict())
+            
+            # Partially close position
+            position.partial_close_position(close_quantity, current_price, f"Trailing close: target hit")
+            
+            # Calculate profit from partial close
+            effective_entry = position.average_entry_price if position.average_entry_price > 0 else position.entry_price
+            profit = (current_price - effective_entry) * close_quantity if position.position_type == PositionType.LONG else (effective_entry - current_price) * close_quantity
+            
+            # Update account balance with profit
+            self.account.current_balance += profit
+            self.account.realized_pnl += profit
+            
+            # Update new stop loss and target based on current price
+            await self._update_trailing_orders(position, current_price)
+            
+            # Save updated position and account
+            await self.mongodb_client.save_position(position.to_dict())
+            await self.mongodb_client.save_account(self.account.to_dict())
+            
+            self.logger.info(f"📉 Trailing executed: Closed {close_quantity} of {position.symbol} at ${current_price:.2f}, profit: ${profit:.2f}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Trailing execution error: {e}")
+            return False 

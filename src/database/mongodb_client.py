@@ -41,6 +41,7 @@ class AsyncMongoDBClient:
         self.accounts_collection = "accounts"
         self.positions_collection = "positions"
         self.trades_collection = "trades"
+        self.orders_collection = "orders"
         self.liveprice = "liveprice"
         self.notifications  = "notifications"
         self.signals_collection = "signals"
@@ -564,4 +565,50 @@ class AsyncMongoDBClient:
             result_notifications = await self.db[self.notifications].delete_many({"timestamp": {"$lt": cutoff_iso}})
             self.log_message(f"Cleanup complete: {result_trades.deleted_count} trades, {result_positions.deleted_count} positions, {result_notifications.deleted_count} notifications deleted.", "info")
         except Exception as e:
-            self.log_message(f"Error during cleanup: {e}", "error") 
+            self.log_message(f"Error during cleanup: {e}", "error")
+
+    # Order Management
+    async def save_order(self, order_data: Dict[str, Any]) -> bool:
+        """Save order data to MongoDB"""
+        try:
+            # Ensure order has timestamp
+            if "order_time" not in order_data:
+                order_data["order_time"] = datetime.now(timezone.utc).isoformat()
+            
+            return await self.insert_document(self.orders_collection, order_data)
+        except Exception as e:
+            self.log_message(f"Error saving order: {e}", "error")
+            return False
+
+    async def load_orders(self, position_id: str = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Load orders from MongoDB, optionally filtered by position_id"""
+        try:
+            query = {}
+            if position_id:
+                query["position_id"] = position_id
+            
+            if not self.is_connected:
+                if not await self.connect():
+                    return []
+                    
+            cursor = self.db[self.orders_collection].find(query).sort("order_time", -1).limit(limit)
+            orders = await cursor.to_list(length=None)
+            
+            # Convert ObjectId to string
+            for order in orders:
+                if '_id' in order:
+                    order['_id'] = str(order['_id'])
+            
+            return orders
+        except Exception as e:
+            self.log_message(f"Error loading orders: {e}", "error")
+            return []
+
+    async def load_orders_by_symbol(self, symbol: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Load orders for a specific symbol"""
+        try:
+            query = {"symbol": symbol}
+            return await self.find_documents(self.orders_collection, query, limit=limit)
+        except Exception as e:
+            self.log_message(f"Error loading orders by symbol: {e}", "error")
+            return [] 

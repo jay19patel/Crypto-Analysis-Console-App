@@ -1377,11 +1377,30 @@
                         const positionType = position.position_type || position.type || position.side || 'LONG';
                         const sideClass = positionType === 'LONG' ? 'positive' : 'negative';
                         
+                        // Pyramiding and trailing indicators
+                        const pyramidCount = position.pyramid_count || 0;
+                        const trailingCount = position.trailing_count || 0;
+                        
+                        const pyramidIndicator = pyramidCount > 0 ? 
+                            `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400 ml-2">
+                                <i class="fas fa-layer-group mr-1"></i>${pyramidCount}
+                            </span>` : '';
+                            
+                        const trailingIndicator = trailingCount > 0 ? 
+                            `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-400 ml-2">
+                                <i class="fas fa-chart-line mr-1"></i>${trailingCount}
+                            </span>` : '';
+                        
                         return `
-                            <div class="glass-effect rounded-xl p-4 mb-4">
+                            <div class="glass-effect rounded-xl p-4 mb-4 cursor-pointer hover:bg-slate-700/30 transition-all duration-200" 
+                                 onclick="dashboard.showOrdersDialog('${position.id}', '${position.symbol}')">
                                 <div class="flex justify-between items-start mb-3">
                                     <div>
-                                        <div class="font-bold text-lg">${position.symbol}</div>
+                                        <div class="font-bold text-lg flex items-center">
+                                            ${position.symbol}
+                                            ${pyramidIndicator}
+                                            ${trailingIndicator}
+                                        </div>
                                         <div class="text-sm ${sideClass}">${positionType}</div>
                                     </div>
                                     <div class="text-right">
@@ -1446,6 +1465,10 @@
                                         const positionType = position.position_type || position.type || position.side || 'LONG';
                                         const sideClass = positionType === 'LONG' ? 'positive' : 'negative';
                                         
+                                        // Pyramiding and trailing indicators
+                                        const pyramidCount = position.pyramid_count || 0;
+                                        const trailingCount = position.trailing_count || 0;
+                                        
                                         // Calculate stop loss and target percentages
                                         const entryPrice = parseFloat(position.entry_price || 0);
                                         const stopLossPrice = parseFloat(position.stop_loss || 0);
@@ -1470,9 +1493,22 @@
                                             month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                                         }) : 'N/A';
                                         
+                                        // Create indicators for pyramiding and trailing
+                                        const indicators = [];
+                                        if (pyramidCount > 0) {
+                                            indicators.push(`<span class="inline-flex items-center px-1 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400"><i class="fas fa-layer-group mr-1"></i>${pyramidCount}</span>`);
+                                        }
+                                        if (trailingCount > 0) {
+                                            indicators.push(`<span class="inline-flex items-center px-1 py-0.5 rounded text-xs bg-purple-500/20 text-purple-400"><i class="fas fa-chart-line mr-1"></i>${trailingCount}</span>`);
+                                        }
+                                        
                                         return `
-                                            <tr class="border-b border-slate-800 hover:bg-slate-800/50">
-                                                <td class="py-3 px-2 font-bold">${position.symbol}</td>
+                                            <tr class="border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                                                onclick="dashboard.showOrdersDialog('${position.id}', '${position.symbol}')">
+                                                <td class="py-3 px-2 font-bold">
+                                                    ${position.symbol}
+                                                    ${indicators.length > 0 ? '<br>' + indicators.join(' ') : ''}
+                                                </td>
                                                 <td class="py-3 px-2"><span class="px-2 py-1 rounded text-xs font-bold ${sideClass === 'positive' ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">${positionType}</span></td>
                                                 <td class="py-3 px-2 text-sm">${position.strategy || position.strategy_name || 'Manual'}</td>
                                                 <td class="py-3 px-2 font-mono">
@@ -2455,8 +2491,27 @@
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Escape') {
                         this.closeReadme();
+                        this.closeOrdersDialog();
                     }
                 });
+                
+                // Orders modal close button
+                const closeOrdersModalBtn = document.getElementById('closeOrdersModal');
+                if (closeOrdersModalBtn) {
+                    closeOrdersModalBtn.addEventListener('click', () => {
+                        this.closeOrdersDialog();
+                    });
+                }
+                
+                // Orders modal backdrop click
+                const ordersModal = document.getElementById('ordersModal');
+                if (ordersModal) {
+                    ordersModal.addEventListener('click', (e) => {
+                        if (e.target === ordersModal) {
+                            this.closeOrdersDialog();
+                        }
+                    });
+                }
                 
                 // Page visibility handlers
                 document.addEventListener('visibilitychange', () => {
@@ -2627,6 +2682,272 @@
                 }
             }
             
+            // Orders Dialog Functions
+            async showOrdersDialog(positionId, symbol) {
+                console.log('📋 Showing orders dialog for position:', positionId, symbol);
+                
+                // Set modal title
+                const symbolElement = document.getElementById('ordersModalSymbol');
+                if (symbolElement) {
+                    symbolElement.textContent = symbol;
+                }
+                
+                // Show loading state
+                const container = document.getElementById('ordersTableContainer');
+                container.innerHTML = `
+                    <div class="text-center text-slate-400 py-8">
+                        <i class="fas fa-spinner animate-spin text-2xl mb-2"></i>
+                        <p>Loading orders for ${symbol}...</p>
+                    </div>
+                `;
+                
+                // Show modal
+                const modal = document.getElementById('ordersModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
+                
+                try {
+                    // Find position data for summary
+                    await this.loadPositionSummary(positionId, symbol);
+                    
+                    // Load orders
+                    await this.loadPositionOrders(positionId);
+                    
+                } catch (error) {
+                    console.error('Error loading position orders:', error);
+                    container.innerHTML = `
+                        <div class="text-center text-red-400 py-8">
+                            <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                            <p>Failed to load orders</p>
+                            <p class="text-sm mt-2">${error.message}</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            async loadPositionSummary(positionId, symbol) {
+                const summaryContainer = document.getElementById('positionSummary');
+                
+                // Find position in current data
+                const positions = this.data.openPositions;
+                const positionsList = Array.isArray(positions) ? positions : (positions.open_positions || []);
+                const position = positionsList.find(p => p.id === positionId);
+                
+                if (!position) {
+                    summaryContainer.innerHTML = `
+                        <div class="text-slate-400 text-sm">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Position data not available
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const pnl = parseFloat(position.pnl || 0);
+                const pnlClass = pnl >= 0 ? 'text-green-400' : 'text-red-400';
+                const pnlSymbol = pnl >= 0 ? '+' : '';
+                
+                const pyramidCount = position.pyramid_count || 0;
+                const trailingCount = position.trailing_count || 0;
+                const realizedPnl = parseFloat(position.realized_pnl || 0);
+                
+                summaryContainer.innerHTML = `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <div class="text-slate-400">Entry Price</div>
+                            <div class="font-bold text-slate-100">$${this.formatPrice(position.average_entry_price || position.entry_price || 0)}</div>
+                            ${position.average_entry_price && position.entry_price && position.average_entry_price !== position.entry_price ? 
+                                `<div class="text-xs text-blue-400">Avg of ${pyramidCount + 1} entries</div>` : ''}
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <div class="text-slate-400">Current Price</div>
+                            <div class="font-bold text-slate-100">$${this.formatPrice(position.current_price || position.entry_price || 0)}</div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <div class="text-slate-400">Quantity</div>
+                            <div class="font-bold text-slate-100">${this.formatNumber(position.remaining_quantity || position.quantity || 0)}</div>
+                            ${position.total_quantity && position.total_quantity !== position.quantity ? 
+                                `<div class="text-xs text-purple-400">of ${this.formatNumber(position.total_quantity)} total</div>` : ''}
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <div class="text-slate-400">PnL</div>
+                            <div class="font-bold ${pnlClass}">${pnlSymbol}$${Math.abs(pnl).toFixed(2)}</div>
+                            ${realizedPnl !== 0 ? 
+                                `<div class="text-xs text-green-400">+$${realizedPnl.toFixed(2)} realized</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    ${pyramidCount > 0 || trailingCount > 0 ? `
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            ${pyramidCount > 0 ? 
+                                `<span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-500/20 text-blue-400">
+                                    <i class="fas fa-layer-group mr-2"></i>
+                                    ${pyramidCount} Pyramid${pyramidCount > 1 ? 's' : ''}
+                                </span>` : ''}
+                            ${trailingCount > 0 ? 
+                                `<span class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-500/20 text-purple-400">
+                                    <i class="fas fa-chart-line mr-2"></i>
+                                    ${trailingCount} Trailing Exit${trailingCount > 1 ? 's' : ''}
+                                </span>` : ''}
+                        </div>
+                    ` : ''}
+                `;
+            }
+            
+            async loadPositionOrders(positionId) {
+                try {
+                    const response = await fetch(`/api/orders/position/${positionId}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    const orders = data.orders || [];
+                    
+                    this.renderOrdersTable(orders);
+                    
+                } catch (error) {
+                    console.error('Error loading position orders:', error);
+                    throw error;
+                }
+            }
+            
+            renderOrdersTable(orders) {
+                const container = document.getElementById('ordersTableContainer');
+                
+                if (!orders || orders.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center text-slate-400 py-8">
+                            <i class="fas fa-inbox text-2xl mb-2"></i>
+                            <p>No orders found for this position</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Sort orders by time (newest first)
+                const sortedOrders = orders.sort((a, b) => {
+                    const timeA = new Date(a.execution_time || a.order_time);
+                    const timeB = new Date(b.execution_time || b.order_time);
+                    return timeB - timeA;
+                });
+                
+                container.innerHTML = `
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-700">
+                                    <th class="text-left py-3 px-4 font-semibold text-slate-300">Time</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-slate-300">Type</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-slate-300">Status</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-slate-300">Price</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-slate-300">Quantity</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-slate-300">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sortedOrders.map((order, index) => {
+                                    const orderTime = order.execution_time || order.order_time;
+                                    const formattedTime = orderTime ? new Date(orderTime).toLocaleString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit'
+                                    }) : 'N/A';
+                                    
+                                    const orderType = order.order_type || 'UNKNOWN';
+                                    const status = order.status || 'PENDING';
+                                    
+                                    // Status styling
+                                    let statusClass = 'text-yellow-400';
+                                    let statusIcon = 'fa-clock';
+                                    if (status === 'EXECUTED') {
+                                        statusClass = 'text-green-400';
+                                        statusIcon = 'fa-check-circle';
+                                    } else if (status === 'FAILED' || status === 'CANCELLED') {
+                                        statusClass = 'text-red-400';
+                                        statusIcon = 'fa-times-circle';
+                                    }
+                                    
+                                    // Order type styling
+                                    let typeClass = 'bg-slate-600/30 text-slate-300';
+                                    let typeIcon = 'fa-question';
+                                    
+                                    switch (orderType) {
+                                        case 'BUY':
+                                            typeClass = 'bg-green-500/20 text-green-400';
+                                            typeIcon = 'fa-arrow-up';
+                                            break;
+                                        case 'SELL':
+                                            typeClass = 'bg-red-500/20 text-red-400';
+                                            typeIcon = 'fa-arrow-down';
+                                            break;
+                                        case 'PYRAMID_ADD':
+                                            typeClass = 'bg-blue-500/20 text-blue-400';
+                                            typeIcon = 'fa-layer-group';
+                                            break;
+                                        case 'TRAILING_CLOSE':
+                                            typeClass = 'bg-purple-500/20 text-purple-400';
+                                            typeIcon = 'fa-chart-line';
+                                            break;
+                                        case 'STOP_LOSS':
+                                            typeClass = 'bg-orange-500/20 text-orange-400';
+                                            typeIcon = 'fa-shield-alt';
+                                            break;
+                                        case 'TARGET':
+                                            typeClass = 'bg-cyan-500/20 text-cyan-400';
+                                            typeIcon = 'fa-bullseye';
+                                            break;
+                                    }
+                                    
+                                    const price = order.executed_price || order.price || 0;
+                                    const quantity = order.executed_quantity || order.quantity || 0;
+                                    const notes = order.notes || '';
+                                    
+                                    return `
+                                        <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                                            <td class="py-3 px-4 text-slate-300 font-mono text-xs">
+                                                ${formattedTime}
+                                            </td>
+                                            <td class="py-3 px-4">
+                                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${typeClass}">
+                                                    <i class="fas ${typeIcon} mr-1"></i>
+                                                    ${orderType.replace('_', ' ')}
+                                                </span>
+                                            </td>
+                                            <td class="py-3 px-4">
+                                                <span class="inline-flex items-center text-xs font-medium ${statusClass}">
+                                                    <i class="fas ${statusIcon} mr-1"></i>
+                                                    ${status}
+                                                </span>
+                                            </td>
+                                            <td class="py-3 px-4 font-mono text-slate-100">
+                                                ${price > 0 ? '$' + this.formatPrice(price) : 'N/A'}
+                                            </td>
+                                            <td class="py-3 px-4 font-mono text-slate-100">
+                                                ${quantity > 0 ? this.formatNumber(quantity) : 'N/A'}
+                                            </td>
+                                            <td class="py-3 px-4 text-slate-400 text-xs max-w-xs truncate" title="${notes}">
+                                                ${notes || 'No notes'}
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            closeOrdersDialog() {
+                const modal = document.getElementById('ordersModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            }
+            
             flashUpdateIndicator(indicatorId) {
                 const indicator = document.getElementById(indicatorId);
                 if (indicator) {
@@ -2755,5 +3076,53 @@
             }
         };
     </script>
+
+    <!-- Orders Dialog Modal -->
+    <div id="ordersModal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 backdrop-blur-sm">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="glass-card rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-slate-100 flex items-center gap-3">
+                        <i class="fas fa-list-ul text-primary-400"></i>
+                        Position Orders
+                        <span id="ordersModalSymbol" class="text-primary-400 font-mono"></span>
+                    </h2>
+                    <button id="closeOrdersModal" class="text-slate-400 hover:text-slate-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-4 flex flex-wrap gap-2" id="positionSummary">
+                    <!-- Position summary will be populated here -->
+                </div>
+                
+                <div class="max-h-[60vh] overflow-y-auto scroll-container">
+                    <div id="ordersTableContainer">
+                        <div class="text-center text-slate-400 py-8">
+                            <i class="fas fa-spinner animate-spin text-2xl mb-2"></i>
+                            <p>Loading orders...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-slate-700 text-xs text-slate-400">
+                    <div class="flex flex-wrap gap-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                            <span>Executed</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                            <span>Pending</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span>Failed/Cancelled</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

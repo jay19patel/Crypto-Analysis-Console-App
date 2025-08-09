@@ -53,6 +53,19 @@ class Settings(BaseSettings):
     PORTFOLIO_HIGH_RISK_MARGIN_PCT: float = Field(default=80.0)  # Portfolio high risk threshold (RENAMED to avoid duplicate)
     MAX_PORTFOLIO_RISK_PCT: float = Field(default=80.0)      # Maximum portfolio risk percentage (anti-overtrade)
     
+    # Pyramiding Settings
+    ENABLE_PYRAMIDING: bool = Field(default=True)            # Enable pyramiding feature
+    PYRAMIDING_MIN_CONFIDENCE: float = Field(default=90.0)   # Minimum confidence required for pyramiding
+    PYRAMIDING_ADD_PERCENTAGE: float = Field(default=50.0)   # Percentage of original quantity to add (50% = 0.5x)
+    PYRAMIDING_MAX_ADDS: int = Field(default=3)              # Maximum number of pyramiding adds allowed per position
+    
+    # Trailing Stop Settings
+    ENABLE_TRAILING: bool = Field(default=True)              # Enable trailing stop feature
+    TRAILING_EXIT_PERCENTAGE: float = Field(default=50.0)    # Percentage to exit on target hit (50% = half position)
+    TRAILING_STOP_OFFSET: float = Field(default=0.5)         # Trailing stop offset percentage (0.5%)
+    TRAILING_TARGET_OFFSET: float = Field(default=1.0)       # Trailing target offset percentage (1.0%)
+    TRAILING_MAX_COUNT: int = Field(default=5)               # Maximum number of trailing exits allowed
+    
     # Trading Fee Settings
     TRADING_FEE_PCT: float = Field(default=0.001)  # 0.1% of margin
     EXIT_FEE_MULTIPLIER: float = Field(default=0.5)  # Exit fee is 50% of entry fee
@@ -78,6 +91,17 @@ class Settings(BaseSettings):
     FASTAPI_MAIL_SERVER: str = Field(default="smtp.gmail.com")
     FASTAPI_MAIL_STARTTLS: bool = Field(default=True)
     FASTAPI_MAIL_SSL_TLS: bool = Field(default=False)
+    
+    # Pyramiding Settings
+    PYRAMIDING_ENABLED: bool = Field(default=False)  # Enable pyramiding
+    PYRAMIDING_ADD_PERCENTAGE: float = Field(default=0.5)  # Add 50% of original quantity
+    PYRAMIDING_MIN_CONFIDENCE: float = Field(default=90.0)  # Minimum 90% confidence for adding
+    
+    # Trailing Settings  
+    TRAILING_ENABLED: bool = Field(default=False)  # Enable trailing
+    TRAILING_REDUCE_PERCENTAGE: float = Field(default=0.5)  # Reduce 50% on target hit
+    TRAILING_STOP_LOSS_PCT: float = Field(default=0.005)  # 0.5% stop loss from current price
+    TRAILING_TARGET_PCT: float = Field(default=0.01)  # 1% target from current price
     
     # Active Strategies
     STRATEGY_CLASSES: List[str] = Field(default=["EMAStrategy", "RSIStrategy"])
@@ -122,6 +146,19 @@ def get_trading_config() -> dict:
         "exit_fee_multiplier": settings.EXIT_FEE_MULTIPLIER,
         "max_positions_open": settings.MAX_POSITIONS_OPEN,
         
+        # Pyramiding settings
+        "enable_pyramiding": settings.ENABLE_PYRAMIDING,
+        "pyramiding_min_confidence": settings.PYRAMIDING_MIN_CONFIDENCE,
+        "pyramiding_add_percentage": settings.PYRAMIDING_ADD_PERCENTAGE,
+        "pyramiding_max_adds": settings.PYRAMIDING_MAX_ADDS,
+        
+        # Trailing settings
+        "enable_trailing": settings.ENABLE_TRAILING,
+        "trailing_exit_percentage": settings.TRAILING_EXIT_PERCENTAGE,
+        "trailing_stop_offset": settings.TRAILING_STOP_OFFSET,
+        "trailing_target_offset": settings.TRAILING_TARGET_OFFSET,
+        "trailing_max_count": settings.TRAILING_MAX_COUNT,
+        
         # Emergency Close Thresholds
         "emergency_close_margin_pct": settings.EMERGENCY_CLOSE_MARGIN_PCT,
         "emergency_close_loss_pct": settings.EMERGENCY_CLOSE_LOSS_PCT,
@@ -142,7 +179,18 @@ def get_trading_config() -> dict:
         
         "max_portfolio_risk_pct": settings.MAX_PORTFOLIO_RISK_PCT,
         "high_risk_margin_pct": settings.HIGH_RISK_MARGIN_PCT,  # Individual position risk
-        "portfolio_high_risk_margin_pct": settings.PORTFOLIO_HIGH_RISK_MARGIN_PCT  # Portfolio level risk
+        "portfolio_high_risk_margin_pct": settings.PORTFOLIO_HIGH_RISK_MARGIN_PCT,  # Portfolio level risk
+        
+        # Pyramiding Settings
+        "pyramiding_enabled": settings.PYRAMIDING_ENABLED,
+        "pyramiding_add_percentage": settings.PYRAMIDING_ADD_PERCENTAGE,
+        "pyramiding_min_confidence": settings.PYRAMIDING_MIN_CONFIDENCE,
+        
+        # Trailing Settings
+        "trailing_enabled": settings.TRAILING_ENABLED,
+        "trailing_reduce_percentage": settings.TRAILING_REDUCE_PERCENTAGE,
+        "trailing_stop_loss_pct": settings.TRAILING_STOP_LOSS_PCT,
+        "trailing_target_pct": settings.TRAILING_TARGET_PCT
     }
 
 
