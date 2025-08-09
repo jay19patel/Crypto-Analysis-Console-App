@@ -892,7 +892,7 @@ class TradingSystem:
                 # Check if position already exists
                 has_open_position = self.broker.has_open_position_for_symbol(symbol)
                 
-                if has_open_position and self.trading_config.get("pyramiding_enabled", False):
+                if has_open_position and self.trading_config.get("enable_pyramiding", True):
                     # Pyramiding logic - check if we should add to existing position
                     existing_position = self.broker.get_open_position_for_symbol(symbol)
                     
@@ -1259,7 +1259,7 @@ class TradingSystem:
             self.logger.info(f"🔺 Executing pyramiding for {signal.symbol}")
             
             # Calculate add quantity as percentage of original position
-            add_percentage = self.trading_config.get("pyramiding_add_percentage", 0.5)
+            add_percentage = self.trading_config.get("pyramiding_add_percentage", 50.0) / 100.0
             original_quantity = existing_position.original_quantity if existing_position.original_quantity > 0 else existing_position.quantity
             add_quantity = original_quantity * add_percentage
             

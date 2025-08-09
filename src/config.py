@@ -93,8 +93,8 @@ class Settings(BaseSettings):
     FASTAPI_MAIL_SSL_TLS: bool = Field(default=False)
     
     # Pyramiding Settings
-    PYRAMIDING_ENABLED: bool = Field(default=False)  # Enable pyramiding
-    PYRAMIDING_ADD_PERCENTAGE: float = Field(default=0.5)  # Add 50% of original quantity
+    PYRAMIDING_ENABLED: bool = Field(default=True)  # Enable pyramiding
+    PYRAMIDING_ADD_PERCENTAGE: float = Field(default=50.0)  # Add 50% of original quantity
     PYRAMIDING_MIN_CONFIDENCE: float = Field(default=90.0)  # Minimum 90% confidence for adding
     
     # Trailing Settings  
