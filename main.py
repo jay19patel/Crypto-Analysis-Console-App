@@ -128,7 +128,7 @@ Examples:
     parser.add_argument(
         "--new", 
         action="store_true", 
-        help="Complete cleanup: Delete all trading data, logs, cache files and start fresh"
+        help="System cleanup: Delete trading databases (orders, positions, notifications, etc.) and start fresh"
     )
     
     parser.add_argument(
@@ -430,13 +430,13 @@ async def main():
         
         # Handle --new flag (complete cleanup)
         if args.new:
-            logger.info("🗑️ Starting complete cleanup (--new flag)...")
-            logger.info("   This will clear: Database, Logs, Cache files, Python cache")
+            logger.info("🗑️ Starting system database cleanup (--new flag)...")
+            logger.info("   This will clear: System databases (orders, positions, notifications, etc.)")
             cleanup_success = await trading_system.delete_all_data()
             if cleanup_success:
-                logger.info("✅ Complete cleanup completed successfully")
+                logger.info("✅ System database cleanup completed successfully")
             else:
-                logger.error("❌ Complete cleanup failed")
+                logger.error("❌ System database cleanup failed")
                 return 1
         
         # Start the trading system

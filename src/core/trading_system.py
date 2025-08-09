@@ -1639,13 +1639,10 @@ class TradingSystem:
             self._record_error(str(e))
 
     async def delete_all_data(self) -> bool:
-        """Delete ALL trading data, logs, cache files with COMPREHENSIVE cleanup
+        """Delete system trading data with targeted cleanup
         
-        This method performs complete system cleanup including:
-        - All MongoDB collections (accounts, positions, trades, signals, liveprice, notifications, websocket_clients, etc.)
-        - All log files
-        - All cache files  
-        - Python cache files (__pycache__, .pyc)
+        This method performs targeted system cleanup including:
+        - System MongoDB collections (accounts, positions, orders, signals, liveprice, notifications, websocket_clients, etc.)
         - In-memory data reset
         """
         try:
@@ -1654,10 +1651,10 @@ class TradingSystem:
             self.logger.info("🗑️ This will delete ALL data and start fresh!")
             self.logger.info("🗑️" * 20)
             
-            # Step 1: Delete ALL database collections (comprehensive)
-            self.logger.info("🗑️ STEP 1: Deleting ALL database collections...")
-            self.logger.info("   📋 This includes: accounts, positions, trades, signals,")
-            self.logger.info("   📋 liveprice, notifications, websocket_clients, and more")
+            # Step 1: Delete system database collections
+            self.logger.info("🗑️ STEP 1: Deleting system database collections...")
+            self.logger.info("   📋 This includes: accounts, positions, orders, signals,")
+            self.logger.info("   📋 liveprice, notifications, websocket_clients")
             
             db_success = await self.broker.delete_all_data()
             
@@ -1668,23 +1665,8 @@ class TradingSystem:
             else:
                 self.logger.info("✅ STEP 1: Database collections deleted successfully")
             
-            # Step 2: Clear ALL log files
-            self.logger.info("🗑️ STEP 2: Clearing ALL log files...")
-            self.logger.info("   📋 Deleting: trading.log, debug.log, error.log, etc.")
-            logs_cleared = self._clear_directory("logs", "log files")
-            
-            # Step 3: Clear ALL cache directories
-            self.logger.info("🗑️ STEP 3: Clearing ALL cache directories...")  
-            self.logger.info("   📋 Deleting: cache/, temp/, __pycache__/")
-            cache_cleared = self._clear_directory("cache", "cache files")
-            
-            # Step 4: Clear Python cache files recursively
-            self.logger.info("🗑️ STEP 4: Clearing Python cache files recursively...")
-            self.logger.info("   📋 Deleting: __pycache__/ folders and .pyc files")
-            pycache_cleared = self._clear_pycache_files()
-            
-            # Step 5: Reset ALL in-memory data and statistics
-            self.logger.info("🗑️ STEP 5: Resetting ALL in-memory data...")
+            # Step 2: Reset ALL in-memory data and statistics
+            self.logger.info("🗑️ STEP 2: Resetting ALL in-memory data...")
             self._stats.update({
                 "trades_executed": 0,
                 "trades_successful": 0, 
@@ -1709,10 +1691,10 @@ class TradingSystem:
             with self.market_data_lock:
                 self.current_market_data.clear()
             
-            self.logger.info("✅ STEP 5: In-memory data reset completed")
+            self.logger.info("✅ STEP 2: In-memory data reset completed")
             
-            # Step 6: Clear WebSocket connections (if active)
-            self.logger.info("🗑️ STEP 6: Clearing WebSocket connections...")
+            # Step 3: Clear WebSocket connections (if active)
+            self.logger.info("🗑️ STEP 3: Clearing WebSocket connections...")
             websocket_cleared = True
             try:
                 if hasattr(self, 'websocket_server') and self.websocket_server:
@@ -1730,34 +1712,31 @@ class TradingSystem:
                         "System Reset"
                     )
                     
-                self.logger.info("✅ STEP 6: WebSocket cleanup completed")
+                self.logger.info("✅ STEP 3: WebSocket cleanup completed")
             except Exception as e:
-                self.logger.warning(f"⚠️ STEP 6: WebSocket cleanup had issues: {e}")
+                self.logger.warning(f"⚠️ STEP 3: WebSocket cleanup had issues: {e}")
                 websocket_cleared = False
             
             # Final cleanup summary
             cleanup_summary = {
                 "database_collections": "✅" if db_success else "❌",
-                "log_files": "✅" if logs_cleared else "❌", 
-                "cache_directories": "✅" if cache_cleared else "❌",
-                "python_cache": "✅" if pycache_cleared else "❌",
                 "websocket_connections": "✅" if websocket_cleared else "❌",
                 "memory_data": "✅"  # This always succeeds
             }
             
-            all_success = all([db_success, logs_cleared, cache_cleared, pycache_cleared, websocket_cleared])
+            all_success = all([db_success, websocket_cleared])
             
             if all_success:
                 self.logger.info("🎉" * 20)
-                self.logger.info("🎉 COMPREHENSIVE CLEANUP COMPLETED SUCCESSFULLY!")
+                self.logger.info("🎉 SYSTEM DATABASE CLEANUP COMPLETED SUCCESSFULLY!")
                 self.logger.info("🎉" * 20)
                 self.logger.info("📋 CLEANUP SUMMARY:")
                 for component, status in cleanup_summary.items():
                     self.logger.info(f"   {status} {component.replace('_', ' ').title()}")
                 
                 self.logger.info("")
-                self.logger.info("🚀 SYSTEM IS NOW COMPLETELY CLEAN!")
-                self.logger.info("🚀 Ready for fresh start with --new flag")
+                self.logger.info("🚀 SYSTEM DATABASE IS NOW CLEAN!")
+                self.logger.info("🚀 Ready for fresh start")
                 self.logger.info("🗑️" * 20)
                 
                 return True

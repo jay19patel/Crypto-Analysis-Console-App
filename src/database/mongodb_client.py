@@ -40,7 +40,6 @@ class AsyncMongoDBClient:
         # Collection names
         self.accounts_collection = "accounts"
         self.positions_collection = "positions"
-        self.trades_collection = "trades"
         self.orders_collection = "orders"
         self.liveprice = "liveprice"
         self.notifications  = "notifications"
@@ -107,10 +106,6 @@ class AsyncMongoDBClient:
             await self.db[self.positions_collection].create_index("status")
             await self.db[self.positions_collection].create_index("entry_time")
             
-            # Create indexes for trades collection
-            await self.db[self.trades_collection].create_index("id", unique=True)
-            await self.db[self.trades_collection].create_index("symbol")
-            await self.db[self.trades_collection].create_index("timestamp")
             
             # Create indexes for analysis collection
             await self.db[self.analysis_collection].create_index("timestamp")
@@ -244,7 +239,7 @@ class AsyncMongoDBClient:
         try:
             # Delete all collections
             collections = [self.accounts_collection, self.positions_collection, 
-                         self.trades_collection, self.liveprice,self.notifications,self.signals_collection]
+                         self.orders_collection, self.liveprice,self.notifications,self.signals_collection]
             
             for collection in collections:
                 await self.delete_collection(collection)
@@ -317,38 +312,6 @@ class AsyncMongoDBClient:
             self.log_message(f"Error deleting position: {e}", "error")
             return False
 
-    # Trade Management
-    async def save_trade(self, trade_data: Dict[str, Any]) -> bool:
-        """Save trade data to MongoDB"""
-        try:
-            # Ensure trade has timestamp
-            if "timestamp" not in trade_data:
-                trade_data["timestamp"] = datetime.now(timezone.utc).isoformat()
-            
-            return await self.insert_document(self.trades_collection, trade_data)
-        except Exception as e:
-            self.log_message(f"Error saving trade: {e}", "error")
-            return False
-
-    async def load_trades(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """Load recent trades from MongoDB"""
-        try:
-            if not self.is_connected:
-                if not await self.connect():
-                    return []
-                
-            cursor = self.db[self.trades_collection].find().sort("timestamp", -1).limit(limit)
-            trades = await cursor.to_list(length=None)
-            
-            # Convert ObjectId to string
-            for trade in trades:
-                if '_id' in trade:
-                    trade['_id'] = str(trade['_id'])
-            
-            return trades
-        except Exception as e:
-            self.log_message(f"Error loading trades: {e}", "error")
-            return []
 
     # Signal Management
     async def save_signal(self, signal_data: Dict[str, Any]) -> bool:
@@ -557,13 +520,11 @@ class AsyncMongoDBClient:
         cutoff = datetime.now(timezone.utc).timestamp() - days * 86400
         cutoff_iso = datetime.fromtimestamp(cutoff, tz=timezone.utc).isoformat()
         try:
-            # Remove old trades
-            result_trades = await self.db[self.trades_collection].delete_many({"timestamp": {"$lt": cutoff_iso}})
             # Remove old positions
             result_positions = await self.db[self.positions_collection].delete_many({"exit_time": {"$lt": cutoff_iso}})
             # Remove old notifications
             result_notifications = await self.db[self.notifications].delete_many({"timestamp": {"$lt": cutoff_iso}})
-            self.log_message(f"Cleanup complete: {result_trades.deleted_count} trades, {result_positions.deleted_count} positions, {result_notifications.deleted_count} notifications deleted.", "info")
+            self.log_message(f"Cleanup complete: {result_positions.deleted_count} positions, {result_notifications.deleted_count} notifications deleted.", "info")
         except Exception as e:
             self.log_message(f"Error during cleanup: {e}", "error")
 

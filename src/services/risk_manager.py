@@ -368,13 +368,42 @@ class AsyncRiskManager:
             # Calculate total portfolio value (balance + unrealized PnL)
             total_portfolio_value = account_balance + total_unrealized_pnl
             
-            # Portfolio return percentage from initial balance
+            # Calculate portfolio return based on current account balance (not initial balance)
+            # This gives us the current session risk, which is more relevant for risk management
             initial_balance = self.broker.account.initial_balance
-            portfolio_return_pct = ((total_portfolio_value - initial_balance) / initial_balance) * 100 if initial_balance > 0 else 0
+            current_balance = self.broker.account.current_balance
             
+            # Use current account balance as baseline instead of initial balance
+            # This makes more sense for risk management of active positions
+            if current_balance > 0:
+                portfolio_return_pct = ((total_portfolio_value - current_balance) / current_balance) * 100
+            else:
+                portfolio_return_pct = 0.0
+            
+            # For risk management, we care about current drawdown, not historical performance
+            # So we'll use total unrealized PnL percentage as the main risk metric
+            current_session_risk_pct = portfolio_pnl_percentage  # This is already calculated above
+            
+            # Log all values for debugging
+            self.logger.debug(f"💰 Balance Comparison:")
+            self.logger.debug(f"  Initial Balance: ${initial_balance:,.2f}")
+            self.logger.debug(f"  Current Balance: ${current_balance:,.2f}")
+            self.logger.debug(f"  Total Portfolio Value: ${total_portfolio_value:,.2f}")
+            self.logger.debug(f"  Portfolio Return: {portfolio_return_pct:.2f}%")
+            self.logger.debug(f"  Current Session Risk: {current_session_risk_pct:.2f}%")
+            
+            # Debug all values before risk level determination
+            self.logger.debug(f"Risk level inputs:")
+            self.logger.debug(f"  portfolio_margin_usage: {portfolio_margin_usage:.2f}%")
+            self.logger.debug(f"  portfolio_pnl_percentage: {portfolio_pnl_percentage:.2f}%")
+            self.logger.debug(f"  current_session_risk_pct: {current_session_risk_pct:.2f}%")
+            self.logger.debug(f"  effective_portfolio_risk: {effective_portfolio_risk:.2f}%")
+            self.logger.debug(f"  critical_positions: {critical_positions}")
+            self.logger.debug(f"  high_risk_positions: {high_risk_positions}")
+
             # Smart portfolio risk level determination (now uses improved calculation)
             overall_risk = self._determine_portfolio_risk_level(
-                portfolio_margin_usage, portfolio_pnl_percentage, portfolio_return_pct,
+                portfolio_margin_usage, portfolio_pnl_percentage, current_session_risk_pct,
                 critical_positions, high_risk_positions, len(open_positions),
                 effective_portfolio_risk  # Pass the new combined risk metric
             )
@@ -781,7 +810,7 @@ class AsyncRiskManager:
             }
     
     def _determine_portfolio_risk_level(self, portfolio_margin_usage: float, portfolio_pnl_percentage: float, 
-                                       portfolio_return_pct: float, critical_positions: int, 
+                                       current_session_risk_pct: float, critical_positions: int, 
                                        high_risk_positions: int, total_positions: int, 
                                        effective_portfolio_risk: float = None) -> RiskLevel:
         """Smart portfolio risk level determination based on CORRECTED thresholds
@@ -801,36 +830,57 @@ class AsyncRiskManager:
             self.logger.debug(f"Portfolio risk assessment:")
             self.logger.debug(f"  Pure margin usage: {portfolio_margin_usage:.1f}%")
             self.logger.debug(f"  PnL impact: {portfolio_pnl_percentage:.1f}%")
+            self.logger.debug(f"  Current session risk: {current_session_risk_pct:.1f}%")
             self.logger.debug(f"  Effective risk: {primary_risk_metric:.1f}%")
             self.logger.debug(f"  High risk threshold: {high_risk_margin:.1f}%")
             
             # LIQUIDATION PROTECTION - CRITICAL RISK CONDITIONS
             liquidation_threshold = 92.0  # Very close to liquidation (95%+ = liquidation)
-            emergency_loss_threshold = config.get("critical_risk_loss_pct", 35.0)  # 35% loss = emergency
+            emergency_loss_threshold = config.get("critical_risk_loss_pct", 12.0)  # Use correct default from config
             
             if (portfolio_margin_usage >= liquidation_threshold or  # Near liquidation - EMERGENCY
                 portfolio_pnl_percentage < -emergency_loss_threshold or  # Major losses - EMERGENCY
-                portfolio_return_pct < -40.0):  # Severe portfolio decline
-                self.logger.warning(f"🚨 LIQUIDATION RISK - CRITICAL: margin={portfolio_margin_usage:.1f}%, pnl={portfolio_pnl_percentage:.1f}%")
+                current_session_risk_pct < -25.0):  # Severe current session drawdown (25% is realistic)
+                # Debug which condition triggered
+                triggers = []
+                if portfolio_margin_usage >= liquidation_threshold:
+                    triggers.append(f"margin({portfolio_margin_usage:.1f}% >= {liquidation_threshold}%)")
+                if portfolio_pnl_percentage < -emergency_loss_threshold:
+                    triggers.append(f"pnl({portfolio_pnl_percentage:.1f}% < -{emergency_loss_threshold}%)")
+                if current_session_risk_pct < -25.0:
+                    triggers.append(f"session_risk({current_session_risk_pct:.1f}% < -25%)")
+                
+                self.logger.warning(f"🚨 LIQUIDATION RISK - CRITICAL: margin={portfolio_margin_usage:.1f}%, pnl={portfolio_pnl_percentage:.1f}% | Triggers: {', '.join(triggers)}")
                 return RiskLevel.CRITICAL
             
             # LIQUIDATION-BASED HIGH RISK CONDITIONS
             liquidation_risk_threshold = 85.0  # Close to liquidation
-            significant_loss_threshold = config.get("high_risk_loss_pct", 25.0)  # 25% loss is significant
+            significant_loss_threshold = config.get("high_risk_loss_pct", 8.0)  # Use correct default from config (8% not 25%)
+            
+            self.logger.debug(f"HIGH RISK thresholds: margin>={liquidation_risk_threshold}%, pnl<-{significant_loss_threshold}%, session_risk<-15%")
             
             if (portfolio_margin_usage >= liquidation_risk_threshold or  # Near liquidation
                 portfolio_pnl_percentage < -significant_loss_threshold or  # Major loss
-                portfolio_return_pct < -30.0):  # Severe portfolio decline
-                self.logger.info(f"HIGH RISK triggered: margin={portfolio_margin_usage:.1f}%, pnl={portfolio_pnl_percentage:.1f}%")
+                current_session_risk_pct < -15.0):  # Significant current session drawdown (15% is realistic)
+                # Debug which condition triggered HIGH RISK
+                triggers = []
+                if portfolio_margin_usage >= liquidation_risk_threshold:
+                    triggers.append(f"margin({portfolio_margin_usage:.1f}% >= {liquidation_risk_threshold}%)")
+                if portfolio_pnl_percentage < -significant_loss_threshold:
+                    triggers.append(f"pnl({portfolio_pnl_percentage:.1f}% < -{significant_loss_threshold}%)")
+                if current_session_risk_pct < -15.0:
+                    triggers.append(f"session_risk({current_session_risk_pct:.1f}% < -15%)")
+                
+                self.logger.info(f"HIGH RISK triggered: margin={portfolio_margin_usage:.1f}%, pnl={portfolio_pnl_percentage:.1f}%, session_risk={current_session_risk_pct:.1f}% | Triggers: {', '.join(triggers)}")
                 return RiskLevel.HIGH
             
             # LIQUIDATION-BASED MEDIUM RISK CONDITIONS  
             medium_risk_margin = 70.0  # Approaching higher margin usage
-            moderate_loss_threshold = config.get("medium_risk_loss_pct", 15.0)  # 15% loss needs attention
+            moderate_loss_threshold = config.get("medium_risk_loss_pct", 5.0)  # Use correct default from config (5% not 15%)
             
             if (portfolio_margin_usage >= medium_risk_margin or  # High margin usage
                 portfolio_pnl_percentage < -moderate_loss_threshold or  # Moderate losses
-                portfolio_return_pct < -20.0):  # Portfolio decline
+                current_session_risk_pct < -10.0):  # Moderate current session drawdown (10% is realistic)
                 return RiskLevel.MEDIUM
             
             # Low risk (healthy portfolio)

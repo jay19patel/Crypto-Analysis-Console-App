@@ -131,6 +131,14 @@ class AsyncBroker:
             if account_data:
                 self.account = Account.from_dict(account_data)
                 self.logger.info(f"✅ Loaded existing account: {self.account.id}")
+                
+                # IMPORTANT: If initial_balance is 0 or not set, initialize from config
+                if not hasattr(self.account, 'initial_balance') or self.account.initial_balance <= 0:
+                    self.account.initial_balance = self.trading_config["initial_balance"]
+                    self.logger.info(f"📝 Set initial_balance from config: ${self.account.initial_balance:,.2f}")
+                
+                # Log current state for debugging
+                self.logger.info(f"💰 Account Balance - Initial: ${self.account.initial_balance:,.2f}, Current: ${self.account.current_balance:,.2f}")
             else:
                 # Create new account with config settings
                 self.account = Account()
@@ -138,6 +146,7 @@ class AsyncBroker:
                 self.account.name = "Trading Account Main"
                 self.account.initial_balance = self.trading_config["initial_balance"]
                 self.account.current_balance = self.trading_config["initial_balance"]
+                self.logger.info(f"🆕 Created new account with initial balance: ${self.account.initial_balance:,.2f}")
                 self.account.daily_trades_limit = self.trading_config["daily_trades_limit"]
                 self.account.max_leverage = self.trading_config["max_leverage"]
                 self.account.total_trades = 0
@@ -214,8 +223,6 @@ class AsyncBroker:
             if success:
                 trade_request.status = ExecutionStatus.COMPLETED
                 
-                # Save trade to MongoDB
-                await self.mongodb_client.save_trade(trade_request.to_dict())
                 
                 # Save updated account to MongoDB
                 await self.mongodb_client.save_account(self.account.to_dict())
@@ -995,7 +1002,7 @@ class AsyncBroker:
             return False
     
     async def check_trailing_opportunity(self, position: Position, current_price: float) -> bool:
-        """Check if we should partially close position (trailing)"""
+        """Check if we should partially close position (trailing) - only after target is hit and price moves favorably"""
         try:
             # Check if trailing is enabled
             if not self.trading_config.get("enable_trailing", True):
@@ -1011,9 +1018,24 @@ class AsyncBroker:
             if position.trailing_count >= max_trailing:
                 return False
             
-            # Check if target price is hit
-            if position.target and current_price >= position.target:
-                return True
+            # IMPORTANT: Only trail if target was actually hit first
+            if not position.target or current_price < position.target:
+                return False
+            
+            # For Long positions: Trail when price goes beyond target by trailing offset
+            # For Short positions: Trail when price goes below target by trailing offset
+            trailing_offset_pct = self.trading_config.get("trailing_target_offset", 1.0) / 100.0  # 1% default
+            
+            if position.position_type == PositionType.LONG:
+                # For Long: current price should be significantly above target to start trailing
+                trailing_trigger_price = position.target * (1 + trailing_offset_pct)
+                if current_price >= trailing_trigger_price:
+                    return True
+            else:  # SHORT position
+                # For Short: current price should be significantly below target to start trailing
+                trailing_trigger_price = position.target * (1 - trailing_offset_pct)
+                if current_price <= trailing_trigger_price:
+                    return True
             
             return False
             
